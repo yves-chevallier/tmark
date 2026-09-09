@@ -13,7 +13,7 @@ use tmark_markdown::mdast::{Node, TmarkMarkKind};
 use tmark_markdown::tmark::looks_like_attributes;
 
 use super::head::{parse_attrs, parse_ref_items, parse_role_head, RoleHead};
-use super::{plain_text, Ctx, Lowerer};
+use super::{decode_escapes, plain_text, Ctx, Lowerer};
 
 /// What a brace group is, decided by its text (spec §Roles: "a parser
 /// decides after reading one token").
@@ -272,20 +272,22 @@ impl Lowerer {
                 }
                 Node::TmarkArgument(n) => {
                     let span = self.span(ctx, n.position.as_ref());
-                    out.push(self.literal_text(span, ctx.slice(n.position.as_ref())));
+                    out.push(
+                        self.literal_text(span, decode_escapes(ctx.slice(n.position.as_ref()))),
+                    );
                 }
                 other => {
                     // MDX and anything unexpected: the source text, literally.
                     let position = other.position();
                     if position.is_some() {
                         let span = self.span(ctx, position);
-                        out.push(self.literal_text(span, ctx.slice(position)));
+                        out.push(self.literal_text(span, decode_escapes(ctx.slice(position))));
                     }
                 }
             }
         }
         Lowered {
-            inlines: out,
+            inlines: merge_strs(out),
             tail_attrs,
         }
     }
@@ -409,11 +411,15 @@ impl Lowerer {
                     span,
                     "attribute list with no host element",
                 );
-                out.push(self.literal_text(span, ctx.slice(node.position.as_ref())));
+                out.push(
+                    self.literal_text(span, decode_escapes(ctx.slice(node.position.as_ref()))),
+                );
             }
             BraceKind::Role(head) => self.lower_role(node, head, nodes, index, ctx, out),
             BraceKind::Literal => {
-                out.push(self.literal_text(span, ctx.slice(node.position.as_ref())));
+                out.push(
+                    self.literal_text(span, decode_escapes(ctx.slice(node.position.as_ref()))),
+                );
             }
         }
         None
@@ -442,7 +448,9 @@ impl Lowerer {
                     format!("`{}` is not a role; the brace group is literal", head.name),
                 );
             }
-            out.push(self.literal_text(head_span, ctx.slice(node.position.as_ref())));
+            out.push(
+                self.literal_text(head_span, decode_escapes(ctx.slice(node.position.as_ref()))),
+            );
             return;
         };
 
@@ -480,7 +488,9 @@ impl Lowerer {
                 head_span,
                 format!("role `{}` needs {what} right after its head", head.name),
             );
-            out.push(self.literal_text(head_span, ctx.slice(node.position.as_ref())));
+            out.push(
+                self.literal_text(head_span, decode_escapes(ctx.slice(node.position.as_ref()))),
+            );
             return;
         }
 
@@ -669,7 +679,10 @@ impl Lowerer {
                         // Deprecated `#{prefix:key}`: only for a declared
                         // prefix (design C16); otherwise literal text.
                         if !self.is_prefix(&prefix) {
-                            out.push(self.literal_text(span, ctx.slice(node.position.as_ref())));
+                            out.push(self.literal_text(
+                                span,
+                                decode_escapes(ctx.slice(node.position.as_ref())),
+                            ));
                             return;
                         }
                         self.deprecated(span, "#{prefix:key}", "#(prefix:key)");
@@ -819,4 +832,19 @@ fn doi_key(key: &str) -> String {
         }
     }
     key.to_string()
+}
+
+/// Adjacent `Str` nodes become one: the IR does not record how text was
+/// split by the tokenizer or by literal fallbacks (design 03 §Shape).
+fn merge_strs(inlines: Vec<Inline>) -> Vec<Inline> {
+    let mut out: Vec<Inline> = Vec::with_capacity(inlines.len());
+    for inline in inlines {
+        if let (Some(Inline::Str(last)), Inline::Str(next)) = (out.last_mut(), &inline) {
+            last.text.push_str(&next.text);
+            last.meta.span = last.meta.span.join(next.meta.span);
+            continue;
+        }
+        out.push(inline);
+    }
+    out
 }

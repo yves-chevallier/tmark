@@ -5,23 +5,23 @@ the deprecated `{latex}[…]` role normalises to the raw role.
 
 ## input
 
-```md
+````md
 A page break {raw latex}(\clearpage) here.
 
 ```latex raw
 \vspace{1cm}
 ```
-```
+````
 
 ## canonical
 
-```md
+````md
 A page break {raw latex}(\clearpage) here.
 
 ```latex raw
 \vspace{1cm}
 ```
-```
+````
 
 ## ir
 

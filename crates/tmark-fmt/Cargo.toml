@@ -7,5 +7,11 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+# The IR is what the printer prints.
 tmark-ir = { path = "../tmark-ir" }
+
+[dev-dependencies]
+# Round-trip tests: parse(print(doc)) == doc.
 tmark-syntax = { path = "../tmark-syntax" }
+# Scratch example and JSON dumps in tests.
+serde_json = { workspace = true }

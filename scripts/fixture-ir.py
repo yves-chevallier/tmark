@@ -43,13 +43,13 @@ def main(paths):
         sys.exit("build the dump example first: cargo build -p tmark-syntax --example dump")
     for path in map(pathlib.Path, paths):
         text = path.read_text()
-        canonical = re.search(r"## canonical\n\n```md\n(.*?)```\n", text, re.S)
+        canonical = re.search(r"## canonical\n\n(`{3,})md\n(.*?)\1\n", text, re.S)
         ir = re.search(r"## ir\n\n```json\n(.*?)```\n", text, re.S)
         if not canonical or not ir:
             print(f"{path.name}: no canonical/ir section, skipped")
             continue
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as tmp:
-            tmp.write(canonical.group(1))
+            tmp.write(canonical.group(2))
         result = subprocess.run([str(DUMP), tmp.name], capture_output=True, text=True, check=True)
         document = normalise(json.loads(result.stdout))
         document.pop("file", None)

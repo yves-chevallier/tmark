@@ -1,0 +1,381 @@
+//! Inline nodes to their canonical spelling (spec Table "Inline text nodes",
+//! §Roles, §Ref, §Cite, §IndexEntry, §CounterItem, §Aside).
+
+use tmark_ir::{Block, Inline, QuoteKind, RefItem, Side, Target};
+
+use crate::attrs;
+use crate::escape::{self, Context};
+use crate::out::Out;
+
+/// Writes `inlines` at the current position.
+pub fn inlines(out: &mut Out, inlines: &[Inline], ctx: Context) {
+    for (i, inline) in inlines.iter().enumerate() {
+        let next = inlines.get(i + 1).and_then(first_char);
+        let ctx = Context {
+            block_start: ctx.block_start && i == 0,
+            ..ctx
+        };
+        one(out, inline, ctx, next);
+    }
+}
+
+/// The first character the next inline prints, when it is plain text.
+fn first_char(inline: &Inline) -> Option<char> {
+    match inline {
+        Inline::Str(s) => s.text.chars().next(),
+        Inline::Space(_) => Some(' '),
+        Inline::SoftBreak(_) | Inline::LineBreak(_) => Some('\n'),
+        _ => None,
+    }
+}
+
+/// `{name key=value}[content]` roles and their friends.
+fn role(out: &mut Out, head: &str, content: &[Inline], ctx: Context) {
+    out.push("{");
+    out.push(head);
+    out.push("}[");
+    inlines(
+        out,
+        content,
+        Context {
+            in_group: true,
+            block_start: false,
+            ..ctx
+        },
+    );
+    out.push("]");
+}
+
+fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
+    match inline {
+        Inline::Str(s) => escape::text(out, &s.text, ctx, next),
+        Inline::Space(_) => out.push(" "),
+        Inline::SoftBreak(_) => out.push("\n"),
+        Inline::LineBreak(_) => out.push("\\\n"),
+        Inline::Emph(n) => {
+            out.push("*");
+            inlines(
+                out,
+                &n.content,
+                Context {
+                    block_start: false,
+                    ..ctx
+                },
+            );
+            out.push("*");
+        }
+        Inline::Strong(n) => {
+            out.push("**");
+            inlines(
+                out,
+                &n.content,
+                Context {
+                    block_start: false,
+                    ..ctx
+                },
+            );
+            out.push("**");
+        }
+        Inline::Strikeout(n) => role(out, "del", &n.content, ctx),
+        Inline::Underline(n) => role(out, "underline", &n.content, ctx),
+        Inline::Highlight(n) => role(out, "mark", &n.content, ctx),
+        Inline::Subscript(n) => role(out, "sub", &n.content, ctx),
+        Inline::Superscript(n) => role(out, "sup", &n.content, ctx),
+        Inline::SmallCaps(n) => role(out, "sc", &n.content, ctx),
+        Inline::Quoted(n) => {
+            let q = match n.kind {
+                QuoteKind::Double => "\"",
+                QuoteKind::Single => "'",
+            };
+            out.push(q);
+            inlines(
+                out,
+                &n.content,
+                Context {
+                    block_start: false,
+                    ..ctx
+                },
+            );
+            out.push(q);
+        }
+        Inline::Code(n) => match &n.lang {
+            Some(lang) => {
+                out.push("{code lang=");
+                out.push(&attrs::value(lang));
+                out.push("}[");
+                out.push(&group_verbatim(&n.text));
+                out.push("]");
+            }
+            None => code_span(out, &n.text),
+        },
+        Inline::Math(n) => {
+            let fence = if n.display { "$$" } else { "$" };
+            out.push(fence);
+            out.push(&n.text);
+            out.push(fence);
+        }
+        Inline::Link(n) => link(out, n, ctx),
+        Inline::Ref(n) => reference(out, &n.items),
+        Inline::Note(n) => match &n.label {
+            Some(label) => {
+                out.push("[^");
+                out.push(label);
+                out.push("]");
+            }
+            None => {
+                // An inline footnote (proposed): print it as a note body.
+                out.push("^[");
+                for block in &n.content {
+                    if let Some(p) = para_like(block) {
+                        inlines(
+                            out,
+                            p,
+                            Context {
+                                in_group: true,
+                                ..ctx
+                            },
+                        );
+                    }
+                }
+                out.push("]");
+            }
+        },
+        Inline::Image(n) => {
+            out.push("![");
+            inlines(
+                out,
+                &n.alt,
+                Context {
+                    in_group: true,
+                    block_start: false,
+                    ..ctx
+                },
+            );
+            out.push("](");
+            out.push(&n.src);
+            out.push(")");
+            attrs::write(out, &n.attrs, "");
+        }
+        Inline::IndexEntry(n) => {
+            let mut head = String::from("index");
+            if n.main {
+                head.push_str(" main=true");
+            }
+            if let Some(registry) = &n.registry {
+                head.push_str(" registry=");
+                head.push_str(&attrs::value(registry));
+            }
+            out.push("{");
+            out.push(&head);
+            out.push("}");
+            for group in &n.path {
+                out.push("[");
+                inlines(
+                    out,
+                    group,
+                    Context {
+                        in_group: true,
+                        block_start: false,
+                        ..ctx
+                    },
+                );
+                out.push("]");
+            }
+        }
+        Inline::CounterItem(n) => {
+            out.push("{counter}(");
+            out.push(&n.prefix);
+            out.push(":");
+            out.push(&n.key);
+            out.push(")");
+        }
+        Inline::Keystroke(n) => {
+            out.push("{keys}[");
+            out.push(&n.keys.join("+"));
+            out.push("]");
+        }
+        Inline::Aside(n) => {
+            let mut head = String::from("aside");
+            if let Some(side) = n.side {
+                head.push_str(" side=");
+                head.push_str(side_name(side));
+            }
+            out.push("{");
+            out.push(&head);
+            out.push("}[");
+            for (i, block) in n.content.iter().enumerate() {
+                if i > 0 {
+                    out.push(" ");
+                }
+                if let Some(p) = para_like(block) {
+                    inlines(
+                        out,
+                        p,
+                        Context {
+                            in_group: true,
+                            block_start: false,
+                            ..ctx
+                        },
+                    );
+                }
+            }
+            out.push("]");
+        }
+        Inline::Span(n) => {
+            out.push("[");
+            inlines(
+                out,
+                &n.content,
+                Context {
+                    in_group: true,
+                    block_start: false,
+                    ..ctx
+                },
+            );
+            out.push("]");
+            attrs::write(out, &n.attrs, "");
+        }
+        Inline::Var(n) => {
+            out.push("{{ ");
+            out.push(&n.path.join("."));
+            out.push(" }}");
+        }
+        Inline::Abbr(n) => escape::text(out, &n.text, ctx, next),
+        Inline::Comment(n) => {
+            out.push("<!--");
+            out.push(&n.text);
+            out.push("-->");
+        }
+        Inline::RawInline(n) => {
+            out.push("{raw ");
+            out.push(&attrs::value(&n.format));
+            out.push("}(");
+            out.push(&n.text);
+            out.push(")");
+        }
+    }
+}
+
+/// The inlines of a paragraph-like block, for content that must print on one
+/// line; `None` for blocks whose content is not inline.
+fn para_like(block: &Block) -> Option<&[Inline]> {
+    match block {
+        Block::Para(p) => Some(&p.content),
+        Block::Plain(p) => Some(&p.content),
+        _ => None,
+    }
+}
+
+pub fn side_name(side: Side) -> &'static str {
+    match side {
+        Side::Left => "left",
+        Side::Right => "right",
+        Side::Outer => "outer",
+        Side::Inner => "inner",
+    }
+}
+
+/// Text inside a role's brackets that is not Markdown (code): brackets and
+/// backslashes escaped.
+fn group_verbatim(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+}
+
+/// A code span with a backtick run longer than any inside, padded when the
+/// text starts or ends with a backtick.
+pub fn code_span(out: &mut Out, text: &str) {
+    let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
+    let fence = "`".repeat(longest + 1);
+    let pad = text.starts_with('`')
+        || text.ends_with('`')
+        || text.starts_with(' ') && text.ends_with(' ') && !text.trim().is_empty();
+    out.push(&fence);
+    if pad {
+        out.push(" ");
+    }
+    out.push(text);
+    if pad {
+        out.push(" ");
+    }
+    out.push(&fence);
+}
+
+fn link(out: &mut Out, n: &tmark_ir::Link, ctx: Context) {
+    // Autolink literals print bare when the text is the address.
+    if let Target::Url(url) = &n.target {
+        if let [Inline::Str(s)] = n.content.as_slice() {
+            let bare = url == &s.text
+                && (url.starts_with("http://")
+                    || url.starts_with("https://")
+                    || url.starts_with("www."));
+            let mail = url.strip_prefix("mailto:") == Some(s.text.as_str());
+            if bare || mail {
+                out.push(&s.text);
+                return;
+            }
+        }
+    }
+    out.push("[");
+    inlines(
+        out,
+        &n.content,
+        Context {
+            in_group: true,
+            block_start: false,
+            ..ctx
+        },
+    );
+    out.push("](");
+    match &n.target {
+        Target::Url(u) | Target::Document(u) => out.push(u),
+        Target::Anchor(a) => {
+            out.push("#");
+            out.push(a);
+        }
+    }
+    if let Some(title) = &n.title {
+        out.push(" \"");
+        out.push(&title.replace('"', "\\\""));
+        out.push("\"");
+    }
+    out.push(")");
+}
+
+/// `@key` when one plain item; `@[…]` otherwise (spec §Ref).
+fn reference(out: &mut Out, items: &[RefItem]) {
+    if let [item] = items {
+        if item.prefix.is_none()
+            && item.suffix.is_none()
+            && !item.suppress_author
+            && !item.key.contains(char::is_whitespace)
+        {
+            out.push("@");
+            out.push(&item.key);
+            return;
+        }
+    }
+    out.push("@[");
+    let parts: Vec<String> = items
+        .iter()
+        .map(|item| {
+            let mut s = String::new();
+            if let Some(prefix) = &item.prefix {
+                s.push_str(prefix);
+                s.push(' ');
+            }
+            if item.suppress_author {
+                s.push('-');
+            }
+            s.push_str(&item.key);
+            if let Some(suffix) = &item.suffix {
+                s.push_str(", ");
+                s.push_str(suffix);
+            }
+            s
+        })
+        .collect();
+    out.push(&parts.join("; "));
+    out.push("]");
+}

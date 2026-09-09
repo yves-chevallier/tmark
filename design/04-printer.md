@@ -102,3 +102,48 @@ citation, converts sugar to canonical on a code action. A whole-document
 - Conformance fixtures: `canonical` block of every fixture must print back
   identically.
 - Snapshot tests for the `Mkdocs` profile on the fixture corpus.
+
+## Implementation notes (milestone 1)
+
+Decisions the printer had to take beyond the table above; each is a
+candidate line for the spec's "Canonical" column.
+
+- **Attribute values** are quoted only when they hold whitespace, `}`, `"`,
+  `=` or are empty: `{title=Folded collapsed=true}`,
+  `{title="LaTeX toolchain"}`.
+- **Fence options** are always quoted (`title="x" linenums="1"`), because
+  the PyMdownX syntax they come from requires it and the `mkdocs` profile
+  must not have to touch them.
+- **Pipe tables** are printed aligned: cells padded to the column width,
+  delimiter cells as wide as the column with at least three dashes, alignment
+  colons kept. A table is a pipe table when its model is plain (leaf
+  columns, no spans, groups, separators, footer, width or placement), a
+  `yaml table` fence otherwise, in a flow YAML style: bare column names,
+  `{name: …, columns: […]}` groups, `- [a, b]` rows, `{value: …, rows: n,
+  cols: n}` spanning cells, `~` absorbed slots, `{separator: true, label:
+  …}` separators; scalars are plain when safe, double-quoted otherwise.
+- A listing whose language defaults to another node word keeps the word:
+  `mermaid code`.
+- An aside with more than one block, or a block that is not a `Plain`,
+  prints as a `::: aside {side=…}` container; an inline aside prints as the
+  role.
+- Generated images (`Image` with `generate=` and `code=` attributes) print
+  as their `<lang> image` fence with the remaining attributes as options.
+- Block quote attributes (`{.epigraph}`) print on their own line after the
+  quote's last block, inside the `> ` prefix.
+- Reference keys print bare when the reference has one item without prefix,
+  suffix or `-`; bracketed otherwise. Autolink literals and `mailto:` links
+  whose text is the address print bare.
+- The round-trip and fixed-point tests compare documents modulo ids, spans
+  and the two fields that record a spelling (`Caption.position`,
+  `Ref.bracketed`), exactly as the conformance runner does. Adjacent `Str`
+  nodes are merged by the parser so that text runs never depend on how the
+  tokenizer split them.
+- Escaping is conservative and contextual (`escape.rs`): sigils, braces,
+  brackets and emphasis markers are escaped only where they would form a
+  construct at that position; the line-start rules defuse block starts
+  (`#`, `>`, `-`, `1.`, `Table:`, `:   `, `!!!`, `:::`) in the first line
+  of a text run that opens a block. Literal fallbacks in the parser decode
+  their backslash escapes, so `format` is idempotent on them.
+- Profiles: `Strict` prints like `Canonical` (the difference is at parse
+  time); `Mkdocs` is a stub that prints like `Canonical` until milestone 5.

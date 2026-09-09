@@ -25,9 +25,9 @@ Table: Stock. {#tbl:stock}
 ## canonical
 
 ```md
-| A | B |
-| - | - |
-| 1 | 2 |
+| A   | B   |
+| --- | --- |
+| 1   | 2   |
 
 Table: Stock. {#tbl:stock}
 ```

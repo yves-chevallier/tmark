@@ -355,3 +355,24 @@ pub(crate) fn plain_text(inlines: &[Inline]) -> String {
     }
     out
 }
+
+/// Source text with its backslash escapes decoded (`\+` → `+`), for text
+/// that the tokenizer took raw and the lowering gives back as literal: what
+/// CommonMark would have produced had the construct not been recognised.
+pub(crate) fn decode_escapes(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    let mut chars = source.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            if let Some(&next) = chars.peek() {
+                if next.is_ascii_punctuation() {
+                    out.push(next);
+                    chars.next();
+                    continue;
+                }
+            }
+        }
+        out.push(c);
+    }
+    out
+}

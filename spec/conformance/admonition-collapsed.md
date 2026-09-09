@@ -26,7 +26,7 @@ Shown by default.
 ## canonical
 
 ```md
-::: note {title="Folded" collapsed=true}
+::: note {title=Folded collapsed=true}
 Hidden by default.
 :::
 

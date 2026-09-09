@@ -5,7 +5,7 @@ and a separator.
 
 ## input
 
-```md
+````md
 ```yaml table
 columns:
   - Fruit
@@ -16,11 +16,11 @@ rows:
 ```
 
 Table: Stock by warehouse. {#tbl:stock}
-```
+````
 
 ## canonical
 
-```md
+````md
 ```yaml table
 columns:
   - Fruit
@@ -31,7 +31,7 @@ rows:
 ```
 
 Table: Stock by warehouse. {#tbl:stock}
-```
+````
 
 ## ir
 
@@ -115,6 +115,19 @@ Table: Stock by warehouse. {#tbl:stock}
             ]
           }
         ]
+      }
+    },
+    {
+      "type": "Caption",
+      "kind": "table",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Stock by warehouse."
+        }
+      ],
+      "attrs": {
+        "id": "tbl:stock"
       }
     }
   ]

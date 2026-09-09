@@ -24,9 +24,12 @@ implementation notes, with totality property tests; the facade exposes
 `parse` and `schema`; the conformance runner
 (`crates/tmark/tests/conformance.rs`) checks 31 fixtures (`input` and
 `canonical` blocks against the `ir` block, diagnostics on the first input);
-`tmark parse` and `tmark schema` work. In progress: `tmark-fmt` and
-`tmark fmt`, the round-trip property tests, the fixed-point check on
-`spec/tmark.md`.
+`tmark parse`, `tmark fmt` and `tmark schema` work; `tmark-fmt` prints
+every node, the canonical block of every fixture is a fixed point, the
+editor sample and the whole spec round-trip and format idempotently, and
+`edit` splices one node. Remaining for M1: the fixed-point check of
+`tmark fmt --check` on `spec/tmark.md` itself (the spec is not written in
+normal form yet; see `04-printer.md`), and the parser's performance target.
 
 - Vendor `markdown-rs`; CommonMark spec tests green with the documented
   exceptions.

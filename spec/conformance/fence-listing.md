@@ -5,23 +5,23 @@ line after the block.
 
 ## input
 
-```md
+````md
 ```python title="bubble_sort.py" linenums="1" hl_lines="2-3"
 def bubble_sort(items): ...
 ```
 
 Listing: Bubble sort, naive version. {#lst:bubble}
-```
+````
 
 ## canonical
 
-```md
+````md
 ```python title="bubble_sort.py" linenums="1" hl_lines="2-3"
 def bubble_sort(items): ...
 ```
 
 Listing: Bubble sort, naive version. {#lst:bubble}
-```
+````
 
 ## ir
 
@@ -47,6 +47,19 @@ Listing: Bubble sort, naive version. {#lst:bubble}
             "2-3"
           ]
         ]
+      }
+    },
+    {
+      "type": "Caption",
+      "kind": "listing",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Bubble sort, naive version."
+        }
+      ],
+      "attrs": {
+        "id": "lst:bubble"
       }
     }
   ]

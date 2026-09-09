@@ -5,7 +5,7 @@ fence is an image, `mermaid code` a listing.
 
 ## input
 
-```md
+````md
 ```python image include="plot.py"
 plt.plot([1, 2, 4, 8])
 ```
@@ -19,11 +19,11 @@ flowchart LR
 flowchart LR
   A --> B
 ```
-```
+````
 
 ## canonical
 
-```md
+````md
 ```python image include="plot.py"
 plt.plot([1, 2, 4, 8])
 ```
@@ -37,7 +37,7 @@ flowchart LR
 flowchart LR
   A --> B
 ```
-```
+````
 
 ## ir
 
@@ -67,6 +67,31 @@ flowchart LR
           }
         }
       ]
+    },
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Image",
+          "attrs": {
+            "kv": [
+              [
+                "generate",
+                "mermaid"
+              ],
+              [
+                "code",
+                "flowchart LR\n  A --> B"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "CodeBlock",
+      "text": "flowchart LR\n  A --> B",
+      "lang": "mermaid"
     }
   ]
 }
