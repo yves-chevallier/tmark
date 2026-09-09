@@ -291,6 +291,10 @@ impl Lowerer {
     }
 
     /// Text with soft breaks split out.
+    ///
+    /// The value of a text node is decoded (escapes and character references
+    /// resolved, continuation indent stripped), so spans come from the
+    /// source slice, line by line, not from the value's lengths.
     fn lower_text(
         &mut self,
         value: &str,
@@ -299,23 +303,55 @@ impl Lowerer {
         out: &mut Vec<Inline>,
     ) {
         let span = self.span(ctx, position);
-        let mut offset = 0usize;
-        for (i, piece) in value.split('\n').enumerate() {
-            if i > 0 {
-                let at = span.start + offset as u32;
-                let meta = self.meta(Span::new(self.file, at, at + 1));
-                out.push(Inline::SoftBreak(SoftBreak { meta }));
-                offset += 1;
-            }
-            if !piece.is_empty() {
-                let start = span.start + offset as u32;
-                let meta = self.meta(Span::new(self.file, start, start + piece.len() as u32));
+        let pieces: Vec<&str> = value.split('\n').collect();
+        if pieces.len() == 1 {
+            if !value.is_empty() {
                 out.push(Inline::Str(Str {
-                    meta,
-                    text: piece.to_string(),
+                    meta: self.meta(span),
+                    text: value.to_string(),
                 }));
-                offset += piece.len();
             }
+            return;
+        }
+        // Source lines of the node, as byte ranges in the parsed text.
+        let source = ctx.slice(position);
+        let base = position.map_or(0, |p| p.start.offset);
+        let mut lines: Vec<(usize, usize)> = Vec::new();
+        let mut line_start = 0;
+        for (i, byte) in source.bytes().enumerate() {
+            if byte == b'\n' {
+                lines.push((line_start, i));
+                line_start = i + 1;
+            }
+        }
+        lines.push((line_start, source.len()));
+        let aligned = lines.len() == pieces.len();
+        for (i, piece) in pieces.iter().enumerate() {
+            if i > 0 {
+                let at = if aligned {
+                    self.span_of(ctx, base + lines[i].0 - 1, base + lines[i].0)
+                } else {
+                    span
+                };
+                out.push(Inline::SoftBreak(SoftBreak {
+                    meta: self.meta(at),
+                }));
+            }
+            if piece.is_empty() {
+                continue;
+            }
+            let piece_span = if aligned {
+                let (from, to) = lines[i];
+                // Continuation indent is stripped from the value.
+                let skip = source[from..to].len() - source[from..to].trim_start().len();
+                self.span_of(ctx, base + from + skip, base + to)
+            } else {
+                span
+            };
+            out.push(Inline::Str(Str {
+                meta: self.meta(piece_span),
+                text: (*piece).to_string(),
+            }));
         }
     }
 

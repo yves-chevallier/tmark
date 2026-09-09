@@ -27,3 +27,4 @@ edits the fork.
 - `src/lib.rs`: `pub use util::tmark;` re-exports the TMark predicates for `tmark-syntax`.
 - `src/to_mdast.rs`: the meta of a closing math fence is attached to the node below the content buffer.
 - `src/construct/text.rs`: `[` tries the Pandoc citation form before the label starts.
+- `src/construct/frontmatter.rs`: the opening fence is only taken when a closing fence exists (upstream panics on `---\n\n> quote`).

@@ -74,6 +74,14 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
     // Indent not allowed.
     if tokenizer.parse_state.options.constructs.frontmatter
         && matches!(tokenizer.current, Some(b'+' | b'-'))
+        // TMark: an opening fence with no closing fence is not front matter.
+        // Deciding it here keeps the document tokenizer from rewinding over
+        // container starts, which upstream mishandles (`---\n\n> quote`).
+        && has_closing_fence(
+            tokenizer.parse_state.bytes,
+            tokenizer.point.index,
+            tokenizer.current.unwrap(),
+        )
     {
         tokenizer.tokenize_state.marker = tokenizer.current.unwrap();
         tokenizer.enter(Name::Frontmatter);
@@ -287,4 +295,21 @@ pub fn after(tokenizer: &mut Tokenizer) -> State {
     );
     tokenizer.exit(Name::Frontmatter);
     State::Ok
+}
+
+/// Whether the line at `index` is a fence of `marker` and a later line is
+/// the same fence (optionally followed by blanks).
+fn has_closing_fence(bytes: &[u8], index: usize, marker: u8) -> bool {
+    let is_fence = |line: &[u8]| {
+        let count = line.iter().take_while(|b| **b == marker).count();
+        count == FRONTMATTER_SEQUENCE_SIZE
+            && line[count..]
+                .iter()
+                .all(|b| matches!(b, b' ' | b'\t' | b'\r'))
+    };
+    let mut lines = bytes[index..].split(|b| *b == b'\n');
+    match lines.next() {
+        Some(first) if is_fence(first) => lines.any(|line| is_fence(line)),
+        _ => false,
+    }
 }

@@ -172,6 +172,15 @@ impl Lowerer {
         }
     }
 
+    /// A span for a byte range of the current text.
+    pub fn span_of(&self, ctx: &Ctx, start: usize, end: usize) -> Span {
+        Span::new(
+            self.file,
+            ctx.map.translate(start) as u32,
+            ctx.map.translate(end) as u32,
+        )
+    }
+
     pub fn meta_at(&mut self, ctx: &Ctx, position: Option<&Position>) -> Meta {
         let span = self.span(ctx, position);
         self.meta(span)
