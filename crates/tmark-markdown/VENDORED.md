@@ -13,3 +13,5 @@ edits the fork.
 
 - `Cargo.toml`: package renamed `tmark-markdown`, lib `tmark_markdown`.
 - `tests/*.rs`: crate path `markdown::` → `tmark_markdown::`.
+- `Cargo.toml`: `[lints.clippy]` allows for lints newer than upstream's toolchain.
+- `src/lib.rs`: `#![deny(clippy::pedantic)]` removed (newer clippy versions keep adding pedantic lints).

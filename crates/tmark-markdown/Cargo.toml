@@ -27,3 +27,16 @@ default = []
 json = ["serde"]
 serde = ["dep:serde"]
 log = ["dep:log"]
+
+# Upstream style predates these lints; allowing them keeps the diff against
+# upstream empty (see VENDORED.md). Applies to the tests too.
+[lints.clippy]
+uninlined_format_args = "allow"
+useless_borrows_in_formatting = "allow"
+manual_assert_eq = "allow"
+manual_clear = "allow"
+byte_char_slices = "allow"
+implicit_saturating_sub = "allow"
+manual_pattern_char_comparison = "allow"
+unnecessary_map_or = "allow"
+unnecessary_cast = "allow"
