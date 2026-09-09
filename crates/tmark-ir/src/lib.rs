@@ -54,3 +54,15 @@ pub use table::{
     TableModel, TableSettings,
 };
 pub use walk::{walk, walk_blocks, walk_inlines, NodeRef};
+
+/// The JSON schema of a public shape, by name: `"ir"` (a `Document`),
+/// `"frontmatter"` (the `Keys` of the front matter). The example
+/// `schema` writes them under `schema/`; the CLI prints them.
+pub fn schema(name: &str) -> Option<serde_json::Value> {
+    let schema = match name {
+        "ir" => schemars::schema_for!(Document),
+        "frontmatter" => schemars::schema_for!(Keys),
+        _ => return None,
+    };
+    serde_json::to_value(schema).ok()
+}

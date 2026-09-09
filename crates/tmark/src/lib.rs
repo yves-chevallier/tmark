@@ -6,5 +6,6 @@
 #![forbid(unsafe_code)]
 
 pub use tmark_ir as ir;
+pub use tmark_ir::schema;
 pub use tmark_ir::{Diagnostic, Document, FileId};
 pub use tmark_syntax::{parse, parse_strict, Parsed};
