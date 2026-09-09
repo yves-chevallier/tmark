@@ -123,3 +123,49 @@ pub fn inside(tokenizer: &mut Tokenizer) -> State {
         State::Ok
     }
 }
+
+/// Start of a Pandoc-style citation, at `[` followed by `@` or `-@`
+/// (`[see @ein05, p. 33; -@AI2027]`), accepted for import (spec §Cite).
+/// The whole bracketed text is the data; the lowering strips the `@`s.
+///
+/// ```markdown
+/// > | See [@ein05, p. 33].
+///         ^
+/// ```
+pub fn pandoc_start(tokenizer: &mut Tokenizer) -> State {
+    if tokenizer.current != Some(b'[') || !tokenizer.parse_state.options.constructs.tmark_reference
+    {
+        return State::Nok;
+    }
+    let bytes = tokenizer.parse_state.bytes;
+    let index = tokenizer.point.index;
+    let end = line_end(bytes, index);
+    let rest = &bytes[index..end];
+    // `[@` or `[-@`, anywhere in the items, and a closing `]` on the line.
+    let has_at = rest
+        .windows(2)
+        .any(|w| w == b"[@" || w == b" @" || w == b"-@" || w == b";@");
+    let Some(close) = rest.iter().position(|b| *b == b']') else {
+        return State::Nok;
+    };
+    if !has_at
+        || close < 3
+        || !(rest.starts_with(b"[@")
+            || rest.starts_with(b"[-@")
+            || rest[1..close].contains(&b'@') && rest[1..close].iter().all(|b| *b != b'['))
+    {
+        return State::Nok;
+    }
+    // Only when the first item is a citation: `[see @key]` or `[@key]`.
+    let first_item_end = rest[1..close]
+        .iter()
+        .position(|b| *b == b';')
+        .map_or(close, |p| p + 1);
+    if !rest[1..first_item_end].contains(&b'@') {
+        return State::Nok;
+    }
+    tokenizer.tokenize_state.size = close + 1;
+    tokenizer.enter(Name::TmarkReference);
+    tokenizer.enter(Name::TmarkReferenceData);
+    State::Retry(StateName::TmarkReferenceInside)
+}

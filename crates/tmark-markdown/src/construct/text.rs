@@ -143,9 +143,9 @@ pub fn before(tokenizer: &mut Tokenizer) -> State {
         Some(b'[') => {
             tokenizer.attempt(
                 State::Next(StateName::TextBefore),
-                State::Next(StateName::TextBeforeLabelStartLink),
+                State::Next(StateName::TextBeforeFootnoteLabel),
             );
-            State::Retry(StateName::GfmLabelStartFootnoteStart)
+            State::Retry(StateName::TmarkReferencePandocStart)
         }
         Some(b'\\') => {
             tokenizer.attempt(
@@ -254,6 +254,17 @@ pub fn before_hard_break_escape(tokenizer: &mut Tokenizer) -> State {
         State::Next(StateName::TextBeforeData),
     );
     State::Retry(StateName::HardBreakEscapeStart)
+}
+
+/// Before GFM label start (footnote).
+///
+/// At `[`, which wasn’t a Pandoc-style citation.
+pub fn before_footnote_label(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::TextBefore),
+        State::Next(StateName::TextBeforeLabelStartLink),
+    );
+    State::Retry(StateName::GfmLabelStartFootnoteStart)
 }
 
 /// Before label start (link).

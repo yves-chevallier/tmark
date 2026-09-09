@@ -65,6 +65,10 @@ impl Lowerer {
                     out.push(Item::Block(math));
                     return;
                 }
+                if let Some(block) = self.compat_paragraph(p, ctx) {
+                    out.push(Item::Block(block));
+                    return;
+                }
                 let meta = self.meta(span);
                 let lowered = self.lower_inlines(&p.children, ctx);
                 let mut content = lowered.inlines;
@@ -334,6 +338,44 @@ impl Lowerer {
             text: math.value.clone(),
             attrs,
         }))
+    }
+
+    /// Compatibility spellings that take a whole paragraph: `\[ … \]`
+    /// display math (spec §Math (display)) and the deprecated PyMdownX
+    /// snippet `--8<-- "file"` (spec §Includes).
+    fn compat_paragraph(
+        &mut self,
+        p: &tmark_markdown::mdast::Paragraph,
+        ctx: &Ctx,
+    ) -> Option<Block> {
+        let source = ctx.slice(p.position.as_ref()).trim();
+        if let Some(inner) = source
+            .strip_prefix("\\[")
+            .and_then(|s| s.strip_suffix("\\]"))
+        {
+            let meta = self.meta_at(ctx, p.position.as_ref());
+            return Some(Block::MathBlock(MathBlock {
+                meta,
+                text: inner.trim_matches('\n').to_string(),
+                attrs: Attrs::new(),
+            }));
+        }
+        if let Some(rest) = source.strip_prefix("--8<--") {
+            let rest = rest.trim();
+            let path = rest.trim_matches('"');
+            let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
+            if !path.is_empty() && (quoted || !rest.contains(char::is_whitespace)) {
+                let span = self.span(ctx, p.position.as_ref());
+                self.deprecated(span, "--8<-- \"file\"", "{include}(file)");
+                let meta = self.meta(span);
+                return Some(Block::Include(Include {
+                    meta,
+                    path: path.to_string(),
+                    base: None,
+                }));
+            }
+        }
+        None
     }
 
     /// A paragraph-initial `{lead}[…]` role, or the `paragraph.lead`

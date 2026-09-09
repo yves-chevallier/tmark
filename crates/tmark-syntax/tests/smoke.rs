@@ -78,3 +78,28 @@ mod tmark_syntax_test_helpers {
             .collect()
     }
 }
+
+#[test]
+fn compat_spellings() {
+    let blocks = blocks(
+        "Pandoc [see @ein05, p. 33; -@AI2027].\n\n\\[\nx^2\n\\]\n\n--8<-- \"snippets/file.md\"\n",
+    );
+    let Block::Para(p) = &blocks[0] else {
+        panic!("{blocks:?}")
+    };
+    let Inline::Ref(r) = &p.content[1] else {
+        panic!("{:?}", p.content)
+    };
+    assert!(r.bracketed);
+    assert_eq!(r.items[0].prefix.as_deref(), Some("see"));
+    assert_eq!(r.items[0].key, "ein05");
+    assert!(r.items[1].suppress_author);
+    let Block::MathBlock(m) = &blocks[1] else {
+        panic!("{blocks:?}")
+    };
+    assert_eq!(m.text, "x^2");
+    let Block::Include(i) = &blocks[2] else {
+        panic!("{blocks:?}")
+    };
+    assert_eq!(i.path, "snippets/file.md");
+}

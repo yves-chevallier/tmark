@@ -472,6 +472,7 @@ pub enum Name {
     TmarkArgumentInside,
     TmarkReferenceStart,
     TmarkReferenceInside,
+    TmarkReferencePandocStart,
     TmarkDefineStart,
     TmarkDefineAfterMarker,
     TmarkDefineAfterArgument,
@@ -511,6 +512,7 @@ pub enum Name {
     FlowBeforeTmarkContainer,
     FlowBeforeTmarkDefinition,
     TextBeforeCharacterEscape,
+    TextBeforeFootnoteLabel,
     TextBeforeMdxExpression,
 
     TitleStart,
@@ -1025,6 +1027,7 @@ pub fn call(tokenizer: &mut Tokenizer, name: Name) -> State {
         Name::TmarkArgumentInside => construct::tmark_argument::inside,
         Name::TmarkReferenceStart => construct::tmark_reference::start,
         Name::TmarkReferenceInside => construct::tmark_reference::inside,
+        Name::TmarkReferencePandocStart => construct::tmark_reference::pandoc_start,
         Name::TmarkDefineStart => construct::tmark_define::start,
         Name::TmarkDefineAfterMarker => construct::tmark_define::after_marker,
         Name::TmarkDefineAfterArgument => construct::tmark_define::after_argument,
@@ -1066,6 +1069,7 @@ pub fn call(tokenizer: &mut Tokenizer, name: Name) -> State {
         Name::FlowBeforeTmarkContainer => construct::flow::before_tmark_container,
         Name::FlowBeforeTmarkDefinition => construct::flow::before_tmark_definition,
         Name::TextBeforeCharacterEscape => construct::text::before_character_escape,
+        Name::TextBeforeFootnoteLabel => construct::text::before_footnote_label,
         Name::TextBeforeMdxExpression => construct::text::before_mdx_expression,
 
         Name::TitleStart => construct::partial_title::start,

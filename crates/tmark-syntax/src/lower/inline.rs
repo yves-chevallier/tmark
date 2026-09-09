@@ -224,7 +224,12 @@ impl Lowerer {
                 Node::TmarkReference(n) => {
                     let meta = self.meta_at(ctx, n.position.as_ref());
                     let (items, bracketed) = match n.value.strip_prefix('[') {
-                        Some(inner) => (parse_ref_items(inner.trim_end_matches(']')), true),
+                        Some(inner) => (
+                            // Pandoc's `[@key, …]` import form carries `@` before each
+                            // key; the item grammar is the same.
+                            parse_ref_items(&inner.trim_end_matches(']').replace('@', "")),
+                            true,
+                        ),
                         None => (
                             vec![tmark_ir::RefItem {
                                 key: n.value.clone(),
