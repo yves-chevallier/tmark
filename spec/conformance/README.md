@@ -29,7 +29,7 @@ other format to learn.
 …
 ```
 
-## diagnostics                   optional; one line per expected diagnostic: `code @ L:C-L:C` (1-based, on the canonical input)
+## diagnostics                   optional; one line per expected diagnostic: `code @ L:C-L:C` (1-based, on the FIRST input block)
 ```text
 deprecated @ 1:1-1:20
 ```
@@ -42,12 +42,15 @@ deprecated @ 1:1-1:20
 
 Rules:
 
-- The `ir` block is compared modulo `id` and `span` fields. Everything else
-  is exact.
+- The `ir` block is compared modulo `id`, `span`, default values, and the
+  fields that only record which spelling was used (`Caption.position`,
+  `Ref.bracketed`). Everything else is exact.
 - Each `input` block is parsed independently and must equal the `ir`.
 - The `canonical` block, parsed, must equal the `ir`, and printed again must
   equal itself (idempotence).
-- Diagnostics are matched by code and span; the message is free.
+- Diagnostics are matched by code and span on the first input block (the
+  sugar spelling, where deprecations fire); the message is free. A fixture
+  without a `diagnostics` section expects none.
 - Backend blocks are `insta` snapshots: the runner fails when they differ
   and `cargo insta review` updates them.
 - A fixture may include a front matter in its inputs when the construct

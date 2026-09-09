@@ -20,15 +20,57 @@ See @sec:intro and @ein05, not me@example.com.
 
 ```json
 {
-  "type": "Document",
   "blocks": [
-    { "type": "Para", "content": [
-      { "type": "Str", "text": "See " },
-      { "type": "Ref", "bracketed": false, "items": [ { "key": "sec:intro" } ] },
-      { "type": "Str", "text": " and " },
-      { "type": "Ref", "bracketed": false, "items": [ { "key": "ein05" } ] },
-      { "type": "Str", "text": ", not me@example.com." }
-    ] }
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "See "
+        },
+        {
+          "type": "Ref",
+          "items": [
+            {
+              "key": "sec:intro"
+            }
+          ]
+        },
+        {
+          "type": "Str",
+          "text": " and "
+        },
+        {
+          "type": "Ref",
+          "items": [
+            {
+              "key": "ein05"
+            }
+          ]
+        },
+        {
+          "type": "Str",
+          "text": ", not "
+        },
+        {
+          "type": "Link",
+          "content": [
+            {
+              "type": "Str",
+              "text": "me@example.com"
+            }
+          ],
+          "target": {
+            "type": "Url",
+            "value": "mailto:me@example.com"
+          }
+        },
+        {
+          "type": "Str",
+          "text": "."
+        }
+      ]
+    }
   ]
 }
 ```

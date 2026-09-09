@@ -23,13 +23,29 @@ Small caps {sc}[on the label] here.
 
 ```json
 {
-  "type": "Document",
   "blocks": [
-    { "type": "Para", "content": [
-      { "type": "Str", "text": "Small caps " },
-      { "type": "SmallCaps", "content": [ { "type": "Str", "text": "on the label" } ] },
-      { "type": "Str", "text": " here." }
-    ] }
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Small caps "
+        },
+        {
+          "type": "SmallCaps",
+          "content": [
+            {
+              "type": "Str",
+              "text": "on the label"
+            }
+          ]
+        },
+        {
+          "type": "Str",
+          "text": " here."
+        }
+      ]
+    }
   ]
 }
 ```

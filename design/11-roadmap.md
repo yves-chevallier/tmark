@@ -17,6 +17,13 @@ is done, except for spikes that end in an ADR.
 Crates: `tmark-ir`, `tmark-syntax`, `tmark-fmt`, `tmark` (facade),
 `tmark-cli` (`parse`, `fmt`, `schema`).
 
+Status: `tmark-ir` done (schema committed); `tmark-markdown` vendored with
+the TMark constructs, CommonMark suite green; `tmark-syntax` lowers every
+construct of `02-syntax.md` except the deferred ones listed in its
+implementation notes; the facade exposes `parse`; the conformance runner
+(`crates/tmark/tests/conformance.rs`) checks the `input` and `canonical`
+blocks against the `ir` block. In progress: `tmark-fmt`, the CLI.
+
 - Vendor `markdown-rs`; CommonMark spec tests green with the documented
   exceptions.
 - Every construct of `02-syntax.md`'s table implemented, with its fixture.

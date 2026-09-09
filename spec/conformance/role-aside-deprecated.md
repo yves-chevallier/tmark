@@ -19,15 +19,35 @@ Hooke's law {aside side=left}[linear only] holds.
 
 ```json
 {
-  "type": "Document",
   "blocks": [
-    { "type": "Para", "content": [
-      { "type": "Str", "text": "Hooke's law " },
-      { "type": "Aside", "side": "left", "content": [
-        { "type": "Plain", "content": [ { "type": "Str", "text": "linear only" } ] }
-      ] },
-      { "type": "Str", "text": " holds." }
-    ] }
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Hooke's law "
+        },
+        {
+          "type": "Aside",
+          "content": [
+            {
+              "type": "Plain",
+              "content": [
+                {
+                  "type": "Str",
+                  "text": "linear only"
+                }
+              ]
+            }
+          ],
+          "side": "left"
+        },
+        {
+          "type": "Str",
+          "text": " holds."
+        }
+      ]
+    }
   ]
 }
 ```

@@ -448,10 +448,21 @@ impl Lowerer {
             return;
         }
 
-        // The span of the whole role: head to last group or argument.
-        let end = groups
-            .last()
-            .and_then(|g| g.position.as_ref())
+        // Deprecated `{margin}[…]{l}` suffix: consumed with the role.
+        let mut suffix_side = None;
+        if role.name == "margin" {
+            if let Some(Node::TmarkBrace(suffix)) = nodes.get(*index) {
+                if let Some(side) = parse_side(&suffix.value) {
+                    suffix_side = Some((side, suffix.position.as_ref()));
+                    *index += 1;
+                }
+            }
+        }
+        // The span of the whole role: head to last group, argument or suffix.
+        let end = suffix_side
+            .as_ref()
+            .and_then(|(_, p)| *p)
+            .or_else(|| groups.last().and_then(|g| g.position.as_ref()))
             .or_else(|| argument.and_then(|a| a.position.as_ref()))
             .map_or(head_span.end, |p| ctx.map.translate(p.end.offset) as u32);
         let span = Span::new(self.file, head_span.start, end);
@@ -537,16 +548,9 @@ impl Lowerer {
                 lang: key("lang"),
             }),
             "aside" | "margin" => {
-                let mut side = key("side").as_deref().and_then(parse_side);
-                // Deprecated `{margin}[…]{l}` suffix.
-                if role.name == "margin" {
-                    if let Some(Node::TmarkBrace(suffix)) = nodes.get(*index) {
-                        if let Some(s) = parse_side(&suffix.value) {
-                            side = Some(s);
-                            *index += 1;
-                        }
-                    }
-                }
+                let side = suffix_side
+                    .map(|(side, _)| side)
+                    .or_else(|| key("side").as_deref().and_then(parse_side));
                 let content = group_content(self, groups[0]);
                 let plain_meta = self.meta(span);
                 Inline::Aside(Aside {

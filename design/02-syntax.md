@@ -128,3 +128,38 @@ Every row of the table above has at least one fixture under
 `spec/conformance/README.md`). The vendored CommonMark spec tests run
 unchanged, except for the documented X-class deviations, which are listed by
 example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
+
+## Implementation notes (milestone 1)
+
+- The tokenizer additions live in `tmark-markdown/src/construct/tmark_*.rs`;
+  `VENDORED.md` lists every touched upstream file. The lowering lives in
+  `tmark-syntax/src/lower/`: `head.rs` (attribute lists, role heads,
+  reference items, info strings), `inline.rs`, `block.rs`, `table.rs`.
+- Bracket groups after a role head or `#` ride on the label machinery of
+  the tokenizer (`LabelKind::TmarkGroup`), so their content is tokenised as
+  text like a link label; `][` chains groups. A `[text]` label followed by an
+  attribute list is retyped `TmarkSpan` at its `]`, so a span may wrap a
+  link and a link may wrap a span or a group.
+- Container, admonition and definition bodies are collected raw with source
+  stops and re-parsed as documents (`OffsetMap` in `offset.rs` maps every
+  span back). Consequence: link reference definitions and footnote
+  definitions written *inside* a body are local to it, and a `[text][id]`
+  inside a body cannot see a definition outside. Accepted; documented here
+  rather than worked around.
+- Equal-length fences do not nest (`:::` inside `:::` closes the outer one),
+  as the spec's "nesting by fence length" implies and as Pandoc does.
+- One-line display math (`$$x$$ {#eq:a}`) becomes a `MathBlock` when it is
+  the whole paragraph; a `\[ … \]` paragraph likewise; `$$ … $$ {#eq:a}` with
+  the attribute list on the closing fence is accepted by the tokenizer.
+- Pandoc's `[@key, locator; -@key2]` is tokenised as a reference when the
+  first item holds an `@`; the lowering strips the `@`s.
+- The `paragraph.lead` promotion applies to a leading `Strong` under 80
+  characters followed by text on the same paragraph; `{lead}[…]` at the
+  start of a paragraph reaches the same field because the role lowers to a
+  `Strong` first.
+- Not implemented yet, deliberately: grid tables (listing with lang
+  `grid table`), critic markup, progress bars, wiki links, inline footnotes
+  `^[…]`, fancy list styles (milestone 5), and `Space` nodes (see 03).
+- Strict profile: `__x__` is bold and `~x~` is literal; the rest of the
+  Appendix-PyMdownX sugar is still accepted (milestone 5 completes the
+  profile).

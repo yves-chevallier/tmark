@@ -711,7 +711,11 @@ impl Lowerer {
                 caption.position = CaptionPosition::After;
                 out.push(Block::Caption(caption));
             } else if next_is_host {
+                // The IR keeps the caption after its host whatever the
+                // source order; `position` records the spelling.
                 caption.position = CaptionPosition::Before;
+                let host = iter.next().expect("peeked");
+                out.push(host);
                 out.push(Block::Caption(caption));
             } else {
                 self.diag(

@@ -36,15 +36,61 @@ Table: Stock. {#tbl:stock}
 
 ```json
 {
-  "type": "Document",
   "blocks": [
-    { "type": "Table", "attrs": {}, "model": {
-      "columns": [ { "name": "A" }, { "name": "B" } ],
-      "rows": [ { "cells": [ "1", "2" ] } ]
-    } },
-    { "type": "Caption", "kind": "Table", "position": "After",
-      "attrs": { "id": "tbl:stock" },
-      "content": [ { "type": "Str", "text": "Stock." } ] }
+    {
+      "type": "Table",
+      "model": {
+        "settings": {
+          "width": "auto"
+        },
+        "columns": [
+          {
+            "type": "Leaf",
+            "name": "A"
+          },
+          {
+            "type": "Leaf",
+            "name": "B"
+          }
+        ],
+        "rows": [
+          {
+            "type": "Data",
+            "cells": [
+              {
+                "content": [
+                  {
+                    "type": "Str",
+                    "text": "1"
+                  }
+                ]
+              },
+              {
+                "content": [
+                  {
+                    "type": "Str",
+                    "text": "2"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "Caption",
+      "kind": "table",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Stock."
+        }
+      ],
+      "attrs": {
+        "id": "tbl:stock"
+      }
+    }
   ]
 }
 ```

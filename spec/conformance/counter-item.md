@@ -46,14 +46,36 @@ press:
 
 ```json
 {
-  "type": "Document",
-  "front_matter": { "keys": { "press": { "declare": { "counters": {
-    "fw": { "name": "Finding", "format": "FW-{n:02d}" } } } } } },
+  "front_matter": {
+    "raw": "---\npress:\n  declare:\n    counters:\n      fw: {name: Finding, format: \"FW-{n:02d}\"}\n---",
+    "keys": {
+      "press": {
+        "declare": {
+          "counters": {
+            "fw": {
+              "name": "Finding",
+              "format": "FW-{n:02d}"
+            }
+          }
+        }
+      }
+    }
+  },
   "blocks": [
-    { "type": "Para", "content": [
-      { "type": "CounterItem", "prefix": "fw", "key": "boot-loop" },
-      { "type": "Str", "text": " The firmware reboots when the watchdog fires." }
-    ] }
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "CounterItem",
+          "prefix": "fw",
+          "key": "boot-loop"
+        },
+        {
+          "type": "Str",
+          "text": " The firmware reboots when the watchdog fires."
+        }
+      ]
+    }
   ]
 }
 ```

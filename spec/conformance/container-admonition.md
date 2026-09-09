@@ -28,17 +28,36 @@ Install TeX Live before `texsmith --build`.
 
 ```json
 {
-  "type": "Document",
   "blocks": [
-    { "type": "Admonition", "kind": "warning", "attrs": {},
-      "title": [ { "type": "Str", "text": "LaTeX toolchain" } ],
+    {
+      "type": "Admonition",
+      "kind": "warning",
+      "title": [
+        {
+          "type": "Str",
+          "text": "LaTeX toolchain"
+        }
+      ],
       "content": [
-        { "type": "Para", "content": [
-          { "type": "Str", "text": "Install TeX Live before " },
-          { "type": "Code", "text": "texsmith --build" },
-          { "type": "Str", "text": "." }
-        ] }
-      ] }
+        {
+          "type": "Para",
+          "content": [
+            {
+              "type": "Str",
+              "text": "Install TeX Live before "
+            },
+            {
+              "type": "Code",
+              "text": "texsmith --build"
+            },
+            {
+              "type": "Str",
+              "text": "."
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
 ```

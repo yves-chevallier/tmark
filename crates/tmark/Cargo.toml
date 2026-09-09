@@ -13,3 +13,6 @@ tmark-registry = { path = "../tmark-registry" }
 tmark-fmt = { path = "../tmark-fmt" }
 tmark-lint = { path = "../tmark-lint" }
 tmark-writers = { path = "../tmark-writers" }
+
+[dev-dependencies]
+serde_json.workspace = true

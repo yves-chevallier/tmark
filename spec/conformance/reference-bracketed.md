@@ -24,16 +24,35 @@ As shown by @[see ein05, pp. 33-35; -AI2027, ch. 1].
 
 ```json
 {
-  "type": "Document",
   "blocks": [
-    { "type": "Para", "content": [
-      { "type": "Str", "text": "As shown by " },
-      { "type": "Ref", "bracketed": true, "items": [
-        { "prefix": "see", "key": "ein05", "suffix": "pp. 33-35" },
-        { "suppress_author": true, "key": "AI2027", "suffix": "ch. 1" }
-      ] },
-      { "type": "Str", "text": "." }
-    ] }
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "As shown by "
+        },
+        {
+          "type": "Ref",
+          "items": [
+            {
+              "prefix": "see",
+              "key": "ein05",
+              "suffix": "pp. 33-35"
+            },
+            {
+              "suppress_author": true,
+              "key": "AI2027",
+              "suffix": "ch. 1"
+            }
+          ]
+        },
+        {
+          "type": "Str",
+          "text": "."
+        }
+      ]
+    }
   ]
 }
 ```
