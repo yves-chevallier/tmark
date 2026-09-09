@@ -15,3 +15,12 @@ edits the fork.
 - `tests/*.rs`: crate path `markdown::` → `tmark_markdown::`.
 - `Cargo.toml`: `[lints.clippy]` allows for lints newer than upstream's toolchain.
 - `src/lib.rs`: `#![deny(clippy::pedantic)]` removed (newer clippy versions keep adding pedantic lints).
+- `src/configuration.rs`: `Constructs` gains the `tmark_*` flags, `Constructs::tmark()` and `ParseOptions::tmark()`; the `Debug` expectations in its unit test list the new flags.
+- `src/event.rs`, `src/state.rs`, `src/tokenizer.rs` (`LabelKind`), `src/construct/mod.rs`, `src/util/mod.rs`: registrations for the TMark constructs.
+- `src/construct/text.rs`, `src/construct/flow.rs`: dispatch to the TMark constructs (all `Nok` when their flag is off).
+- `src/construct/attention.rs`: `=`, `^`, `+` and single `~` sequences under `tmark_attention`.
+- `src/construct/label_end.rs`: `TmarkGroup` and `TmarkSpan` label kinds.
+- `src/mdast.rs`, `src/to_mdast.rs`: the `Tmark*` nodes and their builders.
+- New files: `src/construct/tmark_*.rs`, `src/construct/partial_tmark_body.rs`, `src/util/tmark.rs`.
+- `Cargo.toml`: `doctest = false` (the doc examples import `markdown::`).
+- `src/construct/raw_flow.rs`: an attribute list after a closing math fence (`$$ {#eq:x}`) is accepted under `tmark_brace` and recorded as the fence meta.

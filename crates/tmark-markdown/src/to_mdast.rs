@@ -7,7 +7,9 @@ use crate::mdast::{
     ImageReference, InlineCode, InlineMath, Link, LinkReference, List, ListItem, Math,
     MdxFlowExpression, MdxJsxAttribute, MdxJsxExpressionAttribute, MdxJsxFlowElement,
     MdxJsxTextElement, MdxTextExpression, MdxjsEsm, Node, Paragraph, ReferenceKind, Root, Strong,
-    Table, TableCell, TableRow, Text, ThematicBreak, Toml, Yaml,
+    Table, TableCell, TableRow, Text, ThematicBreak, TmarkAdmonition, TmarkArgument, TmarkBrace,
+    TmarkContainer, TmarkDefine, TmarkDefinition, TmarkGroup, TmarkMark, TmarkMarkKind,
+    TmarkReference, TmarkSpan, Toml, Yaml,
 };
 use crate::message;
 use crate::unist::{Point, Position};
@@ -16,7 +18,7 @@ use crate::util::{
         decode as decode_character_reference, parse as parse_character_reference,
     },
     infer::{gfm_table_align, list_item_loose, list_loose},
-    mdx_collect::{collect, Result as CollectResult},
+    mdx_collect::{collect, Result as CollectResult, Stop},
     normalize_identifier::normalize_identifier,
     slice::{Position as SlicePosition, Slice},
 };
@@ -100,6 +102,8 @@ struct CompileContext<'a> {
     jsx_tag: Option<JsxTag>,
     media_reference_stack: Vec<Reference>,
     raw_flow_fence_seen: bool,
+    /// Whether the opening TMark container fence was seen (the next one closes).
+    tmark_fence_seen: bool,
     // Intermediate results.
     /// Primary tree and buffers.
     trees: Vec<(Node, Vec<usize>, Vec<usize>)>,
@@ -137,6 +141,7 @@ impl<'a> CompileContext<'a> {
             jsx_tag: None,
             media_reference_stack: vec![],
             raw_flow_fence_seen: false,
+            tmark_fence_seen: false,
             trees: vec![(tree, vec![], vec![])],
             index: 0,
         }
@@ -273,6 +278,9 @@ fn enter(context: &mut CompileContext) -> Result<(), message::Message> {
         | Name::HtmlTextData
         | Name::MathFlowChunk
         | Name::MathTextData
+        | Name::TmarkArgumentData
+        | Name::TmarkBraceData
+        | Name::TmarkReferenceData
         | Name::MdxJsxTagAttributeValueLiteralValue => on_enter_data(context),
         Name::CodeFencedFenceInfo
         | Name::CodeFencedFenceMeta
@@ -314,6 +322,20 @@ fn enter(context: &mut CompileContext) -> Result<(), message::Message> {
         Name::ListOrdered | Name::ListUnordered => on_enter_list(context),
         Name::MathFlow => on_enter_math_flow(context),
         Name::MathText => on_enter_math_text(context),
+        Name::TmarkBrace => on_enter_tmark_brace(context),
+        Name::TmarkArgument => on_enter_tmark_argument(context),
+        Name::TmarkReference => on_enter_tmark_reference(context),
+        Name::TmarkGroup => on_enter_tmark_group(context),
+        Name::TmarkSpan => on_enter_tmark_span(context),
+        Name::TmarkDefine => on_enter_tmark_define(context),
+        Name::TmarkHighlight => on_enter_tmark_mark(context, TmarkMarkKind::Highlight),
+        Name::TmarkSuperscript => on_enter_tmark_mark(context, TmarkMarkKind::Superscript),
+        Name::TmarkInsert => on_enter_tmark_mark(context, TmarkMarkKind::Insert),
+        Name::TmarkKeystroke => on_enter_tmark_mark(context, TmarkMarkKind::Keystroke),
+        Name::TmarkSubscript => on_enter_tmark_mark(context, TmarkMarkKind::Subscript),
+        Name::TmarkContainer => on_enter_tmark_container(context),
+        Name::TmarkAdmonition => on_enter_tmark_admonition(context),
+        Name::TmarkDefinition => on_enter_tmark_definition(context),
         Name::MdxEsm => on_enter_mdx_esm(context),
         Name::MdxFlowExpression => on_enter_mdx_flow_expression(context),
         Name::MdxTextExpression => on_enter_mdx_text_expression(context),
@@ -365,9 +387,29 @@ fn exit(context: &mut CompileContext) -> Result<(), message::Message> {
         | Name::HtmlTextData
         | Name::MathFlowChunk
         | Name::MathTextData
+        | Name::TmarkArgumentData
+        | Name::TmarkBraceData
+        | Name::TmarkReferenceData
         | Name::MdxJsxTagAttributeValueLiteralValue => {
             on_exit_data(context)?;
         }
+        Name::TmarkBrace | Name::TmarkArgument | Name::TmarkReference => {
+            on_exit_tmark_literal(context)?;
+        }
+        Name::TmarkGroup | Name::TmarkSpan => on_exit_tmark_group(context)?,
+        Name::TmarkDefine
+        | Name::TmarkHighlight
+        | Name::TmarkSuperscript
+        | Name::TmarkInsert
+        | Name::TmarkKeystroke
+        | Name::TmarkSubscript
+        | Name::TmarkContainer
+        | Name::TmarkAdmonition
+        | Name::TmarkDefinition => on_exit(context)?,
+        Name::TmarkContainerFenceInfo => on_exit_tmark_container_fence_info(context),
+        Name::TmarkContainerFence => on_exit_tmark_container_fence(context),
+        Name::TmarkAdmonitionMarker => on_exit_tmark_admonition_marker(context),
+        Name::TmarkAdmonitionInfo => on_exit_tmark_admonition_info(context),
         Name::MdxJsxTagAttributeExpression | Name::MdxJsxTagAttributeValueExpression => {
             on_exit_drop(context);
         }
@@ -1299,8 +1341,10 @@ fn on_exit_label_text(context: &mut CompileContext) {
     match context.tail_mut() {
         Node::Link(node) => node.children = children,
         Node::Image(node) => node.alt = label,
+        Node::TmarkGroup(node) => node.children = children,
+        Node::TmarkSpan(node) => node.children = children,
         Node::FootnoteReference(_) => {}
-        _ => unreachable!("expected footnote refereence, image, or link on stack"),
+        _ => unreachable!("expected footnote reference, image, link, or tmark group on stack"),
     }
 }
 
@@ -1758,6 +1802,259 @@ fn trim_eol(value: String, at_start: bool, at_end: bool) -> String {
     } else {
         value
     }
+}
+
+// ---------------------------------------------------------------------------
+// TMark
+// ---------------------------------------------------------------------------
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkBrace`][Name::TmarkBrace].
+fn on_enter_tmark_brace(context: &mut CompileContext) {
+    let event = &context.events[context.index];
+    let moustache = context.bytes.get(event.point.index + 1) == Some(&b'{');
+    context.tail_push(Node::TmarkBrace(TmarkBrace {
+        value: String::new(),
+        moustache,
+        position: None,
+    }));
+    context.buffer();
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkArgument`][Name::TmarkArgument].
+fn on_enter_tmark_argument(context: &mut CompileContext) {
+    let event = &context.events[context.index];
+    let marker = context.bytes[event.point.index];
+    context.tail_push(Node::TmarkArgument(TmarkArgument {
+        value: String::new(),
+        marker,
+        position: None,
+    }));
+    context.buffer();
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkReference`][Name::TmarkReference].
+fn on_enter_tmark_reference(context: &mut CompileContext) {
+    context.tail_push(Node::TmarkReference(TmarkReference {
+        value: String::new(),
+        position: None,
+    }));
+    context.buffer();
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkGroup`][Name::TmarkGroup].
+fn on_enter_tmark_group(context: &mut CompileContext) {
+    context.tail_push(Node::TmarkGroup(TmarkGroup {
+        children: vec![],
+        position: None,
+    }));
+    context.media_reference_stack.push(Reference::new());
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkSpan`][Name::TmarkSpan].
+fn on_enter_tmark_span(context: &mut CompileContext) {
+    context.tail_push(Node::TmarkSpan(TmarkSpan {
+        children: vec![],
+        position: None,
+    }));
+    context.media_reference_stack.push(Reference::new());
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkDefine`][Name::TmarkDefine].
+fn on_enter_tmark_define(context: &mut CompileContext) {
+    context.tail_push(Node::TmarkDefine(TmarkDefine {
+        children: vec![],
+        position: None,
+    }));
+}
+
+/// Handle [`Enter`][Kind::Enter] of the TMark attention groups.
+fn on_enter_tmark_mark(context: &mut CompileContext, kind: TmarkMarkKind) {
+    context.tail_push(Node::TmarkMark(TmarkMark {
+        kind,
+        children: vec![],
+        position: None,
+    }));
+}
+
+/// Collect the raw content lines of a block construct, from the current
+/// (enter) event to the matching exit: the chunks joined by line endings,
+/// leading and trailing line endings dropped, with the source offset of
+/// every chunk.
+fn collect_tmark_chunks(
+    context: &CompileContext,
+    chunk: &Name,
+    wrapper: &Name,
+) -> (String, Vec<Stop>) {
+    let mut value = String::new();
+    let mut stops = vec![];
+    let mut pending = 0;
+    let mut started = false;
+    let mut index = context.index + 1;
+    while index < context.events.len() {
+        let event = &context.events[index];
+        if event.kind == Kind::Exit && event.name == *wrapper {
+            break;
+        }
+        if event.kind == Kind::Enter {
+            if event.name == *chunk {
+                if started {
+                    for _ in 0..pending {
+                        value.push('\n');
+                    }
+                }
+                pending = 0;
+                started = true;
+                stops.push((value.len(), event.point.index));
+                value.push_str(
+                    Slice::from_position(
+                        context.bytes,
+                        &SlicePosition {
+                            start: &event.point,
+                            end: &context.events[index + 1].point,
+                        },
+                    )
+                    .as_str(),
+                );
+            } else if event.name == Name::LineEnding {
+                pending += 1;
+            }
+        }
+        index += 1;
+    }
+    (value, stops)
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkContainer`][Name::TmarkContainer].
+fn on_enter_tmark_container(context: &mut CompileContext) {
+    let (value, stops) =
+        collect_tmark_chunks(context, &Name::TmarkContainerChunk, &Name::TmarkContainer);
+    let event = &context.events[context.index];
+    // The marker is the first non-blank byte of the fence line.
+    let mut index = event.point.index;
+    while matches!(context.bytes.get(index), Some(b' ' | b'\t')) {
+        index += 1;
+    }
+    context.tail_push(Node::TmarkContainer(TmarkContainer {
+        marker: context.bytes[index],
+        info: String::new(),
+        value,
+        closed: false,
+        position: None,
+        stops,
+    }));
+    context.tmark_fence_seen = false;
+}
+
+/// Handle [`Exit`][Kind::Exit]:[`TmarkContainerFenceInfo`][Name::TmarkContainerFenceInfo].
+fn on_exit_tmark_container_fence_info(context: &mut CompileContext) {
+    let value = Slice::from_position(
+        context.bytes,
+        &SlicePosition::from_exit_event(context.events, context.index),
+    )
+    .as_str()
+    .trim_end()
+    .to_string();
+    if let Node::TmarkContainer(node) = context.tail_mut() {
+        node.info = value;
+    } else {
+        unreachable!("expected tmark container on stack");
+    }
+}
+
+/// Handle [`Exit`][Kind::Exit]:[`TmarkContainerFence`][Name::TmarkContainerFence].
+///
+/// The second fence is the closing one.
+fn on_exit_tmark_container_fence(context: &mut CompileContext) {
+    let seen = context.tmark_fence_seen;
+    if let Node::TmarkContainer(node) = context.tail_mut() {
+        if seen {
+            node.closed = true;
+        }
+    } else {
+        unreachable!("expected tmark container on stack");
+    }
+    context.tmark_fence_seen = true;
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkAdmonition`][Name::TmarkAdmonition].
+fn on_enter_tmark_admonition(context: &mut CompileContext) {
+    let (value, stops) =
+        collect_tmark_chunks(context, &Name::TmarkAdmonitionChunk, &Name::TmarkAdmonition);
+    context.tail_push(Node::TmarkAdmonition(TmarkAdmonition {
+        marker: String::new(),
+        info: String::new(),
+        value,
+        position: None,
+        stops,
+    }));
+}
+
+/// Handle [`Exit`][Kind::Exit]:[`TmarkAdmonitionMarker`][Name::TmarkAdmonitionMarker].
+fn on_exit_tmark_admonition_marker(context: &mut CompileContext) {
+    let value = Slice::from_position(
+        context.bytes,
+        &SlicePosition::from_exit_event(context.events, context.index),
+    )
+    .as_str()
+    .to_string();
+    if let Node::TmarkAdmonition(node) = context.tail_mut() {
+        node.marker = value;
+    } else {
+        unreachable!("expected tmark admonition on stack");
+    }
+}
+
+/// Handle [`Exit`][Kind::Exit]:[`TmarkAdmonitionInfo`][Name::TmarkAdmonitionInfo].
+fn on_exit_tmark_admonition_info(context: &mut CompileContext) {
+    let value = Slice::from_position(
+        context.bytes,
+        &SlicePosition::from_exit_event(context.events, context.index),
+    )
+    .as_str()
+    .trim_end()
+    .to_string();
+    if let Node::TmarkAdmonition(node) = context.tail_mut() {
+        node.info = value;
+    } else {
+        unreachable!("expected tmark admonition on stack");
+    }
+}
+
+/// Handle [`Enter`][Kind::Enter]:[`TmarkDefinition`][Name::TmarkDefinition].
+fn on_enter_tmark_definition(context: &mut CompileContext) {
+    let (value, stops) =
+        collect_tmark_chunks(context, &Name::TmarkDefinitionChunk, &Name::TmarkDefinition);
+    context.tail_push(Node::TmarkDefinition(TmarkDefinition {
+        value,
+        position: None,
+        stops,
+    }));
+}
+
+/// Handle [`Exit`][Kind::Exit]:{[`TmarkGroup`][Name::TmarkGroup],[`TmarkSpan`][Name::TmarkSpan]}.
+///
+/// Like media, but never a reference: the label machinery only lends the
+/// brackets.
+fn on_exit_tmark_group(context: &mut CompileContext) -> Result<(), message::Message> {
+    context
+        .media_reference_stack
+        .pop()
+        .expect("expected reference on media stack");
+    on_exit(context)
+}
+
+/// Handle [`Exit`][Kind::Exit] of the literal TMark nodes: the buffered
+/// data becomes the value.
+fn on_exit_tmark_literal(context: &mut CompileContext) -> Result<(), message::Message> {
+    let value = context.resume().to_string();
+    match context.tail_mut() {
+        Node::TmarkBrace(node) => node.value = value,
+        Node::TmarkArgument(node) => node.value = value,
+        Node::TmarkReference(node) => node.value = value,
+        _ => unreachable!("expected tmark literal on stack"),
+    }
+    on_exit(context)?;
+    Ok(())
 }
 
 /// Handle a mismatch.

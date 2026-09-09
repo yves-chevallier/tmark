@@ -180,6 +180,7 @@
 //! [html_sup]: https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-sub-and-sup-elements
 
 use crate::construct::partial_space_or_tab_eol::space_or_tab_eol;
+use crate::construct::tmark_brace::group_start;
 use crate::event::{Event, Kind, Name};
 use crate::resolve::Name as ResolveName;
 use crate::state::{Name as StateName, State};
@@ -190,6 +191,7 @@ use crate::util::{
     normalize_identifier::normalize_identifier,
     skip,
     slice::{Position, Slice},
+    tmark::looks_like_attributes,
 };
 use alloc::{string::String, vec};
 
@@ -221,7 +223,10 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
             // ```
             //
             // We can’t have that, so it’s just balanced brackets.
-            if label_start.inactive {
+            // TMark: a span (`[…]{attrs}`) may wrap a link, unlike a link.
+            let span = tokenizer.parse_state.options.constructs.tmark_brace
+                && looks_like_attributes(tokenizer.parse_state.bytes, tokenizer.point.index + 1);
+            if label_start.inactive && !span {
                 return State::Retry(StateName::LabelEndNok);
             }
 
@@ -251,6 +256,23 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
 /// ```
 pub fn after(tokenizer: &mut Tokenizer) -> State {
     let start_index = tokenizer.tokenize_state.label_starts.len() - 1;
+    let start = &tokenizer.tokenize_state.label_starts[start_index];
+
+    // TMark: a bracket group after a role head or `#` closes as is.
+    if start.kind == LabelKind::TmarkGroup {
+        return State::Retry(StateName::LabelEndOk);
+    }
+
+    // TMark: `[text]{attrs}` is an anonymous span, whatever follows.
+    if start.kind == LabelKind::Link
+        && tokenizer.parse_state.options.constructs.tmark_brace
+        && tokenizer.current == Some(b'{')
+        && looks_like_attributes(tokenizer.parse_state.bytes, tokenizer.point.index)
+    {
+        tokenizer.tokenize_state.label_starts[start_index].kind = LabelKind::TmarkSpan;
+        return State::Retry(StateName::LabelEndOk);
+    }
+
     let start = &tokenizer.tokenize_state.label_starts[start_index];
 
     let indices = (
@@ -351,17 +373,24 @@ pub fn ok(tokenizer: &mut Tokenizer) -> State {
     // longer viable for use (as they would otherwise contain a link).
     // These link starts are still looking for balanced closing brackets, so
     // we can’t remove them, but we can mark them.
-    if label_start.kind != LabelKind::Image {
+    // TMark groups and spans are not links: a link may contain them.
+    let tmark = matches!(
+        label_start.kind,
+        LabelKind::TmarkGroup | LabelKind::TmarkSpan
+    );
+    if label_start.kind != LabelKind::Image && !tmark {
         let mut index = 0;
         while index < tokenizer.tokenize_state.label_starts.len() {
             let label_start = &mut tokenizer.tokenize_state.label_starts[index];
-            if label_start.kind != LabelKind::Image {
+            // TMark groups may contain links.
+            if !matches!(label_start.kind, LabelKind::Image | LabelKind::TmarkGroup) {
                 label_start.inactive = true;
             }
             index += 1;
         }
     }
 
+    let chain = label_start.kind == LabelKind::TmarkGroup && tokenizer.current == Some(b'[');
     tokenizer.tokenize_state.labels.push(Label {
         kind: label_start.kind,
         start: label_start.start,
@@ -369,6 +398,10 @@ pub fn ok(tokenizer: &mut Tokenizer) -> State {
     });
     tokenizer.tokenize_state.end = 0;
     tokenizer.register_resolver_before(ResolveName::Label);
+    // TMark: `][` opens the next group (`{index}[a][b]`, `#[a][b]`).
+    if chain {
+        group_start(tokenizer);
+    }
     State::Ok
 }
 
@@ -691,12 +724,12 @@ fn inject_labels(tokenizer: &mut Tokenizer, labels: &[Label]) {
     let mut index = 0;
     while index < labels.len() {
         let label = &labels[index];
-        let group_name = if label.kind == LabelKind::GfmFootnote {
-            Name::GfmFootnoteCall
-        } else if label.kind == LabelKind::Image {
-            Name::Image
-        } else {
-            Name::Link
+        let group_name = match label.kind {
+            LabelKind::GfmFootnote => Name::GfmFootnoteCall,
+            LabelKind::Image => Name::Image,
+            LabelKind::TmarkGroup => Name::TmarkGroup,
+            LabelKind::TmarkSpan => Name::TmarkSpan,
+            LabelKind::Link | LabelKind::GfmUndefinedFootnote => Name::Link,
         };
 
         // If this is a fine link, which starts with a footnote start that did

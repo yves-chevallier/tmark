@@ -122,6 +122,9 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
         && matches!(tokenizer.current, Some(b'*' | b'_')))
         // GFM strikethrough:
         || (tokenizer.parse_state.options.constructs.gfm_strikethrough && tokenizer.current == Some(b'~'))
+        // TMark sugar (highlight, superscript, insert, keystroke, subscript):
+        || (tokenizer.parse_state.options.constructs.tmark_attention
+            && matches!(tokenizer.current, Some(b'=' | b'^' | b'+' | b'~')))
     {
         tokenizer.tokenize_state.marker = tokenizer.current.unwrap();
         tokenizer.enter(Name::AttentionSequence);
@@ -187,17 +190,24 @@ pub fn resolve(tokenizer: &mut Tokenizer) -> Option<Subresult> {
                         continue;
                     }
 
-                    // For GFM strikethrough:
+                    // For GFM strikethrough and the TMark sugar:
                     // * both sequences must have the same size
                     // * more than 2 markers don’t work
-                    // * one marker is prohibited by the spec, but supported by GH
-                    if sequence_close.marker == b'~'
-                        && (sequence_close.size != sequence_open.size
-                            || sequence_close.size > 2
-                            || sequence_close.size == 1
-                                && !tokenizer.parse_state.options.gfm_strikethrough_single_tilde)
-                    {
-                        continue;
+                    // * one `~` is prohibited by the GFM spec, but supported
+                    //   by GH; TMark reads it as a subscript
+                    // * `=` and `+` need exactly two markers
+                    if !is_classic(sequence_close.marker) {
+                        let size = sequence_close.size;
+                        let single_tilde_ok =
+                            tokenizer.parse_state.options.gfm_strikethrough_single_tilde
+                                || tokenizer.parse_state.options.constructs.tmark_attention;
+                        if size != sequence_open.size
+                            || size > 2
+                            || (size == 1 && matches!(sequence_close.marker, b'=' | b'+'))
+                            || (size == 1 && sequence_close.marker == b'~' && !single_tilde_ok)
+                        {
+                            continue;
+                        }
                     }
 
                     // We found a match!
@@ -243,16 +253,17 @@ fn get_sequences(tokenizer: &mut Tokenizer) -> Vec<Sequence> {
                 let before = classify_opt(before_char);
                 let after_char = char_after_index(tokenizer.parse_state.bytes, exit.point.index);
                 let after = classify_opt(after_char);
+                let classic = is_classic(marker);
                 let open = after == CharacterKind::Other
                     || (after == CharacterKind::Punctuation && before != CharacterKind::Other)
                     // For regular attention markers (not strikethrough), the
                     // other attention markers can be used around them
-                    || (marker != b'~' && matches!(after_char, Some('*' | '_')))
-                    || (marker != b'~' && tokenizer.parse_state.options.constructs.gfm_strikethrough && matches!(after_char, Some('~')));
+                    || (classic && matches!(after_char, Some('*' | '_')))
+                    || (classic && tokenizer.parse_state.options.constructs.gfm_strikethrough && matches!(after_char, Some('~')));
                 let close = before == CharacterKind::Other
                     || (before == CharacterKind::Punctuation && after != CharacterKind::Other)
-                    || (marker != b'~' && matches!(before_char, Some('*' | '_')))
-                    || (marker != b'~'
+                    || (classic && matches!(before_char, Some('*' | '_')))
+                    || (classic
                         && tokenizer.parse_state.options.constructs.gfm_strikethrough
                         && matches!(before_char, Some('~')));
 
@@ -327,16 +338,40 @@ fn match_sequences(
         between += 1;
     }
 
-    let (group_name, seq_name, text_name) = if sequences[open].marker == b'~' {
-        (
+    let tmark = tokenizer.parse_state.options.constructs.tmark_attention;
+    let (group_name, seq_name, text_name) = match (sequences[open].marker, take) {
+        (b'~', 1) if tmark => (
+            Name::TmarkSubscript,
+            Name::TmarkSubscriptSequence,
+            Name::TmarkSubscriptText,
+        ),
+        (b'~', _) => (
             Name::GfmStrikethrough,
             Name::GfmStrikethroughSequence,
             Name::GfmStrikethroughText,
-        )
-    } else if take == 1 {
-        (Name::Emphasis, Name::EmphasisSequence, Name::EmphasisText)
-    } else {
-        (Name::Strong, Name::StrongSequence, Name::StrongText)
+        ),
+        (b'=', _) => (
+            Name::TmarkHighlight,
+            Name::TmarkHighlightSequence,
+            Name::TmarkHighlightText,
+        ),
+        (b'+', _) => (
+            Name::TmarkKeystroke,
+            Name::TmarkKeystrokeSequence,
+            Name::TmarkKeystrokeText,
+        ),
+        (b'^', 1) => (
+            Name::TmarkSuperscript,
+            Name::TmarkSuperscriptSequence,
+            Name::TmarkSuperscriptText,
+        ),
+        (b'^', _) => (
+            Name::TmarkInsert,
+            Name::TmarkInsertSequence,
+            Name::TmarkInsertText,
+        ),
+        (_, 1) => (Name::Emphasis, Name::EmphasisSequence, Name::EmphasisText),
+        _ => (Name::Strong, Name::StrongSequence, Name::StrongText),
     };
     let open_index = sequences[open].index;
     let close_index = sequences[close].index;
@@ -437,4 +472,10 @@ fn match_sequences(
     }
 
     next
+}
+
+/// Whether a marker is one of CommonMark's (`*`, `_`), as opposed to the
+/// GFM and TMark markers that need equal-sized sequences.
+fn is_classic(marker: u8) -> bool {
+    matches!(marker, b'*' | b'_')
 }

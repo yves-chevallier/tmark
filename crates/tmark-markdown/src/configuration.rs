@@ -332,6 +332,26 @@ pub struct Constructs {
     ///     ^^^
     /// ```
     pub thematic_break: bool,
+
+    // -------------------------------------------------------------- TMark
+    /// TMark brace groups: role heads, attribute lists, moustaches, anonymous
+    /// spans, and the bracket groups and arguments that follow a role head.
+    pub tmark_brace: bool,
+    /// TMark references and citations (`@key`, `@[…]`).
+    pub tmark_reference: bool,
+    /// TMark definitions (`#[…]`, `#(…)`, deprecated `#{…}`).
+    pub tmark_define: bool,
+    /// TMark inline sugar through attention: `==x==`, `^x^`, `^^x^^`,
+    /// `++k++`, `~x~`.
+    pub tmark_attention: bool,
+    /// TMark container directives (`::: name` … `:::`, `/// name` … `///`).
+    pub tmark_container: bool,
+    /// TMark admonitions in the PyMdownX spelling (`!!!`, `???`, `???+`).
+    pub tmark_admonition: bool,
+    /// TMark definition list items (`:   definition`).
+    pub tmark_definition: bool,
+    /// LaTeX-habit inline math `\(…\)`.
+    pub tmark_math_compat: bool,
 }
 
 impl Default for Constructs {
@@ -379,6 +399,14 @@ impl Default for Constructs {
             mdx_jsx_flow: false,
             mdx_jsx_text: false,
             thematic_break: true,
+            tmark_brace: false,
+            tmark_reference: false,
+            tmark_define: false,
+            tmark_attention: false,
+            tmark_container: false,
+            tmark_admonition: false,
+            tmark_definition: false,
+            tmark_math_compat: false,
         }
     }
 }
@@ -401,6 +429,27 @@ impl Constructs {
             gfm_table: true,
             gfm_task_list_item: true,
             ..Self::default()
+        }
+    }
+
+    /// TMark.
+    ///
+    /// GFM plus front matter, math, and the TMark constructs. The MDX
+    /// constructs stay off.
+    pub fn tmark() -> Self {
+        Self {
+            frontmatter: true,
+            math_flow: true,
+            math_text: true,
+            tmark_brace: true,
+            tmark_reference: true,
+            tmark_define: true,
+            tmark_attention: true,
+            tmark_container: true,
+            tmark_admonition: true,
+            tmark_definition: true,
+            tmark_math_compat: true,
+            ..Self::gfm()
         }
     }
 
@@ -1279,6 +1328,14 @@ impl ParseOptions {
         }
     }
 
+    /// TMark.
+    pub fn tmark() -> Self {
+        Self {
+            constructs: Constructs::tmark(),
+            ..Self::default()
+        }
+    }
+
     /// MDX.
     ///
     /// This turns on `CommonMark`, turns off some conflicting constructs
@@ -1456,7 +1513,7 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", ParseOptions::default()),
-            "ParseOptions { constructs: Constructs { attention: true, autolink: true, block_quote: true, character_escape: true, character_reference: true, code_indented: true, code_fenced: true, code_text: true, definition: true, frontmatter: false, gfm_autolink_literal: false, gfm_footnote_definition: false, gfm_label_start_footnote: false, gfm_strikethrough: false, gfm_table: false, gfm_task_list_item: false, hard_break_escape: true, hard_break_trailing: true, heading_atx: true, heading_setext: true, html_flow: true, html_text: true, label_start_image: true, label_start_link: true, label_end: true, list_item: true, math_flow: false, math_text: false, mdx_esm: false, mdx_expression_flow: false, mdx_expression_text: false, mdx_jsx_flow: false, mdx_jsx_text: false, thematic_break: true }, gfm_strikethrough_single_tilde: true, math_text_single_dollar: true, mdx_expression_parse: None, mdx_esm_parse: None }",
+            "ParseOptions { constructs: Constructs { attention: true, autolink: true, block_quote: true, character_escape: true, character_reference: true, code_indented: true, code_fenced: true, code_text: true, definition: true, frontmatter: false, gfm_autolink_literal: false, gfm_footnote_definition: false, gfm_label_start_footnote: false, gfm_strikethrough: false, gfm_table: false, gfm_task_list_item: false, hard_break_escape: true, hard_break_trailing: true, heading_atx: true, heading_setext: true, html_flow: true, html_text: true, label_start_image: true, label_start_link: true, label_end: true, list_item: true, math_flow: false, math_text: false, mdx_esm: false, mdx_expression_flow: false, mdx_expression_text: false, mdx_jsx_flow: false, mdx_jsx_text: false, thematic_break: true, tmark_brace: false, tmark_reference: false, tmark_define: false, tmark_attention: false, tmark_container: false, tmark_admonition: false, tmark_definition: false, tmark_math_compat: false }, gfm_strikethrough_single_tilde: true, math_text_single_dollar: true, mdx_expression_parse: None, mdx_esm_parse: None }",
             "should support `Debug` trait"
         );
         assert_eq!(
@@ -1469,7 +1526,7 @@ mod tests {
                 })),
                 ..Default::default()
             }),
-            "ParseOptions { constructs: Constructs { attention: true, autolink: true, block_quote: true, character_escape: true, character_reference: true, code_indented: true, code_fenced: true, code_text: true, definition: true, frontmatter: false, gfm_autolink_literal: false, gfm_footnote_definition: false, gfm_label_start_footnote: false, gfm_strikethrough: false, gfm_table: false, gfm_task_list_item: false, hard_break_escape: true, hard_break_trailing: true, heading_atx: true, heading_setext: true, html_flow: true, html_text: true, label_start_image: true, label_start_link: true, label_end: true, list_item: true, math_flow: false, math_text: false, mdx_esm: false, mdx_expression_flow: false, mdx_expression_text: false, mdx_jsx_flow: false, mdx_jsx_text: false, thematic_break: true }, gfm_strikethrough_single_tilde: true, math_text_single_dollar: true, mdx_expression_parse: Some(\"[Function]\"), mdx_esm_parse: Some(\"[Function]\") }",
+            "ParseOptions { constructs: Constructs { attention: true, autolink: true, block_quote: true, character_escape: true, character_reference: true, code_indented: true, code_fenced: true, code_text: true, definition: true, frontmatter: false, gfm_autolink_literal: false, gfm_footnote_definition: false, gfm_label_start_footnote: false, gfm_strikethrough: false, gfm_table: false, gfm_task_list_item: false, hard_break_escape: true, hard_break_trailing: true, heading_atx: true, heading_setext: true, html_flow: true, html_text: true, label_start_image: true, label_start_link: true, label_end: true, list_item: true, math_flow: false, math_text: false, mdx_esm: false, mdx_expression_flow: false, mdx_expression_text: false, mdx_jsx_flow: false, mdx_jsx_text: false, thematic_break: true, tmark_brace: false, tmark_reference: false, tmark_define: false, tmark_attention: false, tmark_container: false, tmark_admonition: false, tmark_definition: false, tmark_math_compat: false }, gfm_strikethrough_single_tilde: true, math_text_single_dollar: true, mdx_expression_parse: Some(\"[Function]\"), mdx_esm_parse: Some(\"[Function]\") }",
             "should support `Debug` trait on mdx functions"
         );
     }

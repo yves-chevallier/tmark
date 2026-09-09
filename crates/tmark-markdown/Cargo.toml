@@ -12,6 +12,9 @@ description = "Vendored markdown-rs (micromark) with the TMark constructs"
 
 [lib]
 name = "tmark_markdown"
+# Upstream doc examples import `markdown::`; rewriting them all would be a
+# large diff against upstream, so doctests are off (see VENDORED.md).
+doctest = false
 
 [dependencies]
 unicode-id = { version = "0.3", features = ["no_std"] }

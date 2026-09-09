@@ -145,6 +145,7 @@ use crate::tokenizer::Tokenizer;
 use crate::util::{
     constant::{CODE_FENCED_SEQUENCE_SIZE_MIN, MATH_FLOW_SEQUENCE_SIZE_MIN, TAB_SIZE},
     slice::{Position, Slice},
+    tmark::{line_end, looks_like_attributes},
 };
 
 /// Start of raw.
@@ -520,17 +521,72 @@ pub fn sequence_close(tokenizer: &mut Tokenizer) -> State {
         tokenizer.exit(tokenizer.tokenize_state.token_3.clone());
 
         if matches!(tokenizer.current, Some(b'\t' | b' ')) {
-            tokenizer.attempt(
-                State::Next(StateName::RawFlowAfterSequenceClose),
-                State::Nok,
-            );
+            tokenizer.attempt(State::Next(StateName::RawFlowCloseAttrsBefore), State::Nok);
             State::Retry(space_or_tab(tokenizer))
         } else {
-            State::Retry(StateName::RawFlowAfterSequenceClose)
+            State::Retry(StateName::RawFlowCloseAttrsBefore)
         }
     } else {
         tokenizer.tokenize_state.size_b = 0;
         State::Nok
+    }
+}
+
+/// TMark: after a closing math fence, at an optional attribute list
+/// (`$$ {#eq:x}`, spec §Math (display)). Recorded as the fence meta.
+///
+/// ```markdown
+///   | $$
+///   | a^2
+/// > | $$ {#eq:x}
+///        ^
+/// ```
+pub fn close_attrs_before(tokenizer: &mut Tokenizer) -> State {
+    if tokenizer.tokenize_state.marker == b'$'
+        && tokenizer.parse_state.options.constructs.tmark_brace
+        && tokenizer.current == Some(b'{')
+        && looks_like_attributes(tokenizer.parse_state.bytes, tokenizer.point.index)
+        && tokenizer.parse_state.bytes
+            [tokenizer.point.index..line_end(tokenizer.parse_state.bytes, tokenizer.point.index)]
+            .contains(&b'}')
+    {
+        tokenizer.enter(tokenizer.tokenize_state.token_5.clone());
+        tokenizer.enter_link(
+            Name::Data,
+            Link {
+                previous: None,
+                next: None,
+                content: Content::String,
+            },
+        );
+        State::Retry(StateName::RawFlowCloseAttrs)
+    } else {
+        State::Retry(StateName::RawFlowAfterSequenceClose)
+    }
+}
+
+/// TMark: in the attribute list after a closing math fence.
+pub fn close_attrs(tokenizer: &mut Tokenizer) -> State {
+    match tokenizer.current {
+        Some(b'}') => {
+            tokenizer.consume();
+            tokenizer.exit(Name::Data);
+            tokenizer.exit(tokenizer.tokenize_state.token_5.clone());
+            if matches!(tokenizer.current, Some(b'\t' | b' ')) {
+                tokenizer.attempt(
+                    State::Next(StateName::RawFlowAfterSequenceClose),
+                    State::Nok,
+                );
+                State::Retry(space_or_tab(tokenizer))
+            } else {
+                State::Next(StateName::RawFlowAfterSequenceClose)
+            }
+        }
+        None | Some(b'\n') => State::Nok,
+        Some(_) => {
+            tokenizer.consume();
+            State::Next(StateName::RawFlowCloseAttrs)
+        }
     }
 }
 

@@ -32,23 +32,28 @@ use crate::subtokenize::Subresult;
 use crate::tokenizer::Tokenizer;
 
 /// Characters that can start something in text.
-const MARKERS: [u8; 16] = [
+const MARKERS: [u8; 21] = [
     b'!',  // `label_start_image`
+    b'#',  // `tmark_define`
     b'$',  // `raw_text` (math (text))
     b'&',  // `character_reference`
     b'*',  // `attention` (emphasis, strong)
+    b'+',  // `attention` (tmark keystroke)
     b'<',  // `autolink`, `html_text`, `mdx_jsx_text`
+    b'=',  // `attention` (tmark highlight)
+    b'@',  // `tmark_reference`
     b'H',  // `gfm_autolink_literal` (`protocol` kind)
     b'W',  // `gfm_autolink_literal` (`www.` kind)
     b'[',  // `label_start_link`
-    b'\\', // `character_escape`, `hard_break_escape`
+    b'\\', // `character_escape`, `hard_break_escape`, `tmark_math_compat`
     b']',  // `label_end`, `gfm_label_start_footnote`
+    b'^',  // `attention` (tmark superscript, insert)
     b'_',  // `attention` (emphasis, strong)
     b'`',  // `raw_text` (code (text))
     b'h',  // `gfm_autolink_literal` (`protocol` kind)
     b'w',  // `gfm_autolink_literal` (`www.` kind)
-    b'{',  // `mdx_expression_text`
-    b'~',  // `attention` (gfm strikethrough)
+    b'{',  // `tmark_brace`, `mdx_expression_text`
+    b'~',  // `attention` (gfm strikethrough, tmark subscript)
 ];
 
 /// Start of text.
@@ -105,8 +110,8 @@ pub fn before(tokenizer: &mut Tokenizer) -> State {
             );
             State::Retry(StateName::CharacterReferenceStart)
         }
-        // attention (emphasis, gfm strikethrough, strong)
-        Some(b'*' | b'_' | b'~') => {
+        // attention (emphasis, gfm strikethrough, strong, tmark sugar)
+        Some(b'*' | b'+' | b'=' | b'^' | b'_' | b'~') => {
             tokenizer.attempt(
                 State::Next(StateName::TextBefore),
                 State::Next(StateName::TextBeforeData),
@@ -145,9 +150,23 @@ pub fn before(tokenizer: &mut Tokenizer) -> State {
         Some(b'\\') => {
             tokenizer.attempt(
                 State::Next(StateName::TextBefore),
-                State::Next(StateName::TextBeforeHardBreakEscape),
+                State::Next(StateName::TextBeforeCharacterEscape),
             );
-            State::Retry(StateName::CharacterEscapeStart)
+            State::Retry(StateName::TmarkMathCompatStart)
+        }
+        Some(b'#') => {
+            tokenizer.attempt(
+                State::Next(StateName::TextBefore),
+                State::Next(StateName::TextBeforeData),
+            );
+            State::Retry(StateName::TmarkDefineStart)
+        }
+        Some(b'@') => {
+            tokenizer.attempt(
+                State::Next(StateName::TextBefore),
+                State::Next(StateName::TextBeforeData),
+            );
+            State::Retry(StateName::TmarkReferenceStart)
         }
         Some(b']') => {
             tokenizer.attempt(
@@ -159,9 +178,9 @@ pub fn before(tokenizer: &mut Tokenizer) -> State {
         Some(b'{') => {
             tokenizer.attempt(
                 State::Next(StateName::TextBefore),
-                State::Next(StateName::TextBeforeData),
+                State::Next(StateName::TextBeforeMdxExpression),
             );
-            State::Retry(StateName::MdxExpressionTextStart)
+            State::Retry(StateName::TmarkBraceStart)
         }
         _ => State::Retry(StateName::TextBeforeData),
     }
@@ -197,6 +216,28 @@ pub fn before_mdx_jsx(tokenizer: &mut Tokenizer) -> State {
         State::Next(StateName::TextBeforeData),
     );
     State::Retry(StateName::MdxJsxTextStart)
+}
+
+/// Before character escape.
+///
+/// At `\`, which wasn’t TMark's `\(…\)`.
+pub fn before_character_escape(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::TextBefore),
+        State::Next(StateName::TextBeforeHardBreakEscape),
+    );
+    State::Retry(StateName::CharacterEscapeStart)
+}
+
+/// Before MDX expression (text).
+///
+/// At `{`, which wasn’t a TMark brace group.
+pub fn before_mdx_expression(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::TextBefore),
+        State::Next(StateName::TextBeforeData),
+    );
+    State::Retry(StateName::MdxExpressionTextStart)
 }
 
 /// Before hard break escape.

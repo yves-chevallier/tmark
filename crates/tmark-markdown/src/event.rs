@@ -3377,6 +3377,105 @@ pub enum Name {
     /// ```
     ThematicBreakSequence,
 
+    // ------------------------------------------------------------------
+    // TMark constructs (see design/02-syntax.md of the tmark repository).
+    // ------------------------------------------------------------------
+    /// TMark brace group: a role head, an attribute list or a moustache.
+    ///
+    /// ```markdown
+    /// > | a {aside side=left}[b] c
+    ///       ^^^^^^^^^^^^^^^^^
+    /// ```
+    TmarkBrace,
+    /// TMark brace marker (`{`, `}`, `{{`, `}}`).
+    TmarkBraceMarker,
+    /// TMark brace data (between the markers).
+    TmarkBraceData,
+    /// TMark parenthesised argument after a role head or a `#`.
+    ///
+    /// ```markdown
+    /// > | a {raw latex}(\clearpage) c
+    ///                  ^^^^^^^^^^^^^
+    /// ```
+    TmarkArgument,
+    /// TMark argument marker (`(`, `)`; `{`, `}` for the deprecated `#{…}`).
+    TmarkArgumentMarker,
+    /// TMark argument data.
+    TmarkArgumentData,
+    /// TMark bracket group after a role head or a `#`, holding text content.
+    ///
+    /// ```markdown
+    /// > | a {aside}[b **c**] d
+    ///              ^^^^^^^^^
+    /// ```
+    TmarkGroup,
+    /// TMark anonymous span: `[text]` immediately followed by an attribute list.
+    TmarkSpan,
+    /// TMark reference or citation (`@key`, `@[…]`).
+    TmarkReference,
+    /// TMark reference marker (`@`, `[`, `]`).
+    TmarkReferenceMarker,
+    /// TMark reference data (the key, or the bracket content).
+    TmarkReferenceData,
+    /// TMark definition sigil (`#` before `[`, `(` or `{`).
+    TmarkDefine,
+    /// TMark definition marker (`#`).
+    TmarkDefineMarker,
+    /// TMark highlight (`==x==`).
+    TmarkHighlight,
+    /// TMark highlight sequence.
+    TmarkHighlightSequence,
+    /// TMark highlight text.
+    TmarkHighlightText,
+    /// TMark superscript (`^x^`).
+    TmarkSuperscript,
+    /// TMark superscript sequence.
+    TmarkSuperscriptSequence,
+    /// TMark superscript text.
+    TmarkSuperscriptText,
+    /// TMark insert (`^^x^^`).
+    TmarkInsert,
+    /// TMark insert sequence.
+    TmarkInsertSequence,
+    /// TMark insert text.
+    TmarkInsertText,
+    /// TMark keystroke (`++ctrl+s++`).
+    TmarkKeystroke,
+    /// TMark keystroke sequence.
+    TmarkKeystrokeSequence,
+    /// TMark keystroke text.
+    TmarkKeystrokeText,
+    /// TMark subscript (`~x~`).
+    TmarkSubscript,
+    /// TMark subscript sequence.
+    TmarkSubscriptSequence,
+    /// TMark subscript text.
+    TmarkSubscriptText,
+    /// TMark container directive (`::: name` … `:::`, `/// name` … `///`).
+    TmarkContainer,
+    /// TMark container fence line.
+    TmarkContainerFence,
+    /// TMark container fence sequence (`:::`).
+    TmarkContainerFenceSequence,
+    /// TMark container fence info (name and attributes, raw).
+    TmarkContainerFenceInfo,
+    /// TMark container content line.
+    TmarkContainerChunk,
+    /// TMark admonition (`!!! type "Title"`, `??? type`, `???+ type`).
+    TmarkAdmonition,
+    /// TMark admonition marker (`!!!`, `???`, `???+`).
+    TmarkAdmonitionMarker,
+    /// TMark admonition info (type, classes, title, raw).
+    TmarkAdmonitionInfo,
+    /// TMark admonition body line (indent stripped).
+    TmarkAdmonitionChunk,
+    /// TMark definition list item (`:   definition`).
+    TmarkDefinition,
+    /// TMark definition marker (`:`).
+    TmarkDefinitionMarker,
+    /// TMark definition body line (marker or indent stripped).
+    TmarkDefinitionChunk,
+
     LinePrefix,
 }
 

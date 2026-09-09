@@ -196,3 +196,14 @@ pub mod raw_text;
 pub mod string;
 pub mod text;
 pub mod thematic_break;
+
+// TMark constructs.
+pub mod partial_tmark_body;
+pub mod tmark_admonition;
+pub mod tmark_argument;
+pub mod tmark_brace;
+pub mod tmark_container;
+pub mod tmark_define;
+pub mod tmark_definition;
+pub mod tmark_math_compat;
+pub mod tmark_reference;

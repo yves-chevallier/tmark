@@ -81,6 +81,30 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
             );
             State::Retry(StateName::MdxExpressionFlowStart)
         }
+        // TMark: `:::` containers, then `:   ` definitions.
+        Some(b':') => {
+            tokenizer.attempt(
+                State::Next(StateName::FlowAfter),
+                State::Next(StateName::FlowBeforeTmarkDefinition),
+            );
+            State::Retry(StateName::TmarkContainerStart)
+        }
+        // TMark: `///` blocks (deprecated).
+        Some(b'/') => {
+            tokenizer.attempt(
+                State::Next(StateName::FlowAfter),
+                State::Next(StateName::FlowBeforeGfmTable),
+            );
+            State::Retry(StateName::TmarkContainerStart)
+        }
+        // TMark: `!!!` and `???` admonitions.
+        Some(b'!' | b'?') => {
+            tokenizer.attempt(
+                State::Next(StateName::FlowAfter),
+                State::Next(StateName::FlowBeforeGfmTable),
+            );
+            State::Retry(StateName::TmarkAdmonitionStart)
+        }
         // Actual parsing: blank line? Indented code? Indented anything?
         // Tables, setext heading underlines, definitions, and Contents are
         // particularly weird.
@@ -125,9 +149,27 @@ pub fn before_code_indented(tokenizer: &mut Tokenizer) -> State {
 pub fn before_raw(tokenizer: &mut Tokenizer) -> State {
     tokenizer.attempt(
         State::Next(StateName::FlowAfter),
-        State::Next(StateName::FlowBeforeHtml),
+        State::Next(StateName::FlowBeforeTmarkContainer),
     );
     State::Retry(StateName::RawFlowStart)
+}
+
+/// Before TMark container (indented up to three spaces).
+pub fn before_tmark_container(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::FlowAfter),
+        State::Next(StateName::FlowBeforeHtml),
+    );
+    State::Retry(StateName::TmarkContainerStart)
+}
+
+/// Before TMark definition (`:   text`), after a `:::` container failed.
+pub fn before_tmark_definition(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::FlowAfter),
+        State::Next(StateName::FlowBeforeGfmTable),
+    );
+    State::Retry(StateName::TmarkDefinitionStart)
 }
 
 /// At html (flow).

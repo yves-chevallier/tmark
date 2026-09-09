@@ -104,6 +104,21 @@ pub enum LabelKind {
     ///
     /// Construct: [Label end][crate::construct::label_end].
     GfmUndefinedFootnote,
+    /// TMark: bracket group after a role head, a `#`, or another group.
+    ///
+    /// ```markdown
+    /// > | a {aside}[b] c
+    ///              ^
+    /// ```
+    TmarkGroup,
+    /// TMark: anonymous span, a label immediately followed by an attribute
+    /// list. Starts as a `Link` and is retyped at the label end.
+    ///
+    /// ```markdown
+    /// > | a [b]{#c} d
+    ///       ^
+    /// ```
+    TmarkSpan,
 }
 
 /// Label start, looking for an end.

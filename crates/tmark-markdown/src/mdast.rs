@@ -253,6 +253,28 @@ pub enum Node {
     Definition(Definition),
     /// Paragraph.
     Paragraph(Paragraph),
+
+    // TMark (see design/02-syntax.md of the tmark repository).
+    /// TMark brace group (role head, attribute list, moustache).
+    TmarkBrace(TmarkBrace),
+    /// TMark parenthesised argument.
+    TmarkArgument(TmarkArgument),
+    /// TMark bracket group.
+    TmarkGroup(TmarkGroup),
+    /// TMark anonymous span.
+    TmarkSpan(TmarkSpan),
+    /// TMark reference or citation.
+    TmarkReference(TmarkReference),
+    /// TMark definition sigil.
+    TmarkDefine(TmarkDefine),
+    /// TMark inline sugar (highlight, superscript, insert, keystroke, subscript).
+    TmarkMark(TmarkMark),
+    /// TMark container directive.
+    TmarkContainer(TmarkContainer),
+    /// TMark admonition (PyMdownX spelling).
+    TmarkAdmonition(TmarkAdmonition),
+    /// TMark definition list item.
+    TmarkDefinition(TmarkDefinition),
 }
 
 impl fmt::Debug for Node {
@@ -293,6 +315,16 @@ impl fmt::Debug for Node {
             Node::ListItem(x) => x.fmt(f),
             Node::Definition(x) => x.fmt(f),
             Node::Paragraph(x) => x.fmt(f),
+            Node::TmarkBrace(x) => x.fmt(f),
+            Node::TmarkArgument(x) => x.fmt(f),
+            Node::TmarkGroup(x) => x.fmt(f),
+            Node::TmarkSpan(x) => x.fmt(f),
+            Node::TmarkReference(x) => x.fmt(f),
+            Node::TmarkDefine(x) => x.fmt(f),
+            Node::TmarkMark(x) => x.fmt(f),
+            Node::TmarkContainer(x) => x.fmt(f),
+            Node::TmarkAdmonition(x) => x.fmt(f),
+            Node::TmarkDefinition(x) => x.fmt(f),
         }
     }
 }
@@ -324,6 +356,16 @@ impl ToString for Node {
             Node::TableCell(x) => children_to_string(&x.children),
             Node::ListItem(x) => children_to_string(&x.children),
             Node::Paragraph(x) => children_to_string(&x.children),
+            Node::TmarkGroup(x) => children_to_string(&x.children),
+            Node::TmarkSpan(x) => children_to_string(&x.children),
+            Node::TmarkDefine(x) => children_to_string(&x.children),
+            Node::TmarkMark(x) => children_to_string(&x.children),
+            Node::TmarkBrace(x) => x.value.clone(),
+            Node::TmarkArgument(x) => x.value.clone(),
+            Node::TmarkReference(x) => x.value.clone(),
+            Node::TmarkContainer(x) => x.value.clone(),
+            Node::TmarkAdmonition(x) => x.value.clone(),
+            Node::TmarkDefinition(x) => x.value.clone(),
 
             // Literals.
             Node::MdxjsEsm(x) => x.value.clone(),
@@ -356,6 +398,10 @@ impl Node {
             // Parent.
             Node::Root(x) => Some(&x.children),
             Node::Paragraph(x) => Some(&x.children),
+            Node::TmarkGroup(x) => Some(&x.children),
+            Node::TmarkSpan(x) => Some(&x.children),
+            Node::TmarkDefine(x) => Some(&x.children),
+            Node::TmarkMark(x) => Some(&x.children),
             Node::Heading(x) => Some(&x.children),
             Node::Blockquote(x) => Some(&x.children),
             Node::List(x) => Some(&x.children),
@@ -381,6 +427,10 @@ impl Node {
             // Parent.
             Node::Root(x) => Some(&mut x.children),
             Node::Paragraph(x) => Some(&mut x.children),
+            Node::TmarkGroup(x) => Some(&mut x.children),
+            Node::TmarkSpan(x) => Some(&mut x.children),
+            Node::TmarkDefine(x) => Some(&mut x.children),
+            Node::TmarkMark(x) => Some(&mut x.children),
             Node::Heading(x) => Some(&mut x.children),
             Node::Blockquote(x) => Some(&mut x.children),
             Node::List(x) => Some(&mut x.children),
@@ -438,6 +488,16 @@ impl Node {
             Node::ListItem(x) => x.position.as_ref(),
             Node::Definition(x) => x.position.as_ref(),
             Node::Paragraph(x) => x.position.as_ref(),
+            Node::TmarkBrace(x) => x.position.as_ref(),
+            Node::TmarkArgument(x) => x.position.as_ref(),
+            Node::TmarkGroup(x) => x.position.as_ref(),
+            Node::TmarkSpan(x) => x.position.as_ref(),
+            Node::TmarkReference(x) => x.position.as_ref(),
+            Node::TmarkDefine(x) => x.position.as_ref(),
+            Node::TmarkMark(x) => x.position.as_ref(),
+            Node::TmarkContainer(x) => x.position.as_ref(),
+            Node::TmarkAdmonition(x) => x.position.as_ref(),
+            Node::TmarkDefinition(x) => x.position.as_ref(),
         }
     }
 
@@ -477,6 +537,16 @@ impl Node {
             Node::ListItem(x) => x.position.as_mut(),
             Node::Definition(x) => x.position.as_mut(),
             Node::Paragraph(x) => x.position.as_mut(),
+            Node::TmarkBrace(x) => x.position.as_mut(),
+            Node::TmarkArgument(x) => x.position.as_mut(),
+            Node::TmarkGroup(x) => x.position.as_mut(),
+            Node::TmarkSpan(x) => x.position.as_mut(),
+            Node::TmarkReference(x) => x.position.as_mut(),
+            Node::TmarkDefine(x) => x.position.as_mut(),
+            Node::TmarkMark(x) => x.position.as_mut(),
+            Node::TmarkContainer(x) => x.position.as_mut(),
+            Node::TmarkAdmonition(x) => x.position.as_mut(),
+            Node::TmarkDefinition(x) => x.position.as_mut(),
         }
     }
 
@@ -516,6 +586,16 @@ impl Node {
             Node::ListItem(x) => x.position = position,
             Node::Definition(x) => x.position = position,
             Node::Paragraph(x) => x.position = position,
+            Node::TmarkBrace(x) => x.position = position,
+            Node::TmarkArgument(x) => x.position = position,
+            Node::TmarkGroup(x) => x.position = position,
+            Node::TmarkSpan(x) => x.position = position,
+            Node::TmarkReference(x) => x.position = position,
+            Node::TmarkDefine(x) => x.position = position,
+            Node::TmarkMark(x) => x.position = position,
+            Node::TmarkContainer(x) => x.position = position,
+            Node::TmarkAdmonition(x) => x.position = position,
+            Node::TmarkDefinition(x) => x.position = position,
         }
     }
 }
@@ -1382,6 +1462,251 @@ pub struct MdxJsxExpressionAttribute {
     /// Value.
     pub value: String,
     /// Stops
+    #[cfg_attr(feature = "serde", serde(rename = "_markdownRsStops"))]
+    pub stops: Vec<Stop>,
+}
+
+// ---------------------------------------------------------------------------
+// TMark nodes. Raw where the lowering in `tmark-syntax` does the parsing.
+// ---------------------------------------------------------------------------
+
+/// TMark brace group: a role head, an attribute list, or a moustache.
+///
+/// `value` is the text between the braces (`aside side=left`, `#id .cls`,
+/// ` key `), the markers excluded.
+///
+/// ```markdown
+/// > | a {aside}[b] c
+///       ^^^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkBrace {
+    // Literal.
+    /// Content model.
+    pub value: String,
+    /// Whether the group is a moustache (`{{ … }}`).
+    pub moustache: bool,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// TMark parenthesised argument after a role head (`{raw latex}(…)`) or
+/// inside a define (`#(fw:key)`, deprecated `#{fw:key}`).
+///
+/// ```markdown
+/// > | a {include}(chapter.md) c
+///                ^^^^^^^^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkArgument {
+    // Literal.
+    /// Content model (without the markers).
+    pub value: String,
+    /// Opening marker byte (`(` or `{`).
+    pub marker: u8,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// TMark bracket group after a role head, a `#`, or another group.
+///
+/// ```markdown
+/// > | a {aside}[b **c**] d
+///              ^^^^^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkGroup {
+    // Parent.
+    /// Content model.
+    pub children: Vec<Node>,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// TMark anonymous span: `[text]` immediately followed by an attribute list
+/// (the following [`TmarkBrace`] sibling).
+///
+/// ```markdown
+/// > | a [b]{#c} d
+///       ^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkSpan {
+    // Parent.
+    /// Content model.
+    pub children: Vec<Node>,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// TMark reference or citation.
+///
+/// `value` is the key (`sec:intro`) or the bracketed items with their
+/// brackets (`[see ein05, p. 33; -AI2027]`).
+///
+/// ```markdown
+/// > | See @sec:intro and @[fig:a; fig:b].
+///         ^^^^^^^^^^     ^^^^^^^^^^^^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkReference {
+    // Literal.
+    /// Content model.
+    pub value: String,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// TMark standalone definition sigil `#`.
+///
+/// For `#(prefix:key)` and `#{prefix:key}` the single child is the
+/// [`TmarkArgument`]; for `#[term]…` there are no children and the groups
+/// follow as [`TmarkGroup`] siblings.
+///
+/// ```markdown
+/// > | #(fw:boot-loop) The firmware…
+///     ^^^^^^^^^^^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkDefine {
+    // Parent.
+    /// Content model.
+    pub children: Vec<Node>,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// Kind of a [`TmarkMark`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "lowercase")
+)]
+pub enum TmarkMarkKind {
+    /// `==x==`
+    Highlight,
+    /// `^x^`
+    Superscript,
+    /// `^^x^^`
+    Insert,
+    /// `++ctrl+s++`
+    Keystroke,
+    /// `~x~`
+    Subscript,
+}
+
+/// TMark inline sugar formed by attention: highlight, superscript, insert,
+/// keystroke, subscript.
+///
+/// ```markdown
+/// > | a ==b== c
+///       ^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkMark {
+    // Parent.
+    /// Kind.
+    pub kind: TmarkMarkKind,
+    /// Content model.
+    pub children: Vec<Node>,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+}
+
+/// TMark container directive (`::: name {attrs}` … `:::`, or the
+/// deprecated `/// name` … `///`).
+///
+/// The content lines are raw, joined by `\n`, their indentation up to the
+/// fence's stripped; `stops` maps offsets in `value` to offsets in the
+/// source so that the lowering can re-parse the content and keep spans.
+///
+/// ```markdown
+/// > | ::: warning {title="Toolchain"}
+///     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/// > | Install TeX Live.
+///     ^^^^^^^^^^^^^^^^^
+/// > | :::
+///     ^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkContainer {
+    // Literal.
+    /// Fence marker byte (`:` or `/`).
+    pub marker: u8,
+    /// Raw info of the opening fence (`warning {title="Toolchain"}`).
+    pub info: String,
+    /// Content model: the content lines.
+    pub value: String,
+    /// Whether a closing fence was found.
+    pub closed: bool,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+    // Custom data on where each slice of `value` came from.
+    #[cfg_attr(feature = "serde", serde(rename = "_markdownRsStops"))]
+    pub stops: Vec<Stop>,
+}
+
+/// TMark admonition in the PyMdownX spelling.
+///
+/// ```markdown
+/// > | !!! note "Title"
+///     ^^^^^^^^^^^^^^^^
+/// > |     Body.
+///         ^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkAdmonition {
+    // Literal.
+    /// Marker (`!!!`, `???`, `???+`).
+    pub marker: String,
+    /// Raw info (`note "Title"`).
+    pub info: String,
+    /// Content model: the body lines, indent stripped.
+    pub value: String,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+    // Custom data on where each slice of `value` came from.
+    #[cfg_attr(feature = "serde", serde(rename = "_markdownRsStops"))]
+    pub stops: Vec<Stop>,
+}
+
+/// TMark definition list item (`:   definition`); the term is the
+/// preceding paragraph, paired by the lowering.
+///
+/// ```markdown
+///   | Term
+/// > | :   Definition.
+///     ^^^^^^^^^^^^^^^
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TmarkDefinition {
+    // Literal.
+    /// Content model: the definition lines, marker and indent stripped.
+    pub value: String,
+    /// Positional info.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub position: Option<Position>,
+    // Custom data on where each slice of `value` came from.
     #[cfg_attr(feature = "serde", serde(rename = "_markdownRsStops"))]
     pub stops: Vec<Stop>,
 }
