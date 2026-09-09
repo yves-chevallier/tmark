@@ -283,6 +283,9 @@ dependencies = [
 name = "tmark-syntax"
 version = "0.0.0"
 dependencies = [
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
  "tmark-ir",
  "tmark-markdown",
 ]

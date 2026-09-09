@@ -183,6 +183,14 @@ impl<'a> CompileContext<'a> {
         delve_mut(tree, stack)
     }
 
+    /// The tail of the tree below the current buffer (TMark: a node whose
+    /// content is being buffered, such as a math block at its closing fence).
+    fn tail_below_buffer_mut(&mut self) -> &mut Node {
+        let index = self.trees.len() - 2;
+        let (tree, stack, _) = &mut self.trees[index];
+        delve_mut(tree, stack)
+    }
+
     fn tail_penultimate_mut(&mut self) -> &mut Node {
         let (tree, stack, _) = self.trees.last_mut().expect("Cannot get tail w/o tree");
         delve_mut(tree, &stack[0..(stack.len() - 1)])
@@ -1049,7 +1057,14 @@ fn on_exit_code_fenced_fence_info(context: &mut CompileContext) {
 /// Handle [`Exit`][Kind::Exit]:{[`CodeFencedFenceMeta`][Name::CodeFencedFenceMeta],[`MathFlowFenceMeta`][Name::MathFlowFenceMeta]}.
 fn on_exit_raw_flow_fence_meta(context: &mut CompileContext) {
     let value = context.resume().to_string();
-    match context.tail_mut() {
+    // TMark: on the closing fence (`$$ {#eq:x}`) the content buffer is on
+    // top; the node sits in the tree below it.
+    let node = if context.raw_flow_fence_seen {
+        context.tail_below_buffer_mut()
+    } else {
+        context.tail_mut()
+    };
+    match node {
         Node::Code(node) => node.meta = Some(value),
         Node::Math(node) => node.meta = Some(value),
         _ => {

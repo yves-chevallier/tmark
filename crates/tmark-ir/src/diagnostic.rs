@@ -28,6 +28,14 @@ pub enum Code {
     AttrNoHost,
     /// Spec §Roles: a role head not followed by `[` or `(`.
     RoleDanglingHead,
+    /// Design C4: a brace group followed by `[` or `(` whose name is not a
+    /// role. Literal text; a hint against typos.
+    RoleUnknown,
+    /// Design C7: a `Kind:` line with no float to attach to.
+    CaptionNoHost,
+    /// Design C10: `{include}(…)` inside a paragraph; only the block form
+    /// exists.
+    IncludeInline,
     /// Spec §Container directives: a `:::` fence without its closing line.
     ContainerUnclosed,
     /// Spec §Div: a `::: name` whose name is unknown.
@@ -87,6 +95,9 @@ impl Code {
         match self {
             Code::AttrNoHost => "attr-no-host",
             Code::RoleDanglingHead => "role-dangling-head",
+            Code::RoleUnknown => "role-unknown",
+            Code::CaptionNoHost => "caption-no-host",
+            Code::IncludeInline => "include-inline",
             Code::ContainerUnclosed => "container-unclosed",
             Code::ContainerUnknown => "container-unknown",
             Code::FenceUnknownNodeWord => "fence-unknown-node-word",
@@ -120,6 +131,8 @@ impl Code {
             }
             Code::AttrNoHost
             | Code::RoleDanglingHead
+            | Code::CaptionNoHost
+            | Code::IncludeInline
             | Code::ContainerUnclosed
             | Code::ContainerUnknown
             | Code::FenceUnknownNodeWord
@@ -135,7 +148,8 @@ impl Code {
             | Code::IncludeMissing
             | Code::DeprecatedFrontmatterKey => Severity::Warning,
             Code::LeadPromotion => Severity::Info,
-            Code::HardcodedNumber
+            Code::RoleUnknown
+            | Code::HardcodedNumber
             | Code::PositionWord
             | Code::CaptionIdOffConvention
             | Code::HeadingSkip => Severity::Hint,

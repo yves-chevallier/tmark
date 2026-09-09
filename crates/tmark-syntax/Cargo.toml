@@ -9,3 +9,10 @@ rust-version.workspace = true
 [dependencies]
 tmark-ir = { path = "../tmark-ir" }
 tmark-markdown = { path = "../tmark-markdown" }
+# `yaml table` and `yaml table-config` fences (same YAML crate as the front matter).
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml_ng = "0.10"
+
+[dev-dependencies]
+serde_json.workspace = true

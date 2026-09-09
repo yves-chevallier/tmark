@@ -24,3 +24,5 @@ edits the fork.
 - New files: `src/construct/tmark_*.rs`, `src/construct/partial_tmark_body.rs`, `src/util/tmark.rs`.
 - `Cargo.toml`: `doctest = false` (the doc examples import `markdown::`).
 - `src/construct/raw_flow.rs`: an attribute list after a closing math fence (`$$ {#eq:x}`) is accepted under `tmark_brace` and recorded as the fence meta.
+- `src/lib.rs`: `pub use util::tmark;` re-exports the TMark predicates for `tmark-syntax`.
+- `src/to_mdast.rs`: the meta of a closing math fence is attached to the node below the content buffer.

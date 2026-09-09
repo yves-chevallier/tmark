@@ -64,6 +64,9 @@ pub use util::location::Location;
 
 pub use util::line_ending::LineEnding;
 
+// TMark: the byte predicates shared with `tmark-syntax`.
+pub use util::tmark;
+
 pub use util::mdx::{
     EsmParse as MdxEsmParse, ExpressionKind as MdxExpressionKind,
     ExpressionParse as MdxExpressionParse, Signal as MdxSignal,
