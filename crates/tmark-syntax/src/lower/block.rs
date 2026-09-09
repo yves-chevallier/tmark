@@ -610,75 +610,45 @@ impl Lowerer {
         }
     }
 
-    /// Pair `:   definition` items with the paragraph before them.
+    /// Pair `:   definition` items with the paragraph before them; a run of
+    /// terms and definitions is one list.
     fn pair_definitions(&mut self, items: Vec<Item>) -> Vec<Block> {
         let mut out: Vec<Block> = Vec::new();
-        let mut list: Option<(DefinitionList, Span)> = None;
         for item in items {
             match item {
+                Item::Block(block) => out.push(block),
                 Item::Definition(content, span) => {
                     let term = match out.last() {
-                        Some(Block::Para(_)) if list.as_ref().map_or(true, |_| true) => {
-                            // A paragraph right before the definition is its term,
-                            // unless it already belongs to the list as a term.
-                            match out.pop() {
-                                Some(Block::Para(para)) => Some(para),
-                                _ => None,
-                            }
-                        }
+                        Some(Block::Para(_)) => match out.pop() {
+                            Some(Block::Para(para)) => Some(para),
+                            _ => None,
+                        },
                         _ => None,
                     };
-                    match (&mut list, term) {
-                        (Some((dl, dl_span)), Some(para)) => {
-                            dl.items.push((para.content, vec![content]));
-                            *dl_span = dl_span.join(span);
-                        }
-                        (Some((dl, dl_span)), None) => {
+                    match (out.last_mut(), term) {
+                        // Another definition of the previous term.
+                        (Some(Block::DefinitionList(dl)), None) => {
                             if let Some(last) = dl.items.last_mut() {
                                 last.1.push(content);
                             }
-                            *dl_span = dl_span.join(span);
+                            dl.meta.span = dl.meta.span.join(span);
                         }
-                        (None, term) => {
+                        // A new term of the same list.
+                        (Some(Block::DefinitionList(dl)), Some(para)) => {
+                            dl.items.push((para.content, vec![content]));
+                            dl.meta.span = dl.meta.span.join(span);
+                        }
+                        (_, term) => {
                             let start = term.as_ref().map_or(span, |p| p.meta.span);
                             let meta = self.meta(start.join(span));
                             let term_content = term.map(|p| p.content).unwrap_or_default();
-                            list = Some((
-                                DefinitionList {
-                                    meta,
-                                    items: vec![(term_content, vec![content])],
-                                },
-                                start.join(span),
-                            ));
+                            out.push(Block::DefinitionList(DefinitionList {
+                                meta,
+                                items: vec![(term_content, vec![content])],
+                            }));
                         }
                     }
                 }
-                Item::Block(block) => {
-                    // A paragraph may be the next term: keep the list open
-                    // until something else comes.
-                    if let Some((dl, dl_span)) = list.take() {
-                        if matches!(block, Block::Para(_)) {
-                            list = Some((dl, dl_span));
-                        } else {
-                            let mut dl = dl;
-                            dl.meta.span = dl_span;
-                            out.push(Block::DefinitionList(dl));
-                        }
-                    }
-                    out.push(block);
-                }
-            }
-        }
-        if let Some((mut dl, dl_span)) = list {
-            dl.meta.span = dl_span;
-            // A paragraph left after the list was not a term.
-            let trailing = matches!(out.last(), Some(Block::Para(_)));
-            if trailing {
-                let para = out.pop().unwrap();
-                out.push(Block::DefinitionList(dl));
-                out.push(para);
-            } else {
-                out.push(Block::DefinitionList(dl));
             }
         }
         out
@@ -712,13 +682,26 @@ impl Lowerer {
             };
             if previous_is_host {
                 caption.position = CaptionPosition::After;
+                // A `yaml table-config` fence belongs right after its table,
+                // before the caption (canonical order: table, config, caption).
+                if matches!(out.last(), Some(Block::Table(_)))
+                    && matches!(iter.peek(), Some(Block::TableConfig(_)))
+                {
+                    let config = iter.next().expect("peeked");
+                    out.push(config);
+                }
                 out.push(Block::Caption(caption));
             } else if next_is_host {
                 // The IR keeps the caption after its host whatever the
                 // source order; `position` records the spelling.
                 caption.position = CaptionPosition::Before;
                 let host = iter.next().expect("peeked");
+                let table = matches!(host, Block::Table(_));
                 out.push(host);
+                if table && matches!(iter.peek(), Some(Block::TableConfig(_))) {
+                    let config = iter.next().expect("peeked");
+                    out.push(config);
+                }
                 out.push(Block::Caption(caption));
             } else {
                 // Inside `::: figure` a free caption captions the figure itself.

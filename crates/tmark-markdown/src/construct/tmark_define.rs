@@ -25,7 +25,7 @@ use crate::construct::tmark_brace::group_start;
 use crate::event::Name;
 use crate::state::{Name as StateName, State};
 use crate::tokenizer::Tokenizer;
-use crate::util::tmark::{is_ident_byte, is_ident_start, is_word_byte};
+use crate::util::tmark::{is_ident_byte, is_ident_start, word_char_before};
 
 /// Whether `bytes[index..]` is `prefix:key` followed by `close`.
 fn counter_shape(bytes: &[u8], index: usize, close: u8) -> bool {
@@ -60,10 +60,10 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
     if tokenizer.current != Some(b'#') || !tokenizer.parse_state.options.constructs.tmark_define {
         return State::Nok;
     }
-    if let Some(previous) = tokenizer.previous {
-        if is_word_byte(previous) || previous == b'\\' {
-            return State::Nok;
-        }
+    if word_char_before(tokenizer.parse_state.bytes, tokenizer.point.index)
+        || tokenizer.previous == Some(b'\\')
+    {
+        return State::Nok;
     }
     let bytes = tokenizer.parse_state.bytes;
     let index = tokenizer.point.index;

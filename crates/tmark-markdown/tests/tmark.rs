@@ -157,6 +157,11 @@ fn references() {
         "should apply the X4 guard and escapes"
     );
     assert_eq!(
+        describe(&inlines("§@[sec:model] and «@key» but é@key")),
+        r##"text("§") ref("[sec:model]") text(" and «") ref("key") text("» but é@key")"##,
+        "should guard on word characters, not on non-ASCII bytes"
+    );
+    assert_eq!(
         describe(&inlines(
             "@doi:10.1002/andp.19053221004. @https://doi.org/10.1/x, done"
         )),

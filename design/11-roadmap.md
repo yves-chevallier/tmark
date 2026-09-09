@@ -27,9 +27,14 @@ implementation notes, with totality property tests; the facade exposes
 `tmark parse`, `tmark fmt` and `tmark schema` work; `tmark-fmt` prints
 every node, the canonical block of every fixture is a fixed point, the
 editor sample and the whole spec round-trip and format idempotently, and
-`edit` splices one node. Remaining for M1: the fixed-point check of
-`tmark fmt --check` on `spec/tmark.md` itself (the spec is not written in
-normal form yet; see `04-printer.md`), and the parser's performance target.
+`edit` splices one node. `tmark fmt` on `spec/tmark.md` is idempotent; the spec itself is not in
+normal form (it uses caption-before and bracketed references), and it must
+stay that way for now: TeXSmith 0.6 does not implement the caption line
+after a table, so the normal form does not yet build "unchanged in
+meaning" (checked by converting both versions with `texsmith`: the after-
+captions render as text). Closing M1 therefore waits on TeXSmith's caption
+support (or on the `mkdocs` profile emitting the shipping spelling). The
+parser's performance target is also open (see `02-syntax.md`).
 
 - Vendor `markdown-rs`; CommonMark spec tests green with the documented
   exceptions.

@@ -3,10 +3,11 @@
 //! They are public so that `tmark-syntax` applies the same rules when it
 //! lowers the tree (one definition of "what an attribute list looks like").
 
-/// Whether a byte belongs to a word for the X4 guard (`@` never fires inside
-/// a word). Non-ASCII bytes count as word bytes.
-pub fn is_word_byte(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_' || byte >= 0x80
+/// Whether the character before `index` is a word character for the X4
+/// guard (`@` never fires inside a word): alphanumeric in the Unicode sense,
+/// or `_`. `§`, `(`, `«` and other punctuation are not.
+pub fn word_char_before(bytes: &[u8], index: usize) -> bool {
+    crate::util::char::before_index(bytes, index).is_some_and(|c| c.is_alphanumeric() || c == '_')
 }
 
 /// Whether a byte can start an identifier (`[A-Za-z]`).

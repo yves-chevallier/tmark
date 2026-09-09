@@ -25,7 +25,7 @@
 use crate::event::Name;
 use crate::state::{Name as StateName, State};
 use crate::tokenizer::Tokenizer;
-use crate::util::tmark::{is_word_byte, line_end};
+use crate::util::tmark::{line_end, word_char_before};
 
 /// Length of the data after `@` at `index + 1`, or 0 when there is none.
 fn data_len(bytes: &[u8], index: usize) -> usize {
@@ -88,10 +88,10 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
     {
         return State::Nok;
     }
-    if let Some(previous) = tokenizer.previous {
-        if is_word_byte(previous) || matches!(previous, b'@' | b'/' | b':' | b'.' | b'-') {
-            return State::Nok;
-        }
+    if word_char_before(tokenizer.parse_state.bytes, tokenizer.point.index)
+        || matches!(tokenizer.previous, Some(b'@' | b'/' | b':' | b'.' | b'-'))
+    {
+        return State::Nok;
     }
     let len = data_len(tokenizer.parse_state.bytes, tokenizer.point.index);
     if len == 0 {

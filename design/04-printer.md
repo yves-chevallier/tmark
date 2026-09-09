@@ -124,6 +124,9 @@ candidate line for the spec's "Canonical" column.
   …}` separators; scalars are plain when safe, double-quoted otherwise.
 - A listing whose language defaults to another node word keeps the word:
   `mermaid code`.
+- A `yaml table-config` fence prints right after its table, before the
+  caption line (spec §Table, rung 3); the parser orders the IR that way
+  whatever the source order.
 - An aside with more than one block, or a block that is not a `Plain`,
   prints as a `::: aside {side=…}` container; an inline aside prints as the
   role.

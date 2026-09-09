@@ -1021,7 +1021,8 @@ A power ladder; use the lowest rung that fits.
 3. Plus a `yaml table-config` fence after the table: positional column layout
    (width, `X` flexible columns, justify) without touching the data. The one
    data directive that names an attachment rather than a node (Appendix
-   @[app:questions]).
+   @[app:questions]). Canonical order: the table, its `table-config` fence,
+   then the caption line.
 4. `grid table`: reST and Pandoc grid syntax in a fence for moderate spans;
    the fence keeps foreign renderers showing tidy monospace:
 
