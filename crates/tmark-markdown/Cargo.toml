@@ -1,0 +1,29 @@
+# Vendored fork of markdown-rs 1.0.0 (MIT, Titus Wormer), see VENDORED.md and
+# ADR 0002. The CommonMark core stays as upstream; TMark constructs are added
+# under src/construct/tmark_*.rs and flagged in `Constructs`.
+[package]
+name = "tmark-markdown"
+version.workspace = true
+edition = "2018"
+license = "MIT"
+repository.workspace = true
+rust-version.workspace = true
+description = "Vendored markdown-rs (micromark) with the TMark constructs"
+
+[lib]
+name = "tmark_markdown"
+
+[dependencies]
+unicode-id = { version = "0.3", features = ["no_std"] }
+log = { version = "0.4", optional = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+pretty_assertions = "1"
+serde_json.workspace = true
+
+[features]
+default = []
+json = ["serde"]
+serde = ["dep:serde"]
+log = ["dep:log"]

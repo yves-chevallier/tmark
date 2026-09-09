@@ -19,14 +19,16 @@ upward. A crate may only use the public API of the crates below it.
                                   tmark-registry (counters, labels, bib, glossary, index, crossrefs, Loader)
                                           |
                                      tmark-syntax  (parser: text → IR + diagnostics)
-                                          |
-                                      tmark-ir     (nodes, spans, front matter types, closed registries, JSON schema)
+                                       /      \
+                          tmark-markdown      tmark-ir     (nodes, spans, front matter types, closed registries, JSON schema)
+                          (vendored micromark: tokenizer constructs, events, mdast)
 ```
 
 | Crate | Responsibility | Depends on | Design doc |
 | ----- | -------------- | ---------- | ---------- |
 | `tmark-ir` | Node types, spans, attributes, front-matter types, the closed registries (roles, node words, predeclared prefixes, deprecations), serde and `schemars` derivations. No logic beyond constructors, `walk`, `map`. | `serde`, `schemars` | `03-ir.md` |
-| `tmark-syntax` | Text → `Document` + `Vec<Diagnostic>`. CommonMark core plus TMark constructs. Never fails. | `tmark-ir` | `02-syntax.md` |
+| `tmark-markdown` | Vendored markdown-rs (micromark architecture) with the TMark tokenizer constructs added. Events and mdast only; knows nothing of the IR. | `unicode-id` | `02-syntax.md`, ADR 0002 |
+| `tmark-syntax` | Text → `Document` + `Vec<Diagnostic>`: drives `tmark-markdown` and lowers its mdast to the IR. Never fails. | `tmark-ir`, `tmark-markdown` | `02-syntax.md` |
 | `tmark-registry` | Builds the registries from the front matter, the document and, through `Loader`, included files and external sources (`.bib`, `refs.json`). Resolves `@` and `#`. | `tmark-ir`, `tmark-syntax` | `06-registries.md` |
 | `tmark-fmt` | Canonical printer and profiles; local edit splicing. | `tmark-ir`, `tmark-syntax` (for idempotence tests) | `04-printer.md` |
 | `tmark-lint` | Rule catalogue over IR + registries; produces `Diagnostic`s. | `tmark-ir`, `tmark-registry` | `05-diagnostics.md` |

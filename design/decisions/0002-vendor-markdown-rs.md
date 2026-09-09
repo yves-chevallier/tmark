@@ -9,9 +9,10 @@ a CommonMark parser; (c) vendor `markdown-rs` (MIT, port of micromark, one
 module per construct, positions on every event, GFM/math/front matter
 already present) and add constructs inside.
 
-**Decision.** (c). The vendored tree lives in `crates/tmark-syntax/src/md/`
-with `VENDORED.md` recording the upstream commit and the list of changed
-files.
+**Decision.** (c). The vendored tree is the workspace crate
+`crates/tmark-markdown` (lib `tmark_markdown`), which keeps upstream's
+internal paths and test suite intact; `VENDORED.md` records the upstream
+commit and the list of changed files. `tmark-syntax` depends on it.
 
 **Consequences.** CommonMark conformance and its test suite come for free.
 Adding a construct is a state machine plus a `Name` variant; most TMark

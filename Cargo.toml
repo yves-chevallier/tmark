@@ -3,6 +3,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/tmark-markdown",
     "crates/tmark-ir",
     "crates/tmark-syntax",
     "crates/tmark-registry",

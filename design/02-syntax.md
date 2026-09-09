@@ -19,8 +19,11 @@ Post-processing a third-party AST is not an option: role content
 tokenised in the same inline pass.
 
 Cost accepted: a fork. CommonMark changes at glacial pace; upstream merges are
-rare and mechanical. The vendored tree stays in `crates/tmark-syntax/src/md/`
-with its license and a `VENDORED.md` naming the upstream commit.
+rare and mechanical. The vendored tree is its own workspace crate,
+`crates/tmark-markdown` (lib `tmark_markdown`), so that its internal `crate::`
+paths and its test suite stay untouched; `VENDORED.md` names the upstream
+commit and lists every changed file. `tmark-syntax` depends on it and owns the
+lowering.
 
 ## Two passes, as in micromark
 

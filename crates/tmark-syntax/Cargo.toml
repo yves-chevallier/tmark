@@ -8,3 +8,4 @@ rust-version.workspace = true
 
 [dependencies]
 tmark-ir = { path = "../tmark-ir" }
+tmark-markdown = { path = "../tmark-markdown" }
