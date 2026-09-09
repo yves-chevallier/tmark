@@ -1,0 +1,15 @@
+[package]
+name = "tmark"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tmark-ir = { path = "../tmark-ir" }
+tmark-syntax = { path = "../tmark-syntax" }
+tmark-registry = { path = "../tmark-registry" }
+tmark-fmt = { path = "../tmark-fmt" }
+tmark-lint = { path = "../tmark-lint" }
+tmark-writers = { path = "../tmark-writers" }

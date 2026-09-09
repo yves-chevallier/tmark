@@ -1,0 +1,14 @@
+[package]
+name = "tmark-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tmark = { path = "../tmark" }
+
+[lib]
+name = "_tmark"
+crate-type = ["cdylib"]

@@ -1,0 +1,39 @@
+# TMark workspace. One crate per responsibility; see design/01-architecture.md
+# for the dependency graph. Nothing points upward.
+[workspace]
+resolver = "2"
+members = [
+    "crates/tmark-ir",
+    "crates/tmark-syntax",
+    "crates/tmark-registry",
+    "crates/tmark-fmt",
+    "crates/tmark-lint",
+    "crates/tmark-writers",
+    "crates/tmark",
+    "crates/tmark-cli",
+    "crates/tmark-lsp",
+    "crates/tmark-py",
+    "crates/tmark-wasm",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/yves-chevallier/tmark"
+rust-version = "1.80"
+
+[workspace.dependencies]
+# Core (allowed everywhere; see design/01-architecture.md §Dependencies policy)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "0.8"
+# Edges only
+clap = { version = "4", features = ["derive"] }
+lsp-server = "0.7"
+lsp-types = "0.97"
+pyo3 = { version = "0.22", features = ["extension-module"] }
+wasm-bindgen = "0.2"
+# Tests
+insta = "1"
+proptest = "1"
