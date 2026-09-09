@@ -116,6 +116,13 @@ document still parses with an empty front matter.
 ## Performance targets
 
 - 1 MB of prose: under 50 ms on a laptop core, single-threaded.
+  **Measured at milestone 1**: about 700 ms per MB in release
+  (`cargo run --release -p tmark-syntax --example bench -- spec/tmark.md`),
+  of which the lowering is under 1 %; the vendored tokenizer costs the same
+  with plain GFM options, so the gap is upstream markdown-rs, not the TMark
+  constructs. A chapter-sized file (100 KB) parses in about 70 ms, which the
+  language server can live with. Profiling the tokenizer is a milestone-3
+  item; the target stands.
 - No allocation per character; events are a `Vec<Event>` reused across
   parses where the caller keeps the parser.
 - The LSP re-parses whole files. Incremental parsing is out of scope until a
