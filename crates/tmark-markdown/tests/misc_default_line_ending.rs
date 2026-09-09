@@ -1,5 +1,5 @@
-use tmark_markdown::{message, to_html, to_html_with_options, CompileOptions, LineEnding, Options};
 use pretty_assertions::assert_eq;
+use tmark_markdown::{message, to_html, to_html_with_options, CompileOptions, LineEnding, Options};
 
 #[test]
 fn default_line_ending() -> Result<(), message::Message> {

@@ -1,10 +1,10 @@
+use pretty_assertions::assert_eq;
 use tmark_markdown::{
     mdast::{InlineMath, Node, Paragraph, Root, Text},
     message, to_html, to_html_with_options, to_mdast,
     unist::Position,
     CompileOptions, Constructs, Options, ParseOptions,
 };
-use pretty_assertions::assert_eq;
 
 #[test]
 fn math_text() -> Result<(), message::Message> {

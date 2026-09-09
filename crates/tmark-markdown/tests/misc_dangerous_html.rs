@@ -1,5 +1,5 @@
-use tmark_markdown::{message, to_html, to_html_with_options, CompileOptions, Options};
 use pretty_assertions::assert_eq;
+use tmark_markdown::{message, to_html, to_html_with_options, CompileOptions, Options};
 
 #[test]
 fn dangerous_html() -> Result<(), message::Message> {

@@ -1,5 +1,5 @@
-use tmark_markdown::to_html;
 use pretty_assertions::assert_eq;
+use tmark_markdown::to_html;
 
 #[test]
 fn dangerous_protocol_autolink() {

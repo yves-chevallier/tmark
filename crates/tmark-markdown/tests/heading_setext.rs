@@ -1,10 +1,10 @@
+use pretty_assertions::assert_eq;
 use tmark_markdown::{
     mdast::{Heading, Node, Root, Text},
     message, to_html, to_html_with_options, to_mdast,
     unist::Position,
     Constructs, Options, ParseOptions,
 };
-use pretty_assertions::assert_eq;
 
 #[test]
 fn heading_setext() -> Result<(), message::Message> {

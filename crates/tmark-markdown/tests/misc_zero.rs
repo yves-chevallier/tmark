@@ -1,9 +1,9 @@
+use pretty_assertions::assert_eq;
 use tmark_markdown::{
     mdast::{Node, Root},
     message, to_html, to_mdast,
     unist::Position,
 };
-use pretty_assertions::assert_eq;
 
 #[test]
 fn zero() -> Result<(), message::Message> {

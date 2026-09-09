@@ -1,5 +1,5 @@
-use tmark_markdown::{mdast, message, to_html, to_html_with_options, to_mdast, Options};
 use pretty_assertions::assert_eq;
+use tmark_markdown::{mdast, message, to_html, to_html_with_options, to_mdast, Options};
 
 #[test]
 fn fuzz() -> Result<(), message::Message> {
