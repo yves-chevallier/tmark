@@ -29,7 +29,7 @@ def normalise(value):
             if key == "span" or (node and key == "id") or key in SUGAR_FIELDS:
                 continue
             item = normalise(item)
-            if item is None or item is False or item in ([], {}, ""):
+            if item is None or (not isinstance(item, bool) and item in ([], {}, "")):
                 continue
             out[key] = item
         return out

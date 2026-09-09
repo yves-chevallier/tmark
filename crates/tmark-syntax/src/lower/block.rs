@@ -544,7 +544,10 @@ impl Lowerer {
                 format!("`::: {name}` is never closed"),
             );
         }
+        let was_in_figure = self.in_figure;
+        self.in_figure = name == "figure";
         let content = self.lower_content(&c.value, &c.stops, ctx, document);
+        self.in_figure = was_in_figure;
         let name = if name == "margin" {
             self.deprecated(span, "::: margin", "::: aside");
             "aside".to_string()
@@ -718,11 +721,14 @@ impl Lowerer {
                 out.push(host);
                 out.push(Block::Caption(caption));
             } else {
-                self.diag(
-                    Code::CaptionNoHost,
-                    caption.meta.span,
-                    "caption line with no table, figure or listing next to it",
-                );
+                // Inside `::: figure` a free caption captions the figure itself.
+                if !self.in_figure {
+                    self.diag(
+                        Code::CaptionNoHost,
+                        caption.meta.span,
+                        "caption line with no table, figure or listing next to it",
+                    );
+                }
                 out.push(Block::Caption(caption));
             }
         }
@@ -777,7 +783,15 @@ fn is_caption(content: &[Inline]) -> Option<(CaptionKind, usize)> {
 fn is_float(block: &Block) -> bool {
     match block {
         Block::Table(_) | Block::Figure(_) | Block::CodeBlock(_) | Block::TableConfig(_) => true,
-        Block::Para(para) => para.content.len() == 1 && matches!(para.content[0], Inline::Image(_)),
+        // One image, or the subfigures of a `::: figure`.
+        Block::Para(para) => {
+            para.content.iter().any(|i| matches!(i, Inline::Image(_)))
+                && para.content.iter().all(|i| match i {
+                    Inline::Image(_) | Inline::SoftBreak(_) => true,
+                    Inline::Str(s) => s.text.trim().is_empty(),
+                    _ => false,
+                })
+        }
         _ => false,
     }
 }

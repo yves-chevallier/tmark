@@ -232,7 +232,7 @@ impl Lowerer {
                         ),
                         None => (
                             vec![tmark_ir::RefItem {
-                                key: n.value.clone(),
+                                key: doi_key(&n.value),
                                 ..Default::default()
                             }],
                             false,
@@ -773,4 +773,14 @@ pub(crate) fn trim_trailing_space(inlines: &mut Vec<Inline>) {
             s.text.truncate(trimmed);
         }
     }
+}
+
+/// `@https://doi.org/…` is sugar for `@doi:…` (spec §Cite).
+fn doi_key(key: &str) -> String {
+    for prefix in ["https://doi.org/", "http://doi.org/", "https://dx.doi.org/"] {
+        if let Some(doi) = key.strip_prefix(prefix) {
+            return format!("doi:{doi}");
+        }
+    }
+    key.to_string()
 }

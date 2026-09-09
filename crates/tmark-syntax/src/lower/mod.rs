@@ -86,6 +86,8 @@ pub(crate) struct Lowerer {
     pub admonitions: Vec<String>,
     /// Link reference definitions of the current parse (`[id]: url "title"`).
     pub definitions: HashMap<String, (String, Option<String>)>,
+    /// Lowering the body of a `::: figure`: a free caption is the figure's.
+    pub in_figure: bool,
 }
 
 pub fn parse(text: &str, file: FileId) -> Parsed {
@@ -112,6 +114,7 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
             .map(|a| a.name.to_string())
             .collect(),
         definitions: HashMap::new(),
+        in_figure: false,
     };
     let ctx = Ctx {
         text,

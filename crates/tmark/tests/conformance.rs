@@ -105,14 +105,15 @@ fn normalise(value: Value) -> Value {
     }
 }
 
+/// Absent-equivalent values. Booleans stay: `false` is meaningful in a
+/// feature map, and the IR already skips its own boolean defaults.
 fn is_default(value: &Value) -> bool {
     match value {
         Value::Null => true,
-        Value::Bool(b) => !b,
         Value::Array(a) => a.is_empty(),
         Value::Object(o) => o.is_empty(),
         Value::String(s) => s.is_empty(),
-        Value::Number(_) => false,
+        Value::Bool(_) | Value::Number(_) => false,
     }
 }
 
