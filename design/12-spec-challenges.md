@@ -15,7 +15,6 @@ deleting the entry from this file.
 | C4 | §Roles | "an unknown name is literal text" versus the closed registry: nothing says whether `{qty}[…]` should raise a diagnostic. Silent literal text hides typos (`{asid}[…]`). | Literal text (spec) plus lint hint `role-unknown` when the head is followed by `[` or `(`. | code |
 | C5 | §IndexEntry | `#[**term**]` as sugar for `main=true` conflicts with "brackets hold content parsed as Markdown": a bold term that is not a main entry becomes unrepresentable in sugar. | Sugar kept; the canonical form `{index main=true}[term]` disambiguates; the printer never emits the bold sugar. Documented as an accepted lossy sugar. | spec (say it is lossy) |
 | C6 | §Two sigils vs §IndexEntry/§CounterItem | The sigil section presents `#[…]` and `#(…)` as *the* forms; the catalogue says the roles `{index}` and `{counter}` are canonical and the sigils sugar. The printer must pick one. | Roles are canonical (matches the catalogue and P6's "one spelling per mechanism"; sigils stay the finger-friendly sugar). Revisit if authors find printed roles noisy. | spec (state it once, in §Two sigils) |
-| C7 | §Caption | Which block a caption attaches to when both neighbours are floats (`table`, caption, `image`): "adjacent" is ambiguous. | After-position wins: a caption attaches to the block *before* it if that block is a float without caption; otherwise to the block after it. A caption with no float host is a paragraph plus `caption-no-host`. | spec |
 | C8 | §Attributes (zero-width nodes) | "whitespace on both sides collapses to a single space, and disappears before punctuation" is a rendering rule but is stated in the syntax section; the IR must decide whether the `Space` nodes exist. | Spaces stay in the IR (round-trip); writers apply the collapse. | code |
 | C9 | §Front matter | "unknown keys fail at parse time" conflicts with the `press` namespace being shared with site generators that own other keys, and with TeXSmith owning `template`, `callouts`, … that TMark does not know. | TMark validates only the keys it reads (`declare`, `sources`, `features`, and the metadata keys) and preserves the rest; TeXSmith validates its own. Unknown keys *inside* a TMark-owned group are errors. | spec |
 | C10 | §Include | "A block include is the include role alone on its line" — inline `{include}(…)` in a paragraph is not defined (error? inline splice?). | Inline includes are a diagnostic `include-inline` and render as literal text. | spec |
@@ -29,3 +28,5 @@ deleting the entry from this file.
 
 Open questions the spec already lists (Appendix "Open questions") are not
 repeated here; their answers, when taken, go in the same appendix.
+
+Closed: C7 (attachment rule written into §Caption, including the `::: figure` case).

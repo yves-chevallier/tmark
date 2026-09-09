@@ -38,6 +38,14 @@ from this repository.
 
 ## Status
 
-Specification and design phase. The Rust workspace is a skeleton with no
-implementation. The VS Code extension ships a working TextMate grammar and a
-grammar test harness (`editors/vscode/README.md`).
+Milestone 1 in progress (`design/11-roadmap.md`): the IR, the vendored
+tokenizer with the TMark constructs, the lowering to the IR, the facade, a
+conformance runner over `spec/conformance/` and a CLI with `parse` and
+`schema` are in place; the canonical printer is being written. The VS Code
+extension ships a working TextMate grammar and a grammar test harness
+(`editors/vscode/README.md`).
+
+```sh
+cargo run -p tmark-cli -- parse spec/conformance/role-aside.md   # IR as JSON
+cargo test --workspace                                            # incl. the CommonMark suite and the fixtures
+```

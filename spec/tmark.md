@@ -939,6 +939,13 @@ Rules:
 - An element with a caption line or an anchor is *promoted* to a numbered
   float; a bare image or table stays inline. Promotion is the same rule for
   every float kind, including images produced by data directives.
+- Attachment: a caption line attaches to the block *before* it when that
+  block is a float (a table, a code block, a paragraph made of images, a
+  figure container) that has no caption yet; otherwise to the float *after*
+  it. Inside a `::: figure` container a caption with no such neighbour is
+  the caption of the figure itself. A caption line with no float next to it
+  is a paragraph and a `caption-no-host` diagnostic. In the IR the caption
+  always follows its host; the source position is recorded, not the order.
 
 #### Image, Figure
 
