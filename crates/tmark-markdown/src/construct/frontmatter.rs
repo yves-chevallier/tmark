@@ -309,7 +309,7 @@ fn has_closing_fence(bytes: &[u8], index: usize, marker: u8) -> bool {
     };
     let mut lines = bytes[index..].split(|b| *b == b'\n');
     match lines.next() {
-        Some(first) if is_fence(first) => lines.any(|line| is_fence(line)),
+        Some(first) if is_fence(first) => lines.any(is_fence),
         _ => false,
     }
 }
