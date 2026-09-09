@@ -5,8 +5,13 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "TMark intermediate representation: nodes, spans, front matter, closed registries, diagnostics"
 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 schemars.workspace = true
+# YAML front matter (spec §Front matter). `serde_yaml` is deprecated upstream;
+# `serde_yaml_ng` is its maintained fork with the same API (design/01-architecture.md
+# §Dependencies policy: "a YAML parser, serde_yaml successor of the day").
+serde_yaml_ng = "0.10"
