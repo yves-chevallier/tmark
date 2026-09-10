@@ -33,6 +33,7 @@ schemars = "0.8"
 clap = { version = "4", features = ["derive"] }
 lsp-server = "0.7"
 lsp-types = "0.97"
+crossbeam-channel = "0.5"
 pyo3 = { version = "0.22", features = ["extension-module"] }
 wasm-bindgen = "0.2"
 # Tests
