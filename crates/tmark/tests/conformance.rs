@@ -13,6 +13,9 @@ struct Fixture {
     ir: Option<Value>,
     /// `code @ L:C-L:C` lines, expected on the first input.
     diagnostics: Vec<String>,
+    /// Same, for the resolve and lint stages (`## resolution`); checked
+    /// when the section exists.
+    resolution: Option<Vec<String>>,
 }
 
 /// Fenced blocks under each `## section`, in order.
@@ -47,6 +50,14 @@ fn sections(text: &str) -> Vec<(String, Vec<(String, String)>)> {
     out
 }
 
+fn lines(blocks: Vec<(String, String)>) -> Vec<String> {
+    blocks
+        .into_iter()
+        .flat_map(|(_, c)| c.lines().map(str::to_string).collect::<Vec<_>>())
+        .filter(|l| !l.trim().is_empty())
+        .collect()
+}
+
 fn load(path: &Path) -> Fixture {
     let text = fs::read_to_string(path).unwrap();
     let mut fixture = Fixture {
@@ -55,6 +66,7 @@ fn load(path: &Path) -> Fixture {
         canonical: None,
         ir: None,
         diagnostics: Vec::new(),
+        resolution: None,
     };
     for (title, blocks) in sections(&text) {
         match title.as_str() {
@@ -67,11 +79,10 @@ fn load(path: &Path) -> Fixture {
                     .map(|(_, c)| serde_json::from_str(&c).expect("valid ir json"))
             }
             "diagnostics" => {
-                fixture.diagnostics = blocks
-                    .into_iter()
-                    .flat_map(|(_, c)| c.lines().map(str::to_string).collect::<Vec<_>>())
-                    .filter(|l| !l.trim().is_empty())
-                    .collect()
+                fixture.diagnostics = lines(blocks);
+            }
+            "resolution" => {
+                fixture.resolution = Some(lines(blocks));
             }
             _ => {}
         }
@@ -165,6 +176,62 @@ fn inputs_parse_to_the_ir() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+/// `code @ L:C-L:C` for each diagnostic of the main file, sorted.
+fn describe(input: &str, diagnostics: &[tmark::Diagnostic]) -> Vec<String> {
+    let index = tmark::ir::LineIndex::new(input);
+    let mut out: Vec<String> = diagnostics
+        .iter()
+        .filter(|d| d.span.file == FileId::default())
+        .map(|d| {
+            let a = index.line_col(d.span.start);
+            let b = index.line_col(d.span.end);
+            format!(
+                "{} @ {}:{}-{}:{}",
+                d.code.id(),
+                a.line + 1,
+                a.col + 1,
+                b.line + 1,
+                b.col + 1
+            )
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn first_input_yields_the_resolution_diagnostics() {
+    let mut failures = Vec::new();
+    for fixture in fixtures() {
+        let (Some(input), Some(expected)) = (fixture.inputs.first(), &fixture.resolution) else {
+            continue;
+        };
+        let parsed = parse(input, FileId::default());
+        let resolved = tmark::resolve(
+            &parsed.document,
+            &tmark::MemoryLoader::new(),
+            &Default::default(),
+        );
+        let mut diagnostics = resolved.diagnostics.clone();
+        diagnostics.extend(tmark::lint(
+            &parsed.document,
+            &resolved,
+            input,
+            &Default::default(),
+        ));
+        let actual = describe(input, &diagnostics);
+        let mut expected = expected.clone();
+        expected.sort();
+        if actual != expected {
+            failures.push(format!(
+                "{}: expected resolution {:?}, got {:?}",
+                fixture.name, expected, actual
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]

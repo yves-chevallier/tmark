@@ -34,6 +34,11 @@ other format to learn.
 deprecated @ 1:1-1:20
 ```
 
+## resolution                    optional; `code @ L:C-L:C` lines from the resolve and lint stages on the FIRST input (no other files, no `.bib`)
+```text
+ref-unresolved @ 1:5-1:15
+```
+
 ## latex / typst / html          optional; the body each writer must produce for the canonical input
 ```latex
 …
@@ -50,7 +55,10 @@ Rules:
   equal itself (idempotence).
 - Diagnostics are matched by code and span on the first input block (the
   sugar spelling, where deprecations fire); the message is free. A fixture
-  without a `diagnostics` section expects none.
+  without a `diagnostics` section expects no parse diagnostic. The
+  `resolution` section does the same for the resolve and lint stages, run
+  with an empty loader; a fixture without it is not checked at that stage
+  (most fixtures reference keys they do not define).
 - Backend blocks are `insta` snapshots: the runner fails when they differ
   and `cargo insta review` updates them.
 - A fixture may include a front matter in its inputs when the construct

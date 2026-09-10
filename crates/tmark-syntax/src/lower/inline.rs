@@ -143,10 +143,10 @@ impl Lowerer {
                 }
                 Node::Image(n) => {
                     let span = self.span(ctx, n.position.as_ref());
-                    let meta = self.meta(span);
-                    let alt = self.lower_fragment(&n.alt, span);
-                    let attrs =
+                    let (attrs, attrs_end) =
                         self.take_adjacent_attrs(nodes, &mut index, n.position.as_ref(), ctx);
+                    let meta = self.meta(self.host_span(ctx, span, attrs_end));
+                    let alt = self.lower_fragment(&n.alt, span);
                     out.push(Inline::Image(Image {
                         meta,
                         src: n.url.clone(),
@@ -156,15 +156,15 @@ impl Lowerer {
                 }
                 Node::ImageReference(n) => {
                     let span = self.span(ctx, n.position.as_ref());
-                    let meta = self.meta(span);
+                    let (attrs, attrs_end) =
+                        self.take_adjacent_attrs(nodes, &mut index, n.position.as_ref(), ctx);
+                    let meta = self.meta(self.host_span(ctx, span, attrs_end));
                     let alt = self.lower_fragment(&n.alt, span);
                     let (url, _) = self
                         .definitions
                         .get(&n.identifier)
                         .cloned()
                         .unwrap_or_default();
-                    let attrs =
-                        self.take_adjacent_attrs(nodes, &mut index, n.position.as_ref(), ctx);
                     out.push(Inline::Image(Image {
                         meta,
                         src: url,
@@ -245,10 +245,11 @@ impl Lowerer {
                     }));
                 }
                 Node::TmarkSpan(n) => {
-                    let meta = self.meta_at(ctx, n.position.as_ref());
-                    let content = self.lower_inlines(&n.children, ctx).inlines;
-                    let attrs =
+                    let span = self.span(ctx, n.position.as_ref());
+                    let (attrs, attrs_end) =
                         self.take_adjacent_attrs(nodes, &mut index, n.position.as_ref(), ctx);
+                    let meta = self.meta(self.host_span(ctx, span, attrs_end));
+                    let content = self.lower_inlines(&n.children, ctx).inlines;
                     out.push(Inline::Span(SpanNode {
                         meta,
                         content,
@@ -357,14 +358,16 @@ impl Lowerer {
         }
     }
 
-    /// If the next node is an attribute list right after `position`, take it.
+    /// If the next node is an attribute list right after `position`, take
+    /// it and return the end offset of the list, so that the host's span
+    /// covers its attributes.
     fn take_adjacent_attrs(
         &mut self,
         nodes: &[Node],
         index: &mut usize,
         position: Option<&tmark_markdown::unist::Position>,
         _ctx: &Ctx,
-    ) -> Attrs {
+    ) -> (Attrs, Option<usize>) {
         if let Some(Node::TmarkBrace(brace)) = nodes.get(*index) {
             let adjacent = match (position, brace.position.as_ref()) {
                 (Some(host), Some(b)) => host.end.offset == b.start.offset,
@@ -373,11 +376,19 @@ impl Lowerer {
             if adjacent && !brace.moustache {
                 if let BraceKind::Attrs(attrs) = classify(brace) {
                     *index += 1;
-                    return attrs;
+                    return (attrs, brace.position.as_ref().map(|p| p.end.offset));
                 }
             }
         }
-        Attrs::new()
+        (Attrs::new(), None)
+    }
+
+    /// The span of a host node extended over its attribute list.
+    fn host_span(&self, ctx: &Ctx, span: Span, attrs_end: Option<usize>) -> Span {
+        match attrs_end {
+            Some(end) => Span::new(self.file, span.start, ctx.map.translate(end) as u32),
+            None => span,
+        }
     }
 
     /// A brace group: moustache, attribute list, role head, or literal.

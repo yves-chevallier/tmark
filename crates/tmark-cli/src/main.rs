@@ -1,15 +1,16 @@
 //! `tmark` command-line interface. Design: `design/09-bindings.md`.
 //!
-//! Milestone 1: `parse`, `fmt` and `schema`; `lint`, `check` and `write`
-//! arrive with their crates.
+//! `parse`, `fmt`, `check`, `lint` and `schema`; `write` arrives with the
+//! writers (milestone 4). `lint --fix` is a milestone-3 item (it needs the
+//! fixes the LSP also applies).
 
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use tmark::ir::{LineIndex, Severity};
-use tmark::{format, parse, FileId, Profile};
+use tmark::ir::{Code, LineIndex, Severity};
+use tmark::{check, format, parse, FileId, FsLoader, LintConfig, Profile, ResolveOptions};
 
 #[derive(Parser)]
 #[command(name = "tmark", version, about = "The TMark language toolchain")]
@@ -42,6 +43,26 @@ enum Command {
         #[arg(long)]
         write: bool,
     },
+    /// Parse, resolve and lint files; exit 1 on errors (on warnings too
+    /// with `--strict`).
+    Check {
+        /// Files to check; `.bib` files feed the bibliography.
+        files: Vec<PathBuf>,
+        /// Treat warnings as failures.
+        #[arg(long)]
+        strict: bool,
+        /// Lint levels, `code=off|hint|info|warning|error`, repeatable.
+        #[arg(long = "level", value_name = "CODE=LEVEL")]
+        levels: Vec<String>,
+    },
+    /// Alias of `check` (fixes arrive with milestone 3).
+    Lint {
+        files: Vec<PathBuf>,
+        #[arg(long)]
+        strict: bool,
+        #[arg(long = "level", value_name = "CODE=LEVEL")]
+        levels: Vec<String>,
+    },
     /// Print a JSON schema: `ir` or `frontmatter`.
     Schema { name: String },
 }
@@ -55,8 +76,118 @@ fn main() -> ExitCode {
             check,
             write,
         } => cmd_fmt(&files, &profile, check, write),
+        Command::Check {
+            files,
+            strict,
+            levels,
+        }
+        | Command::Lint {
+            files,
+            strict,
+            levels,
+        } => cmd_check(&files, strict, &levels),
         Command::Schema { name } => cmd_schema(&name),
     }
+}
+
+fn severity_name(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Error => "error",
+        Severity::Warning => "warning",
+        Severity::Info => "info",
+        Severity::Hint => "hint",
+    }
+}
+
+fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
+    let mut config = LintConfig::default();
+    for level in levels {
+        let Some((code, value)) = level.split_once('=') else {
+            eprintln!("tmark: --level takes CODE=LEVEL, got `{level}`");
+            return ExitCode::from(2);
+        };
+        let Some(code) = Code::from_id(code) else {
+            eprintln!("tmark: unknown diagnostic code `{code}`");
+            return ExitCode::from(2);
+        };
+        if let Err(error) = config.set(code, value) {
+            eprintln!("tmark: {error}");
+            return ExitCode::from(2);
+        }
+    }
+    let bibliography: Vec<PathBuf> = files
+        .iter()
+        .filter(|f| f.extension().is_some_and(|e| e == "bib"))
+        .cloned()
+        .collect();
+    let mut worst = Severity::Hint;
+    let mut failed = false;
+    for file in files
+        .iter()
+        .filter(|f| !f.extension().is_some_and(|e| e == "bib"))
+    {
+        let text = match read(file) {
+            Ok(text) => text,
+            Err(error) => {
+                eprintln!("tmark: {}: {error}", file.display());
+                failed = true;
+                continue;
+            }
+        };
+        let options = ResolveOptions {
+            path: file.clone(),
+            bibliography: bibliography
+                .iter()
+                .map(|b| {
+                    // `.bib` paths are given relative to the working directory;
+                    // the loader resolves them from the document's directory.
+                    let base = file.parent().unwrap_or(std::path::Path::new(""));
+                    pathdiff(b, base)
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let (_, diagnostics) = check(&text, FileId::default(), &FsLoader, &options, &config);
+        let index = LineIndex::new(&text);
+        let name = file.display().to_string();
+        for d in &diagnostics {
+            if d.span.file != FileId::default() {
+                continue;
+            }
+            let at = index.line_col(d.span.start);
+            eprintln!(
+                "{name}:{}:{}: {} {}: {}",
+                at.line + 1,
+                at.col + 1,
+                severity_name(d.severity),
+                d.code.id(),
+                d.message
+            );
+            if d.severity > worst {
+                worst = d.severity;
+            }
+        }
+    }
+    if failed {
+        ExitCode::from(2)
+    } else if worst == Severity::Error || (strict && worst == Severity::Warning) {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// `path` expressed relative to `base` when both are relative, else as is.
+fn pathdiff(path: &std::path::Path, base: &std::path::Path) -> PathBuf {
+    if path.is_absolute() || base.as_os_str().is_empty() {
+        return path.to_path_buf();
+    }
+    let ups = base.components().count();
+    let mut out = PathBuf::new();
+    for _ in 0..ups {
+        out.push("..");
+    }
+    out.join(path)
 }
 
 fn read(file: &PathBuf) -> io::Result<String> {

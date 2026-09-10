@@ -38,14 +38,18 @@ from this repository.
 
 ## Status
 
-Milestone 1 in progress (`design/11-roadmap.md`): the IR, the vendored
-tokenizer with the TMark constructs, the lowering to the IR, the facade, a
-conformance runner over `spec/conformance/` and a CLI with `parse` and
-`schema` are in place; the canonical printer is being written. The VS Code
+Milestones 1 and 2 of `design/11-roadmap.md` are implemented: the IR, the
+vendored tokenizer with the TMark constructs, the lowering, the canonical
+printer, the registries and resolution, the lint catalogue, a conformance
+runner over `spec/conformance/`, and a CLI (`parse`, `fmt`, `check`, `lint`,
+`schema`). Milestone 1 formally waits on TeXSmith's support of the caption
+line after a table. The VS Code
 extension ships a working TextMate grammar and a grammar test harness
 (`editors/vscode/README.md`).
 
 ```sh
 cargo run -p tmark-cli -- parse spec/conformance/role-aside.md   # IR as JSON
+cargo run -p tmark-cli -- check spec/tmark.md                      # parse, resolve, lint
+cargo run -p tmark-cli -- fmt --check spec/tmark.md                # normal form?
 cargo test --workspace                                            # incl. the CommonMark suite and the fixtures
 ```

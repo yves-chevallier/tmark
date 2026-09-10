@@ -71,3 +71,24 @@ spelling is safe, guessing a label for an unresolved reference is not.
 - Hint: style rules (position words, hard-coded numbers).
 
 `tmark check` exits non-zero on errors, and on warnings with `--strict`.
+
+## Implementation notes (milestone 2)
+
+- `tmark-lint` exposes `lint(doc, resolved, text, config)` and a `Rule`
+  trait whose `check` receives a `Context { doc, resolved, text }`: the
+  source text is there for rules that look at spellings (lead promotion).
+- Rules shipped: `hardcoded-number`, `position-word`,
+  `caption-id-off-convention`, `heading-skip`, `lead-promotion`.
+  `strict-x-construct` waits for the strict profile's parse-time reporting
+  (milestone 5); `deprecated-frontmatter-key` and `role-unknown` are emitted
+  by the parser, not by a rule.
+- `Config` maps a `Code` to `off | hint | info | warning | error`; the CLI
+  takes `--level code=level`. `tmark.toml` is a milestone-3 item with the
+  language server.
+- `Code` gained `ALL` and `from_id` (the CLI and the LSP parse codes).
+- `tmark check FILE… [.bib…] [--strict] [--level …]` prints parse, resolve
+  and lint diagnostics and exits 1 on errors (warnings under `--strict`);
+  `tmark lint` is its alias until `--fix` lands with the LSP fixes.
+- Conformance fixtures gained a `## resolution` section for the resolve
+  and lint stages; one fixture per diagnostic code lives under
+  `spec/conformance/diag-*.md` and `lint-*.md`.

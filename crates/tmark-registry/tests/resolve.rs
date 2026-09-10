@@ -1,0 +1,115 @@
+//! Resolution against the registries (design 06).
+use std::path::PathBuf;
+
+use tmark_ir::{Code, FileId};
+use tmark_registry::{resolve, MemoryLoader, Resolution, ResolveOptions};
+use tmark_syntax::parse;
+
+fn codes(diags: &[tmark_ir::Diagnostic]) -> Vec<&str> {
+    let mut v: Vec<&str> = diags.iter().map(|d| d.code.id()).collect();
+    v.sort();
+    v
+}
+
+fn run(text: &str) -> tmark_registry::Resolved {
+    let doc = parse(text, FileId::default()).document;
+    resolve(&doc, &MemoryLoader::new(), &ResolveOptions::default())
+}
+
+#[test]
+fn labels_resolve_by_host_and_prefix() {
+    let r = run("## Intro {#sec:intro}\n\nSee @sec:intro, @Sec:intro and [here](#sec:intro), not @sec:nope.\n");
+    assert_eq!(codes(&r.diagnostics), vec!["ref-unresolved"]);
+    assert_eq!(r.refs.len(), 4);
+    assert!(
+        matches!(&r.refs[0].resolution, Resolution::Label { prefix: Some(p), number: None, .. } if p == "sec")
+    );
+    assert!(
+        matches!(&r.refs[1].resolution, Resolution::Label { .. }),
+        "prefixes are case-insensitive"
+    );
+    assert!(
+        matches!(&r.refs[2].resolution, Resolution::Label { .. }),
+        "anchor links resolve too"
+    );
+    assert_eq!(r.refs[3].resolution, Resolution::Unresolved);
+}
+
+#[test]
+fn user_counters_are_numbered_in_document_order() {
+    let text = "---\npress:\n  declare:\n    counters:\n      fw: {name: Finding, format: \"FW-{n:02d}\"}\n---\n\n#(fw:a) First. #(fw:b) Second.\n\n## Loop {#fw:c}\n\nSee @fw:b and @fw:c and #(rq:x).\n";
+    let r = run(text);
+    assert_eq!(codes(&r.diagnostics), vec!["prefix-unknown"]);
+    let fw = r.counters.get("fw").expect("declared");
+    assert_eq!(fw.label("a").as_deref(), Some("FW-01"));
+    assert_eq!(fw.label("c").as_deref(), Some("FW-03"));
+    assert!(
+        matches!(&r.refs[0].resolution, Resolution::Label { number: Some(n), .. } if n == "FW-02")
+    );
+}
+
+#[test]
+fn host_mismatch_and_duplicates_are_reported() {
+    let r = run("![x](a.png){#tbl:one}\n\n## A {#sec:a}\n\n## B {#sec:a}\n");
+    assert_eq!(
+        codes(&r.diagnostics),
+        vec!["label-duplicate", "prefix-host-mismatch"]
+    );
+}
+
+#[test]
+fn citations_glossary_doi_and_ambiguity() {
+    let text = "---\npress:\n  declare:\n    glossary:\n      solid: Five principles\n  sources:\n    bibliography:\n      ein05: https://doi.org/10.1002/andp.19053221004\n      stock: {type: misc, title: Stock}\n---\n\nSee @ein05, @gls:solid, @gls:nope, @doi:10.1/x and [span]{#stock} @stock.\n";
+    let r = run(text);
+    assert_eq!(
+        codes(&r.diagnostics),
+        vec!["ref-ambiguous", "ref-unresolved"]
+    );
+    assert!(matches!(&r.refs[0].resolution, Resolution::Citation { key } if key == "ein05"));
+    assert!(matches!(&r.refs[1].resolution, Resolution::Glossary { term } if term == "solid"));
+    assert_eq!(r.refs[2].resolution, Resolution::Unresolved);
+    assert!(matches!(&r.refs[3].resolution, Resolution::Doi { doi } if doi == "10.1/x"));
+    assert_eq!(r.refs[4].resolution, Resolution::Ambiguous);
+}
+
+#[test]
+fn includes_and_inventories_load_through_the_loader() {
+    let main = "---\npress:\n  sources:\n    crossrefs: {fwrev: build/fw.refs.json, gone: nope.json}\n---\n\n{include}(chapters/boot.md)\n\n{include}(chapters/missing.md)\n\nSee @sec:boot, @fwrev:fw:x and @fwrev:fw:y.\n";
+    let loader = MemoryLoader::new()
+        .with(
+            "docs/chapters/boot.md",
+            "## Boot {#sec:boot}\n\n{include}(../main.md)\n",
+        )
+        .with(
+            "docs/build/fw.refs.json",
+            r#"{"document": {"id": "RHE"}, "refs": {"fw:x": {"label": "FW-10", "page": 14}}}"#,
+        );
+    let doc = parse(main, FileId::default()).document;
+    let options = ResolveOptions {
+        path: PathBuf::from("docs/main.md"),
+        ..Default::default()
+    };
+    let r = resolve(&doc, &loader, &options);
+    assert_eq!(
+        codes(&r.diagnostics),
+        vec![
+            "crossref-inventory-missing",
+            "include-missing",
+            "ref-unresolved"
+        ]
+    );
+    assert_eq!(
+        r.files.len(),
+        1,
+        "the include is parsed once despite the cycle"
+    );
+    assert!(
+        matches!(&r.refs[0].resolution, Resolution::Label { .. }),
+        "labels of includes count"
+    );
+    assert!(
+        matches!(&r.refs[1].resolution, Resolution::External { label, page: Some(14), .. } if label == "FW-10")
+    );
+    assert_eq!(r.refs[2].resolution, Resolution::Unresolved);
+    assert!(r.diagnostics.iter().all(|d| d.code != Code::LabelDuplicate));
+}

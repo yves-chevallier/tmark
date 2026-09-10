@@ -58,6 +58,12 @@ Crates: `tmark-registry`, `tmark-lint`, `tmark-cli` (`lint`, `check`).
   unresolved references of the spec (it cites appendices by label) and
   nothing else, and a fixture exists per diagnostic code.
 
+Status: done. `tmark check spec/tmark.md` resolves every reference of the
+spec (none is unresolved) and reports only hints (13 position words, 2
+hard-coded numbers, all genuine prose). Fixtures exist for every resolve and
+lint code that is implemented; open items are listed in the implementation
+notes of `05-diagnostics.md` and `06-registries.md`.
+
 ## M3 — Language server and editor
 
 Crates: `tmark-lsp`; `editors/vscode` gains the client; the grammar

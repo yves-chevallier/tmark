@@ -20,7 +20,9 @@ pub enum Severity {
 }
 
 /// Stable diagnostic identifiers. Design `05-diagnostics.md` §Who emits what.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Code {
     // --- Parse (tmark-syntax) ---
@@ -89,6 +91,42 @@ pub enum Code {
 }
 
 impl Code {
+    /// Every code, in catalogue order.
+    pub const ALL: &'static [Code] = &[
+        Code::AttrNoHost,
+        Code::RoleDanglingHead,
+        Code::RoleUnknown,
+        Code::CaptionNoHost,
+        Code::IncludeInline,
+        Code::ContainerUnclosed,
+        Code::ContainerUnknown,
+        Code::FenceUnknownNodeWord,
+        Code::FrontmatterYaml,
+        Code::FrontmatterUnknownKey,
+        Code::Deprecated,
+        Code::RefUnresolved,
+        Code::RefAmbiguous,
+        Code::PrefixUnknown,
+        Code::PrefixHostMismatch,
+        Code::LabelDuplicate,
+        Code::CitationShadowedByFootnote,
+        Code::CrossrefInventoryMissing,
+        Code::CrossrefInventoryStale,
+        Code::IncludeMissing,
+        Code::HardcodedNumber,
+        Code::PositionWord,
+        Code::CaptionIdOffConvention,
+        Code::StrictXConstruct,
+        Code::DeprecatedFrontmatterKey,
+        Code::LeadPromotion,
+        Code::HeadingSkip,
+    ];
+
+    /// The code with this kebab-case identifier.
+    pub fn from_id(id: &str) -> Option<Code> {
+        Code::ALL.iter().copied().find(|c| c.id() == id)
+    }
+
     /// The stable kebab-case identifier printed by the CLI and shown by the
     /// LSP.
     pub fn id(self) -> &'static str {

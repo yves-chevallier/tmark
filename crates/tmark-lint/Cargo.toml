@@ -9,3 +9,6 @@ rust-version.workspace = true
 [dependencies]
 tmark-ir = { path = "../tmark-ir" }
 tmark-registry = { path = "../tmark-registry" }
+
+[dev-dependencies]
+tmark-syntax = { path = "../tmark-syntax" }

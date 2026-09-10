@@ -6,10 +6,14 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["fs"]
+fs = ["tmark-registry/fs"]
+
 [dependencies]
 tmark-ir = { path = "../tmark-ir" }
 tmark-syntax = { path = "../tmark-syntax" }
-tmark-registry = { path = "../tmark-registry" }
+tmark-registry = { path = "../tmark-registry", default-features = false }
 tmark-fmt = { path = "../tmark-fmt" }
 tmark-lint = { path = "../tmark-lint" }
 tmark-writers = { path = "../tmark-writers" }

@@ -111,3 +111,34 @@ reference), document links for includes.
 - Fetching anything.
 - Persisting registries between runs: the LSP keeps `Resolved` in memory per
   document; TeXSmith keeps inventories on disk.
+
+## Implementation notes (milestone 2)
+
+- `tmark-registry` exposes `resolve(doc, loader, options) -> Resolved`;
+  `ResolveOptions` carries the document path (includes and sources resolve
+  against its directory), the `.bib` paths and the first values of series
+  that continue across documents.
+- `FsLoader` lives in this crate behind the default `fs` feature (off in
+  WASM) rather than in each edge crate: one implementation, three users.
+- Hosts and prefixes: a heading accepts any heading-class prefix (`part`,
+  `chap`, `sec`, `app`); a predeclared prefix on the wrong host is
+  `prefix-host-mismatch`, a user series on any host numbers it in that
+  series (spec §Anchor). Image and span nodes span their attribute list, so
+  a label diagnostic covers `![…](…){#id}` as a whole.
+- Numbers are allocated for the TeXSmith-numbered series only (declared
+  counters and theorem kinds with a counter of their own); `Counter::label`
+  applies the Python-style `format` (`{n:02d}`, `{prefix}`, `{key}`).
+- A key present in a label registry and in the bibliography resolves to
+  `Resolution::Ambiguous` with a `ref-ambiguous` diagnostic, not to
+  `Unresolved`, so that it is not reported twice.
+- Anchor links (`[text](#id)`) are resolved like references and appear in
+  `Resolved.refs`.
+- Inventories are read from `sources.crossrefs`; a missing or invalid file
+  is `crossref-inventory-missing`. The staleness check (`hash`) waits for
+  the writer side in TeXSmith, which fixes the hash algorithm.
+- Footnote-versus-citation shadowing is not implemented: the GFM footnote
+  construct only forms a footnote reference when a definition exists, so a
+  `[^key]` citation never reaches the IR as a `Note`. The deprecated sugar
+  needs its own tokenizer rule if it is ever wanted (milestone 5, or never).
+- Glossary terms come from `declare.glossary`, `declare.acronyms` (term to
+  string or object with `name`/`description`) and the `*[KEY]: …` lines.
