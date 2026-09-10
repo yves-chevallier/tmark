@@ -36,7 +36,7 @@ use lsp_types::{
     TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
 };
 use tmark::ir::LineIndex;
-use tmark::{Config, Diagnostic, Document, FileId, Profile, Resolved};
+use tmark::{Config, Diagnostic, Document, FileId, Resolved};
 
 use worker::{Analysis, Check, Job};
 
@@ -263,11 +263,7 @@ impl Server {
             }
         };
         let detected = is_tmark(&language_id, &text, has_config);
-        let parsed = if config.profile == Profile::Strict {
-            tmark::parse_strict(&text, FileId::default())
-        } else {
-            tmark::parse(&text, FileId::default())
-        };
+        let parsed = tmark::parse_with(&text, FileId::default(), config.profile);
         let index = LineIndex::new(&text);
         let analysis = self.docs.remove(uri.as_str()).and_then(|old| old.analysis);
         let doc = Doc {

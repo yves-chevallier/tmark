@@ -7,6 +7,10 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+# Writers read the IR...
 tmark-ir = { path = "../tmark-ir" }
-tmark-registry = { path = "../tmark-registry" }
+# ...and the resolution (numbers, labels); never the file system.
+tmark-registry = { path = "../tmark-registry", default-features = false }
+# Milestone 4 decides whether the CommonMark output lives here or stays a
+# tmark-fmt profile (architecture review C4); the edge is unused today.
 tmark-fmt = { path = "../tmark-fmt" }

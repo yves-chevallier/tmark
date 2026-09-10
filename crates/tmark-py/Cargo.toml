@@ -7,6 +7,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+# The facade with `fs`: the wheel ships the CLI's loader.
 tmark = { path = "../tmark" }
 
 [lib]

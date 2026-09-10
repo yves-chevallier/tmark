@@ -11,6 +11,9 @@ default = ["fs"]
 fs = ["tmark-registry/fs"]
 
 [dependencies]
+# The facade re-exports one entry point per crate (design/01-architecture.md
+# §The facade): IR and schemas, parser, registries (fs behind the feature),
+# printer, lint rules, writers (milestone 4).
 tmark-ir = { path = "../tmark-ir" }
 tmark-syntax = { path = "../tmark-syntax" }
 tmark-registry = { path = "../tmark-registry", default-features = false }

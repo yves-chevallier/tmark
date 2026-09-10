@@ -7,8 +7,11 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+# Rules walk the IR.
 tmark-ir = { path = "../tmark-ir" }
-tmark-registry = { path = "../tmark-registry" }
+# Rules read `Resolved` (counters, labels); never the file system.
+tmark-registry = { path = "../tmark-registry", default-features = false }
 
 [dev-dependencies]
+# Tests parse their inputs.
 tmark-syntax = { path = "../tmark-syntax" }

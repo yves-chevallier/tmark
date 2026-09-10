@@ -7,13 +7,18 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["fs"]
-# `FsLoader`: the one `Loader` that touches the file system. Off for WASM.
+# Off by default so that feature unification through tmark-lint and
+# tmark-writers cannot switch it on for WASM; the facade turns it on.
+default = []
+# `FsLoader`: the one `Loader` that touches the file system.
 fs = []
 
 [dependencies]
+# The IR the registries are built from.
 tmark-ir = { path = "../tmark-ir" }
+# Included files are parsed here (design/06-registries.md §Includes).
 tmark-syntax = { path = "../tmark-syntax" }
+# Inventories are JSON with a schema (design/06-registries.md §Inventory format).
 serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = { workspace = true }

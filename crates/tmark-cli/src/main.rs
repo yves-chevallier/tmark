@@ -158,7 +158,14 @@ fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
             let base = file.parent().unwrap_or(std::path::Path::new(""));
             pathdiff(b, base)
         }));
-        let (_, diagnostics) = check(&text, FileId::default(), &FsLoader, &options, &config);
+        let (_, diagnostics) = check(
+            &text,
+            FileId::default(),
+            workspace.profile,
+            &FsLoader,
+            &options,
+            &config,
+        );
         let index = LineIndex::new(&text);
         let name = file.display().to_string();
         for d in &diagnostics {
@@ -279,11 +286,7 @@ fn cmd_fmt(files: &[PathBuf], profile: Option<&str>, check: bool, write: bool) -
                 Err(code) => return code,
             },
         };
-        let parsed = if profile == Profile::Strict {
-            tmark::parse_strict(&text, FileId::default())
-        } else {
-            parse(&text, FileId::default())
-        };
+        let parsed = tmark::parse_with(&text, FileId::default(), profile);
         let formatted = format(&parsed.document, profile);
         if check {
             if formatted != text {

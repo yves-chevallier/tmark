@@ -84,9 +84,7 @@ fn analyse(check: Check) -> Analysis {
         document,
         lint,
     } = check;
-    let resolved = tmark::resolve(&document, &FsLoader, &options);
-    let mut diagnostics = resolved.diagnostics.clone();
-    diagnostics.extend(tmark::lint(&document, &resolved, &text, &lint));
+    let (resolved, diagnostics) = tmark::analyse(&document, &text, &FsLoader, &options, &lint);
     debug_assert_eq!(document.file, FileId::default());
     Analysis {
         uri,
