@@ -11,8 +11,8 @@ use serde_json::json;
 use tmark_ir::registry::{ADMONITIONS, NODE_WORDS, PREFIXES, ROLES};
 
 fn main() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../editors/vscode/scripts/registries.json");
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../editors/vscode/scripts/registries.json");
     let value = json!({
         "generated_by": "cargo run -p tmark-ir --example registries; do not edit",
         "roles": ROLES.iter().map(|r| json!({
