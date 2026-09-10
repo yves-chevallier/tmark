@@ -5,10 +5,12 @@
 //! the parsed document here; a request never waits for this thread.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use lsp_types::Uri;
+use tmark::ir::LineIndex;
 use tmark::{Diagnostic, Document, FileId, FsLoader, LintConfig, ResolveOptions, Resolved};
 
 /// Quiet time after the last change before an analysis starts.
@@ -36,6 +38,11 @@ pub struct Analysis {
     /// Resolve and lint diagnostics; parse diagnostics stay with the
     /// document.
     pub diagnostics: Vec<Diagnostic>,
+    /// Diagnostics of the included files, converted here (their text is
+    /// read again from disk for the positions), one entry per file
+    /// (design `08-lsp.md`: "published per file, including for included
+    /// files that are not open").
+    pub included: Vec<(Uri, Vec<lsp_types::Diagnostic>)>,
 }
 
 /// Runs until the job channel closes. Jobs for the same document replace
@@ -86,10 +93,32 @@ fn analyse(check: Check) -> Analysis {
     } = check;
     let (resolved, diagnostics) = tmark::analyse(&document, &text, &FsLoader, &options, &lint);
     debug_assert_eq!(document.file, FileId::default());
+    let base = options.path.parent().unwrap_or(Path::new("")).to_path_buf();
+    let mut included = Vec::new();
+    for (id, path) in &resolved.files {
+        let absolute = if path.is_absolute() {
+            path.clone()
+        } else {
+            base.join(path)
+        };
+        let Some(file_uri) = crate::convert::path_to_uri(&absolute) else {
+            continue;
+        };
+        let Ok(file_text) = std::fs::read_to_string(&absolute) else {
+            continue;
+        };
+        let index = LineIndex::new(&file_text);
+        let converted: Vec<lsp_types::Diagnostic> = diagnostics
+            .iter()
+            .filter_map(|d| crate::convert::diagnostic(&file_uri, &index, *id, d))
+            .collect();
+        included.push((file_uri, converted));
+    }
     Analysis {
         uri,
         version,
         resolved,
         diagnostics,
+        included,
     }
 }

@@ -519,3 +519,55 @@ fn code_actions_fix_deprecated_spellings() {
     assert_eq!(edit["range"]["end"]["character"], 14);
     client.shutdown(handle);
 }
+
+#[test]
+fn included_files_get_their_own_diagnostics() {
+    let dir = std::env::temp_dir().join(format!("tmark-lsp-inc-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // A parse diagnostic: references inside included files are not
+    // resolved yet (the collector keeps labels only; see 13-handoff.md).
+    std::fs::write(dir.join("part.md"), "## Part\n\nA {unknown}[x] here.\n").unwrap();
+    std::fs::write(dir.join("tmark.toml"), "[press]\nschema = \"press.json\"\n").unwrap();
+    std::fs::write(
+        dir.join("press.json"),
+        r#"{"properties": {"template": {"type": "string"}}}"#,
+    )
+    .unwrap();
+    let main = dir.join("main.md");
+    let text = "---\npress:\n  te\n---\n# Main\n\n{include}(part.md)\n";
+    std::fs::write(&main, text).unwrap();
+    let uri = format!("file://{}", main.display());
+    let part_uri = format!("file://{}", dir.join("part.md").display());
+    let (mut client, handle) = Client::start();
+    client.open(&uri, "markdown", text);
+    // Parse wave, then the analysis publishes the main file and the
+    // included one (the half-typed front matter is not a concern here).
+    let _ = client.diagnostics(&uri);
+    let _ = client.diagnostics(&uri);
+    let (version, part_diags) = client.diagnostics(&part_uri);
+    assert_eq!(version, None);
+    assert_eq!(part_diags[0]["code"], "role-unknown", "{part_diags:?}");
+    assert_eq!(part_diags[0]["range"]["start"]["line"], 2);
+    // The external press schema completes under `press:`.
+    let items = client.request(
+        "textDocument/completion",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 2, "character": 4}}),
+    );
+    assert!(
+        items
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["label"] == "template"),
+        "{items}"
+    );
+    // Closing clears the included file's diagnostics too.
+    client.notify(
+        "textDocument/didClose",
+        json!({"textDocument": {"uri": uri}}),
+    );
+    let (_, cleared) = client.diagnostics(&part_uri);
+    assert!(cleared.is_empty());
+    client.shutdown(handle);
+    let _ = std::fs::remove_dir_all(&dir);
+}

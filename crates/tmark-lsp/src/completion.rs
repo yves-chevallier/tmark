@@ -11,14 +11,27 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionTextEdit, Documentation, MarkupContent,
     MarkupKind, Range, TextEdit,
 };
+use std::path::Path;
 use tmark::ir::registry::{self, ADMONITIONS, NODE_WORDS, ROLES};
 use tmark::ir::{Document, LineIndex};
+
 use tmark::{Host, Resolved};
 
 use crate::convert;
 
 /// Characters the client should send a request on.
-pub const TRIGGERS: &[&str] = &["@", "{", ":", ";", "[", " "];
+pub const TRIGGERS: &[&str] = &["@", "{", ":", ";", "[", " ", ".", "(", "/"];
+
+/// What completion needs beyond the document: the edge supplies it.
+pub struct Extra<'a> {
+    /// TeXSmith's `press` JSON schema (`tmark.toml` `[press] schema`),
+    /// merged under `press:` in the front matter.
+    pub press_schema: Option<&'a serde_json::Value>,
+    /// The document's directory, for image and include paths.
+    pub dir: &'a Path,
+    /// Entries of a directory, directories with a trailing `/`.
+    pub list_dir: &'a dyn Fn(&Path) -> Vec<String>,
+}
 
 fn is_key_char(c: char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | ':')
@@ -35,6 +48,7 @@ pub fn complete(
     doc: &Document,
     resolved: Option<&Resolved>,
     offset: u32,
+    extra: &Extra,
 ) -> Option<Vec<CompletionItem>> {
     let offset = (offset as usize).min(text.len());
     let line_start = index.line_start(index.line_col(offset as u32).line)? as usize;
@@ -42,9 +56,25 @@ pub fn complete(
 
     let fm = doc.front_matter.meta.span;
     if !doc.front_matter.raw.is_empty() && fm.contains(offset as u32) {
-        return Some(front_matter(text, index, line_start, line, offset));
+        return Some(front_matter(
+            text,
+            index,
+            line_start,
+            line,
+            offset,
+            extra.press_schema,
+        ));
+    }
+    if let Some(items) = moustache(index, line, line_start, offset, doc) {
+        return Some(items);
+    }
+    if let Some(items) = paths(index, line, line_start, offset, extra) {
+        return Some(items);
     }
     if let Some(items) = reference(index, line, line_start, offset, resolved) {
+        return Some(items);
+    }
+    if let Some(items) = classes(index, line, line_start, offset, text) {
         return Some(items);
     }
     if let Some(items) = role(index, line, line_start, offset) {
@@ -238,6 +268,164 @@ fn role(
     Some(items)
 }
 
+// --- `{.` ---
+
+/// `{.cla` inside an attribute list: the classes the document already
+/// uses.
+fn classes(
+    index: &LineIndex,
+    line: &str,
+    line_start: usize,
+    offset: usize,
+    text: &str,
+) -> Option<Vec<CompletionItem>> {
+    let start = word_start(line, |c| {
+        c.is_ascii_alphanumeric() || matches!(c, '_' | '-')
+    });
+    let before = &line[..start];
+    if !before.ends_with('.') {
+        return None;
+    }
+    let open = before.rfind('{')?;
+    if before[open..].contains('}') || before[..open].ends_with('{') {
+        return None;
+    }
+    let mut seen: Vec<String> = Vec::new();
+    // Every `.class` token inside a brace group of the text.
+    for group in text.split('{').skip(1) {
+        // Closed groups only: the one being typed is not a source.
+        let Some((inner, _)) = group.split_once('}') else {
+            continue;
+        };
+        for token in inner.split_whitespace() {
+            if let Some(class) = token.strip_prefix('.') {
+                if !class.is_empty()
+                    && class
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+                    && !seen.iter().any(|s| s == class)
+                {
+                    seen.push(class.to_string());
+                }
+            }
+        }
+    }
+    seen.sort();
+    let range = edit_range(index, line_start + start, offset);
+    Some(
+        seen.iter()
+            .map(|class| item(class, CompletionItemKind::ENUM_MEMBER, range, class))
+            .collect(),
+    )
+}
+
+// --- `{{ path }}` ---
+
+/// `{{ pre` → dotted paths into the front matter (spec §Var).
+fn moustache(
+    index: &LineIndex,
+    line: &str,
+    line_start: usize,
+    offset: usize,
+    doc: &Document,
+) -> Option<Vec<CompletionItem>> {
+    let start = word_start(line, |c| {
+        c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')
+    });
+    let before = line[..start].trim_end();
+    if !before.ends_with("{{") {
+        return None;
+    }
+    let mut value = serde_json::to_value(&doc.front_matter.keys).ok()?;
+    if let (serde_json::Value::Object(map), serde_json::Value::Object(extra)) =
+        (&mut value, &doc.front_matter.extra)
+    {
+        for (k, v) in extra {
+            map.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+    }
+    let mut out = Vec::new();
+    fn walk(prefix: &str, value: &serde_json::Value, out: &mut Vec<(String, String)>) {
+        if let serde_json::Value::Object(map) = value {
+            for (k, v) in map {
+                let path = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefix}.{k}")
+                };
+                let kind = match v {
+                    serde_json::Value::Object(_) => "mapping",
+                    serde_json::Value::Array(_) => "list",
+                    serde_json::Value::Null => "null",
+                    _ => "value",
+                };
+                out.push((path.clone(), kind.to_string()));
+                walk(&path, v, out);
+            }
+        }
+    }
+    walk("", &value, &mut out);
+    let range = edit_range(index, line_start + start, offset);
+    Some(
+        out.into_iter()
+            .map(|(path, kind)| {
+                let mut it = item(&path, CompletionItemKind::VARIABLE, range, &path);
+                it.detail = Some(kind);
+                it
+            })
+            .collect(),
+    )
+}
+
+// --- paths ---
+
+/// `![alt](img/pa` and `{include}(chap/pa`: files next to the document.
+fn paths(
+    index: &LineIndex,
+    line: &str,
+    line_start: usize,
+    offset: usize,
+    extra: &Extra,
+) -> Option<Vec<CompletionItem>> {
+    let open = line.rfind('(')?;
+    let partial = &line[open + 1..];
+    if partial.contains(')') || partial.contains(' ') {
+        return None;
+    }
+    let head = &line[..open];
+    let image = head.ends_with(']') && head.rfind("![").is_some_and(|i| !head[i..].contains(')'));
+    let include = head.ends_with("{include}");
+    if !image && !include {
+        return None;
+    }
+    let (subdir, segment) = match partial.rfind('/') {
+        Some(slash) => (&partial[..=slash], &partial[slash + 1..]),
+        None => ("", partial),
+    };
+    let dir = extra.dir.join(subdir);
+    let range = edit_range(index, line_start + open + 1 + subdir.len(), offset);
+    let _ = segment;
+    let items = (extra.list_dir)(&dir)
+        .into_iter()
+        .filter(|name| {
+            name.ends_with('/')
+                || !include
+                || name.ends_with(".md")
+                || name.ends_with(".tmd")
+                || name.ends_with(".tm")
+        })
+        .map(|name| {
+            let kind = if name.ends_with('/') {
+                CompletionItemKind::FOLDER
+            } else {
+                CompletionItemKind::FILE
+            };
+            item(&name, kind, range, &name)
+        })
+        .collect();
+    Some(items)
+}
+
 // --- `:::`, `!!!`, `???` ---
 
 fn container(
@@ -325,6 +513,7 @@ fn front_matter(
     line_start: usize,
     line: &str,
     offset: usize,
+    press_schema: Option<&serde_json::Value>,
 ) -> Vec<CompletionItem> {
     let indent = line.len() - line.trim_start().len();
     let typed = &line[indent..];
@@ -358,9 +547,24 @@ fn front_matter(
             None => return Vec::new(),
         },
     };
-    let Some(props) = node.get("properties").and_then(|p| p.as_object()) else {
-        return Vec::new();
-    };
+    let mut props: Vec<(String, serde_json::Value)> = node
+        .get("properties")
+        .and_then(|p| p.as_object())
+        .map(|p| p.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+        .unwrap_or_default();
+    // TeXSmith's own `press` keys, merged after TMark's.
+    if parent.as_deref() == Some("press") {
+        if let Some(external) = press_schema
+            .and_then(|s| s.get("properties"))
+            .and_then(|p| p.as_object())
+        {
+            for (k, v) in external {
+                if !props.iter().any(|(existing, _)| existing == k) {
+                    props.push((k.clone(), v.clone()));
+                }
+            }
+        }
+    }
     let range = edit_range(index, line_start + indent, offset);
     props
         .iter()
@@ -416,12 +620,28 @@ mod tests {
         items.iter().map(|i| i.label.as_str()).collect()
     }
 
+    fn none(_: &Path) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn fake(_: &Path) -> Vec<String> {
+        vec!["img/".into(), "plot.png".into(), "ch2.md".into()]
+    }
+
+    fn extra<'a>(list_dir: &'a dyn Fn(&Path) -> Vec<String>) -> Extra<'a> {
+        Extra {
+            press_schema: None,
+            dir: Path::new("/docs"),
+            list_dir,
+        }
+    }
+
     #[test]
     fn references_after_at() {
         let text = "# Intro {#sec:intro}\n\nA #(fw:boot) item. See @sec:in\n";
         let (doc, resolved, index) = setup(text);
         let at = text.len() as u32 - 1;
-        let items = complete(text, &index, &doc, Some(&resolved), at).unwrap();
+        let items = complete(text, &index, &doc, Some(&resolved), at, &extra(&none)).unwrap();
         assert!(
             labels(&items).contains(&"sec:intro"),
             "{:?}",
@@ -437,19 +657,43 @@ mod tests {
         // Bracketed, second item.
         let text2 = "# Intro {#sec:intro}\n\nSee @[sec:intro; s";
         let (doc, resolved, index) = setup(text2);
-        let items = complete(text2, &index, &doc, Some(&resolved), text2.len() as u32).unwrap();
+        let items = complete(
+            text2,
+            &index,
+            &doc,
+            Some(&resolved),
+            text2.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert!(labels(&items).contains(&"sec:intro"));
         // Not after a closed list, nor in prose.
         let text3 = "See @[sec:intro] and s";
         let (doc, resolved, index) = setup(text3);
-        assert!(complete(text3, &index, &doc, Some(&resolved), text3.len() as u32).is_none());
+        assert!(complete(
+            text3,
+            &index,
+            &doc,
+            Some(&resolved),
+            text3.len() as u32,
+            &extra(&none)
+        )
+        .is_none());
     }
 
     #[test]
     fn roles_containers_fences() {
         let text = "Text {co";
         let (doc, resolved, index) = setup(text);
-        let items = complete(text, &index, &doc, Some(&resolved), text.len() as u32).unwrap();
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            text.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert!(labels(&items).contains(&"code"));
         assert!(
             !labels(&items).contains(&"latex"),
@@ -457,20 +701,136 @@ mod tests {
         );
         let text = "Text {code l";
         let (doc, resolved, index) = setup(text);
-        let items = complete(text, &index, &doc, Some(&resolved), text.len() as u32).unwrap();
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            text.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert!(labels(&items).contains(&"lang"), "{:?}", labels(&items));
         let text = "::: no";
         let (doc, resolved, index) = setup(text);
-        let items = complete(text, &index, &doc, Some(&resolved), text.len() as u32).unwrap();
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            text.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert_eq!(labels(&items)[..2], ["aside", "figure"]);
         assert!(labels(&items).contains(&"note"));
         let text = "```yaml ta";
         let (doc, resolved, index) = setup(text);
-        let items = complete(text, &index, &doc, Some(&resolved), text.len() as u32).unwrap();
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            text.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert!(labels(&items).contains(&"table"));
         let text = "{{ pa";
         let (doc, resolved, index) = setup(text);
-        assert!(complete(text, &index, &doc, Some(&resolved), text.len() as u32).is_none());
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            text.len() as u32,
+            &extra(&none),
+        );
+        assert!(
+            items.is_some_and(|i| i.is_empty()),
+            "moustache paths, none here"
+        );
+    }
+
+    #[test]
+    fn classes_paths_and_moustaches() {
+        let text =
+            "---\ntitle: T\npress:\n  template: article\n---\nA [x]{.draft .wide} and ![alt](pl";
+        let (doc, resolved, index) = setup(text);
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            text.len() as u32,
+            &extra(&fake),
+        )
+        .unwrap();
+        assert_eq!(labels(&items), ["img/", "plot.png", "ch2.md"]);
+        let text2 = "A [x]{.draft .wide} and [y]{.w";
+        let (doc, resolved, index) = setup(text2);
+        let items = complete(
+            text2,
+            &index,
+            &doc,
+            Some(&resolved),
+            text2.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
+        assert_eq!(labels(&items), ["draft", "wide"]);
+        let text3 = "{include}(ch";
+        let (doc, resolved, index) = setup(text3);
+        let items = complete(
+            text3,
+            &index,
+            &doc,
+            Some(&resolved),
+            text3.len() as u32,
+            &extra(&fake),
+        )
+        .unwrap();
+        assert_eq!(
+            labels(&items),
+            ["img/", "ch2.md"],
+            "only Markdown files for includes"
+        );
+        let text4 = "---\ntitle: T\npress:\n  template: article\n---\nSee {{ pr";
+        let (doc, resolved, index) = setup(text4);
+        let items = complete(
+            text4,
+            &index,
+            &doc,
+            Some(&resolved),
+            text4.len() as u32,
+            &extra(&none),
+        )
+        .unwrap();
+        assert!(
+            labels(&items).contains(&"press.template"),
+            "{:?}",
+            labels(&items)
+        );
+        assert!(labels(&items).contains(&"title"));
+    }
+
+    #[test]
+    fn press_schema_merges_under_press() {
+        let text = "---\npress:\n  te\n---\n";
+        let (doc, resolved, index) = setup(text);
+        let schema = serde_json::json!({"properties": {"template": {"type": "string", "description": "TeXSmith template"}, "declare": {}}});
+        let extra = Extra {
+            press_schema: Some(&schema),
+            dir: Path::new("/docs"),
+            list_dir: &none,
+        };
+        let at = text.find("  te\n").unwrap() + 4;
+        let items = complete(text, &index, &doc, Some(&resolved), at as u32, &extra).unwrap();
+        assert!(labels(&items).contains(&"template"), "{:?}", labels(&items));
+        assert_eq!(
+            labels(&items).iter().filter(|l| **l == "declare").count(),
+            1
+        );
     }
 
     #[test]
@@ -478,11 +838,27 @@ mod tests {
         let text = "---\ntitle: X\nti\npress:\n  ba\n---\n# H\n";
         let (doc, resolved, index) = setup(text);
         let top = text.find("\nti\n").unwrap() + 3;
-        let items = complete(text, &index, &doc, Some(&resolved), top as u32).unwrap();
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            top as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert!(labels(&items).contains(&"title"), "{:?}", labels(&items));
         assert!(labels(&items).contains(&"press"));
         let under = text.find("  ba\n").unwrap() + 4;
-        let items = complete(text, &index, &doc, Some(&resolved), under as u32).unwrap();
+        let items = complete(
+            text,
+            &index,
+            &doc,
+            Some(&resolved),
+            under as u32,
+            &extra(&none),
+        )
+        .unwrap();
         assert!(
             labels(&items).contains(&"base_level"),
             "{:?}",

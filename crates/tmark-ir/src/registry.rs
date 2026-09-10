@@ -197,6 +197,9 @@ pub struct Prefix {
     pub scope: Option<Scope>,
     /// The `ref` template with `{name}` and `{number}` fields.
     pub reference: Option<&'static str>,
+    /// A heading-class prefix (`part`, `chap`, `sec`, `app`): any of them
+    /// may label a heading (spec Table "Predeclared counter prefixes").
+    pub heading: bool,
 }
 
 const fn mk_prefix(name: &'static str, label: &'static str, scope: Scope) -> Prefix {
@@ -205,15 +208,23 @@ const fn mk_prefix(name: &'static str, label: &'static str, scope: Scope) -> Pre
         label: Some(label),
         scope: Some(scope),
         reference: Some("{name} {number}"),
+        heading: false,
+    }
+}
+
+const fn mk_heading(name: &'static str, label: &'static str) -> Prefix {
+    Prefix {
+        heading: true,
+        ..mk_prefix(name, label, Scope::Document)
     }
 }
 
 /// Spec §Counters.
 pub const PREFIXES: &[Prefix] = &[
-    mk_prefix("part", "Part", Scope::Document),
-    mk_prefix("chap", "Chapter", Scope::Document),
-    mk_prefix("sec", "Section", Scope::Document),
-    mk_prefix("app", "Appendix", Scope::Document),
+    mk_heading("part", "Part"),
+    mk_heading("chap", "Chapter"),
+    mk_heading("sec", "Section"),
+    mk_heading("app", "Appendix"),
     mk_prefix("fig", "Figure", Scope::Chapter),
     mk_prefix("tbl", "Table", Scope::Chapter),
     mk_prefix("lst", "Listing", Scope::Chapter),
@@ -225,12 +236,14 @@ pub const PREFIXES: &[Prefix] = &[
         label: None,
         scope: None,
         reference: None,
+        heading: false,
     },
     Prefix {
         name: "doi",
         label: None,
         scope: None,
         reference: None,
+        heading: false,
     },
 ];
 

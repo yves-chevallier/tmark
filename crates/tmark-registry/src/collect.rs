@@ -213,11 +213,10 @@ impl<'a> Collector<'a> {
         // Headings take any of the heading-class prefixes (spec Table
         // "Predeclared counter prefixes": part, chap, sec, app).
         let heading_class = host == Host::Header
-            && prefix.as_deref().is_some_and(|p| {
-                ["part", "chap", "sec", "app"]
-                    .iter()
-                    .any(|h| p.eq_ignore_ascii_case(h))
-            });
+            && prefix
+                .as_deref()
+                .and_then(tmark_ir::registry::prefix)
+                .is_some_and(|p| p.heading);
         let prefix = match (&prefix, host.prefix()) {
             (Some(p), Some(_)) if heading_class => Some(p.clone()),
             (Some(p), Some(conventional)) if !p.eq_ignore_ascii_case(conventional) => {

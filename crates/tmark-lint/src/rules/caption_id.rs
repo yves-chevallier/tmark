@@ -2,7 +2,7 @@
 //! conventional one for its kind (spec §Anchor: `tbl:`, `fig:`, `lst:` are
 //! recommended; a mismatch with the host is linted).
 
-use tmark_ir::{Block, CaptionKind, Code, Diagnostic};
+use tmark_ir::{Block, Code, Diagnostic};
 
 use crate::{Context, Rule};
 
@@ -22,11 +22,7 @@ impl Rule for CaptionIdOffConvention {
                 return;
             };
             let Some(id) = caption.attrs.id() else { return };
-            let expected = match caption.kind {
-                CaptionKind::Table => "tbl",
-                CaptionKind::Figure => "fig",
-                CaptionKind::Listing => "lst",
-            };
+            let expected = caption.kind.prefix();
             let prefix = id.split_once(':').map(|(p, _)| p);
             let user_series = prefix.is_some_and(|p| {
                 ctx.resolved

@@ -7,9 +7,7 @@
 use lsp_types::{
     DocumentSymbol, FoldingRange, FoldingRangeKind, Location, SymbolInformation, SymbolKind, Uri,
 };
-use tmark::ir::{
-    plain_text, walk_blocks, Block, CaptionKind, Document, Inline, LineIndex, NodeRef, Span,
-};
+use tmark::ir::{plain_text, walk_blocks, Block, Document, Inline, LineIndex, NodeRef, Span};
 
 use crate::convert::range;
 
@@ -138,11 +136,7 @@ fn collect(blocks: &[Block], end: u32) -> Vec<Sym> {
                 stack.push((h.level, sym));
             }
             Block::Caption(c) => {
-                let word = match c.kind {
-                    CaptionKind::Table => "Table",
-                    CaptionKind::Figure => "Figure",
-                    CaptionKind::Listing => "Listing",
-                };
+                let word = c.kind.word();
                 let sym = symbol(
                     label(&plain_text(&c.content), word),
                     Some(match c.attrs.id() {
@@ -217,6 +211,27 @@ fn collect(blocks: &[Block], end: u32) -> Vec<Sym> {
                     }
                 }
             }
+            Block::Para(p) => match para_special(p) {
+                Some(ParaKind::Aside(content)) => {
+                    let mut sym = symbol("aside".into(), None, SymbolKind::NAMESPACE, span);
+                    sym.children = collect(content, span.end);
+                    attach(sym, &mut stack, &mut root);
+                }
+                Some(ParaKind::GeneratedImage(lang)) => {
+                    let sym = symbol(
+                        format!("{lang} image"),
+                        Some("generated".into()),
+                        SymbolKind::OBJECT,
+                        span,
+                    );
+                    attach(sym, &mut stack, &mut root);
+                }
+                None => {
+                    for sym in counter_items(block) {
+                        attach(sym, &mut stack, &mut root);
+                    }
+                }
+            },
             _ => {
                 for sym in counter_items(block) {
                     attach(sym, &mut stack, &mut root);
@@ -226,6 +241,25 @@ fn collect(blocks: &[Block], end: u32) -> Vec<Sym> {
     }
     close_to(0, &mut stack, &mut root, end);
     root
+}
+
+/// Paragraphs that stand for a block: a `::: aside` lowers to
+/// `Para([Aside])`, a `python image` fence to `Para([Image])` with a
+/// `generate` attribute (design 03 §Implementation notes).
+enum ParaKind<'a> {
+    Aside(&'a [Block]),
+    GeneratedImage(&'a str),
+}
+
+fn para_special(p: &tmark::ir::Para) -> Option<ParaKind<'_>> {
+    let [only] = p.content.as_slice() else {
+        return None;
+    };
+    match only {
+        Inline::Aside(a) => Some(ParaKind::Aside(&a.content)),
+        Inline::Image(i) => i.attrs.get("generate").map(ParaKind::GeneratedImage),
+        _ => None,
+    }
 }
 
 fn symbol(name: String, detail: Option<String>, kind: SymbolKind, span: Span) -> Sym {
@@ -278,6 +312,7 @@ pub fn folding_ranges(doc: &Document, index: &LineIndex) -> Vec<FoldingRange> {
             | Block::MathBlock(_)
             | Block::RawBlock(_) => Some(FoldingRangeKind::Region),
             Block::Comment(_) => Some(FoldingRangeKind::Comment),
+            Block::Para(p) => para_special(p).map(|_| FoldingRangeKind::Region),
             _ => None,
         };
         if let Some(kind) = kind {
@@ -324,6 +359,11 @@ fn sections(blocks: &[Block], end: u32, out: &mut Vec<(Span, Option<FoldingRange
                 open.push((h.level, span.start));
             }
             Block::Figure(f) => sections(&f.content, span.end, out),
+            Block::Para(p) => {
+                if let Some(ParaKind::Aside(content)) = para_special(p) {
+                    sections(content, span.end, out);
+                }
+            }
             Block::Admonition(a) => sections(&a.content, span.end, out),
             Block::Div(d) => sections(&d.content, span.end, out),
             Block::BlockQuote(q) => sections(&q.content, span.end, out),

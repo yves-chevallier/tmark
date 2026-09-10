@@ -124,6 +124,9 @@ struct Doc {
     path: PathBuf,
     /// The nearest `tmark.toml`, or the defaults.
     config: Config,
+    /// TeXSmith's `press` JSON schema named by the configuration, for
+    /// front-matter completion.
+    press_schema: Option<serde_json::Value>,
     analysis: Option<Analysis>,
 }
 
@@ -261,9 +264,12 @@ impl Server {
             DidCloseTextDocument::METHOD => {
                 let p: DidCloseTextDocumentParams = serde_json::from_value(n.params)?;
                 let uri = p.text_document.uri;
-                if self.docs.remove(uri.as_str()).is_some() {
+                if let Some(doc) = self.docs.remove(uri.as_str()) {
                     let _ = self.jobs.send(Job::Drop(uri.clone()));
                     self.send_diagnostics(uri, Vec::new(), None)?;
+                    for (included, _) in doc.analysis.iter().flat_map(|a| &a.included) {
+                        self.send_diagnostics(included.clone(), Vec::new(), None)?;
+                    }
                 }
             }
             _ => {}
@@ -292,6 +298,10 @@ impl Server {
             }
         };
         let detected = is_tmark(&language_id, &text, has_config);
+        let press_schema = config.press_schema.as_ref().and_then(|schema| {
+            let text = std::fs::read_to_string(config.dir.join(schema)).ok()?;
+            serde_json::from_str(&text).ok()
+        });
         let mut parsed = tmark::parse_with(&text, FileId::default(), config.profile);
         tmark::fixes(&parsed.document, &mut parsed.diagnostics);
         let index = LineIndex::new(&text);
@@ -305,6 +315,7 @@ impl Server {
             language_id,
             path,
             config,
+            press_schema,
             analysis,
             version,
             text,
@@ -332,7 +343,19 @@ impl Server {
             // Stale: a newer version is queued or running.
             return Ok(());
         }
+        // Included files that dropped out of the document lose their
+        // diagnostics.
+        let gone: Vec<Uri> = doc
+            .analysis
+            .iter()
+            .flat_map(|old| &old.included)
+            .map(|(u, _)| u.clone())
+            .filter(|u| !analysis.included.iter().any(|(n, _)| n == u))
+            .collect();
         doc.analysis = Some(analysis);
+        for uri in gone {
+            self.send_diagnostics(uri, Vec::new(), None)?;
+        }
         self.publish(&uri)?;
         // The overlay (unresolved references) is only known now.
         if self.semantic_refresh {
@@ -369,7 +392,13 @@ impl Server {
             .chain(analysed)
             .filter_map(|d| convert::diagnostic(uri, &doc.index, file, d))
             .collect();
-        self.send_diagnostics(uri.clone(), diagnostics, Some(doc.version))
+        self.send_diagnostics(uri.clone(), diagnostics, Some(doc.version))?;
+        if let Some(analysis) = doc.analysis.as_ref().filter(|a| a.version == doc.version) {
+            for (included, diagnostics) in &analysis.included {
+                self.send_diagnostics(included.clone(), diagnostics.clone(), None)?;
+            }
+        }
+        Ok(())
     }
 
     fn show_message(&self, typ: MessageType, message: String) -> Result<(), Error> {
@@ -584,7 +613,37 @@ impl Server {
         // The last analysis is good enough for labels even when a newer
         // version is being typed: a stale list beats an empty one.
         let resolved = doc.analysis.as_ref().map(|a| &a.resolved);
-        match completion::complete(&doc.text, &doc.index, &doc.document, resolved, offset) {
+        let list_dir = |dir: &std::path::Path| -> Vec<String> {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return Vec::new();
+            };
+            let mut names: Vec<String> = entries
+                .flatten()
+                .filter_map(|e| {
+                    let name = e.file_name().to_string_lossy().into_owned();
+                    if name.starts_with('.') {
+                        return None;
+                    }
+                    let dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+                    Some(if dir { format!("{name}/") } else { name })
+                })
+                .collect();
+            names.sort();
+            names
+        };
+        let extra = completion::Extra {
+            press_schema: doc.press_schema.as_ref(),
+            dir: doc.path.parent().unwrap_or(std::path::Path::new("")),
+            list_dir: &list_dir,
+        };
+        match completion::complete(
+            &doc.text,
+            &doc.index,
+            &doc.document,
+            resolved,
+            offset,
+            &extra,
+        ) {
             Some(items) => {
                 serde_json::to_value(CompletionResponse::Array(items)).expect("items serialise")
             }
