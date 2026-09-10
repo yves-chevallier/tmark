@@ -8,7 +8,7 @@
 mod config;
 
 pub use config::Config;
-pub use tmark_fmt::{edit, format, NodeEdit, Profile, Replacement};
+pub use tmark_fmt::{edit, format, print_node, NodeEdit, Profile, Replacement};
 pub use tmark_ir as ir;
 pub use tmark_ir::schema;
 pub use tmark_ir::{Diagnostic, Document, FileId};
@@ -47,7 +47,33 @@ pub fn analyse(
     (resolved, diagnostics)
 }
 
-/// Every diagnostic of a file: parse, resolve and lint, in that order.
+/// Attach a `Fix` to every `deprecated` diagnostic whose span is exactly a
+/// node of `doc`: the node reprinted in its canonical spelling (design 05
+/// §Fixes: "rewriting a deprecated spelling is safe"). Diagnostics that
+/// already carry a fix, or whose span is not a node (front-matter keys),
+/// are left alone.
+pub fn fixes(doc: &Document, diagnostics: &mut [Diagnostic]) {
+    for d in diagnostics
+        .iter_mut()
+        .filter(|d| d.code == ir::Code::Deprecated && d.fix.is_none())
+    {
+        let mut node = None;
+        ir::walk(doc, &mut |n: ir::NodeRef| {
+            if node.is_none() && n.span() == d.span {
+                node = Some(n);
+            }
+        });
+        if let Some(node) = node {
+            d.fix = Some(ir::Fix {
+                span: d.span,
+                replacement: print_node(node),
+            });
+        }
+    }
+}
+
+/// Every diagnostic of a file: parse, resolve and lint, in that order,
+/// with fixes attached.
 pub fn check(
     text: &str,
     file: FileId,
@@ -60,5 +86,6 @@ pub fn check(
     let (_, analysis) = analyse(&parsed.document, text, loader, options, lint_config);
     let mut diagnostics = parsed.diagnostics;
     diagnostics.extend(analysis);
+    fixes(&parsed.document, &mut diagnostics);
     (parsed.document, diagnostics)
 }

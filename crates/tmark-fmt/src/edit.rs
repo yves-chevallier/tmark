@@ -1,7 +1,7 @@
 //! Local edits: reprint one node and splice it into its span, leaving every
 //! other byte untouched (design 04 §Local edits, ADR 0004).
 
-use tmark_ir::{walk, Block, Document, Inline, NodeId, NodeRef, Span};
+use tmark_ir::{find, Block, Document, Inline, NodeId, NodeRef, Span};
 
 use crate::escape::Context;
 use crate::out::Out;
@@ -23,21 +23,25 @@ pub struct NodeEdit {
 
 /// The span of a node of the document, if it exists.
 pub fn span_of(doc: &Document, id: NodeId) -> Option<Span> {
-    let mut found = None;
-    walk(doc, &mut |node: NodeRef| {
-        if node.id() == id {
-            found = Some(node.span());
-        }
-    });
-    found
+    find(doc, id).map(|node| node.span())
 }
 
 /// The canonical text of a replacement, on its own (no trailing newline).
 pub fn print(replacement: &Replacement) -> String {
-    let mut out = Out::new();
     match replacement {
-        Replacement::Block(b) => block::block(&mut out, b),
-        Replacement::Inline(i) => {
+        Replacement::Block(b) => print_node(NodeRef::Block(b)),
+        Replacement::Inline(i) => print_node(NodeRef::Inline(i)),
+    }
+}
+
+/// The canonical text of one node of a document, on its own (no trailing
+/// newline): what a fix for a deprecated spelling replaces the node's span
+/// with (design 05 §Fixes).
+pub fn print_node(node: NodeRef<'_>) -> String {
+    let mut out = Out::new();
+    match node {
+        NodeRef::Block(b) => block::block(&mut out, b),
+        NodeRef::Inline(i) => {
             inline::inlines(&mut out, std::slice::from_ref(i), Context::default())
         }
     }

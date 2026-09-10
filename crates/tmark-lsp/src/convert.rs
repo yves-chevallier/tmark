@@ -3,7 +3,7 @@
 //! Design: `08-lsp.md` §Protocol details: the LSP speaks UTF-16 columns,
 //! the IR speaks bytes; `LineIndex` converts once, both ways.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use lsp_types::{
     Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag, Location,
@@ -97,6 +97,31 @@ pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
     Some(PathBuf::from(path))
 }
 
+/// A `file:` URI for an absolute path (a relative one is taken from the
+/// current directory).
+pub fn path_to_uri(path: &Path) -> Option<Uri> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(path)
+    };
+    let text = absolute.to_string_lossy().replace('\\', "/");
+    let mut out = String::from("file://");
+    if !text.starts_with('/') {
+        out.push('/');
+    }
+    for byte in text.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    use std::str::FromStr;
+    Uri::from_str(&out).ok()
+}
+
 fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -132,6 +157,16 @@ mod tests {
         assert_eq!(offset(&index, Position::new(0, 3)), 5);
         assert_eq!(offset(&index, Position::new(1, 1)), text.len() as u32);
         assert_eq!(full_range(&index).end, Position::new(1, 1));
+    }
+
+    #[test]
+    fn paths_to_uris() {
+        let uri = path_to_uri(Path::new("/home/me/a b/doc.md")).unwrap();
+        assert_eq!(uri.as_str(), "file:///home/me/a%20b/doc.md");
+        assert_eq!(
+            uri_to_path(&uri),
+            Some(PathBuf::from("/home/me/a b/doc.md"))
+        );
     }
 
     #[test]

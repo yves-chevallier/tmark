@@ -9,6 +9,7 @@
 
 mod completion;
 mod convert;
+mod navigate;
 mod outline;
 mod semantic;
 mod worker;
@@ -23,17 +24,22 @@ use lsp_types::notification::{
     Notification as _, PublishDiagnostics, ShowMessage,
 };
 use lsp_types::request::{
-    Completion, DocumentSymbolRequest, FoldingRangeRequest, Formatting, Request as _,
-    SemanticTokensFullRequest, SemanticTokensRefresh,
+    CodeActionRequest, Completion, DocumentLinkRequest, DocumentSymbolRequest, FoldingRangeRequest,
+    Formatting, GotoDefinition, HoverRequest, PrepareRenameRequest, References, Rename,
+    Request as _, SemanticTokensFullRequest, SemanticTokensRefresh,
 };
 use lsp_types::{
-    CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
-    DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
-    FoldingRangeProviderCapability, InitializeParams, InitializeResult, MessageType, OneOf,
-    PublishDiagnosticsParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensResult, ServerCapabilities, ServerInfo, ShowMessageParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams,
+    CodeActionProviderCapability, CompletionOptions, CompletionParams, CompletionResponse,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentFormattingParams, DocumentLinkOptions, DocumentLinkParams, DocumentSymbolParams,
+    DocumentSymbolResponse, FoldingRangeParams, FoldingRangeProviderCapability,
+    GotoDefinitionParams, GotoDefinitionResponse, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, MessageType, OneOf, PublishDiagnosticsParams,
+    ReferenceParams, RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult, ServerCapabilities,
+    ServerInfo, ShowMessageParams, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextEdit, Uri, WorkspaceEdit,
 };
 use tmark::ir::LineIndex;
 use tmark::{Config, Diagnostic, Document, FileId, Resolved};
@@ -74,6 +80,18 @@ fn capabilities() -> ServerCapabilities {
         document_symbol_provider: Some(OneOf::Left(true)),
         folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
+        definition_provider: Some(OneOf::Left(true)),
+        references_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        rename_provider: Some(OneOf::Right(RenameOptions {
+            prepare_provider: Some(true),
+            work_done_progress_options: Default::default(),
+        })),
+        document_link_provider: Some(DocumentLinkOptions {
+            resolve_provider: Some(false),
+            work_done_progress_options: Default::default(),
+        }),
+        code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(completion::TRIGGERS.iter().map(|s| s.to_string()).collect()),
             ..Default::default()
@@ -117,6 +135,17 @@ impl Doc {
             .as_ref()
             .filter(|a| a.version == self.version)
             .map(|a| &a.resolved)
+    }
+
+    fn view(&self) -> navigate::View<'_> {
+        navigate::View {
+            uri: &self.uri,
+            path: &self.path,
+            text: &self.text,
+            index: &self.index,
+            doc: &self.document,
+            resolved: self.resolved(),
+        }
     }
 }
 
@@ -263,7 +292,8 @@ impl Server {
             }
         };
         let detected = is_tmark(&language_id, &text, has_config);
-        let parsed = tmark::parse_with(&text, FileId::default(), config.profile);
+        let mut parsed = tmark::parse_with(&text, FileId::default(), config.profile);
+        tmark::fixes(&parsed.document, &mut parsed.diagnostics);
         let index = LineIndex::new(&text);
         let analysis = self.docs.remove(uri.as_str()).and_then(|old| old.analysis);
         let doc = Doc {
@@ -382,6 +412,56 @@ impl Server {
                 let at = p.text_document_position;
                 self.completion(&at.text_document.uri, at.position)
             }),
+            GotoDefinition::METHOD => with_params(req, |p: GotoDefinitionParams| {
+                self.at(&p.text_document_position_params, |view, offset| {
+                    let locations = navigate::definition(view, offset);
+                    serde_json::to_value(GotoDefinitionResponse::Array(locations))
+                        .expect("locations serialise")
+                })
+            }),
+            References::METHOD => with_params(req, |p: ReferenceParams| {
+                let include = p.context.include_declaration;
+                self.at(&p.text_document_position, |view, offset| {
+                    serde_json::to_value(navigate::references(view, offset, include))
+                        .expect("locations serialise")
+                })
+            }),
+            HoverRequest::METHOD => with_params(req, |p: HoverParams| {
+                self.at(&p.text_document_position_params, |view, offset| {
+                    serde_json::to_value(navigate::hover(view, offset)).expect("hover serialises")
+                })
+            }),
+            PrepareRenameRequest::METHOD => with_params(req, |p: TextDocumentPositionParams| {
+                self.at(&p, |view, offset| {
+                    serde_json::to_value(navigate::prepare_rename(view, offset))
+                        .expect("range serialises")
+                })
+            }),
+            Rename::METHOD => {
+                let id = req.id.clone();
+                return match serde_json::from_value::<RenameParams>(req.params) {
+                    Ok(p) => {
+                        let outcome = self.rename(&p.text_document_position, &p.new_name);
+                        match outcome {
+                            Ok(edit) => Response::new_ok(id, edit),
+                            Err(message) => {
+                                Response::new_err(id, ErrorCode::RequestFailed as i32, message)
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        Response::new_err(id, ErrorCode::InvalidParams as i32, error.to_string())
+                    }
+                };
+            }
+            DocumentLinkRequest::METHOD => with_params(req, |p: DocumentLinkParams| {
+                self.with_view(&p.text_document.uri, |view| {
+                    serde_json::to_value(navigate::document_links(view)).expect("links serialise")
+                })
+            }),
+            CodeActionRequest::METHOD => with_params(req, |p: CodeActionParams| {
+                self.code_actions(&p.text_document.uri, p.range)
+            }),
             _ => {
                 return Response::new_err(
                     id,
@@ -418,6 +498,82 @@ impl Server {
         };
         serde_json::to_value(outline::folding_ranges(&doc.document, &doc.index))
             .expect("folds serialise")
+    }
+
+    /// Run `f` on the document's view, or answer `null` when it is not open.
+    fn with_view(
+        &self,
+        uri: &Uri,
+        f: impl FnOnce(&navigate::View) -> serde_json::Value,
+    ) -> serde_json::Value {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
+            return serde_json::Value::Null;
+        };
+        f(&doc.view())
+    }
+
+    /// Run `f` on the view and the byte offset of a position.
+    fn at(
+        &self,
+        p: &TextDocumentPositionParams,
+        f: impl FnOnce(&navigate::View, u32) -> serde_json::Value,
+    ) -> serde_json::Value {
+        let Some(doc) = self.docs.get(p.text_document.uri.as_str()) else {
+            return serde_json::Value::Null;
+        };
+        let offset = convert::offset(&doc.index, p.position);
+        f(&doc.view(), offset)
+    }
+
+    fn rename(
+        &self,
+        p: &TextDocumentPositionParams,
+        new_name: &str,
+    ) -> Result<WorkspaceEdit, String> {
+        let doc = self
+            .docs
+            .get(p.text_document.uri.as_str())
+            .ok_or("document not open")?;
+        let offset = convert::offset(&doc.index, p.position);
+        navigate::rename(&doc.view(), offset, new_name)
+    }
+
+    /// Quick fixes: every diagnostic with a `Fix` that touches `range`
+    /// (design 05 §Fixes; today the deprecated spellings).
+    fn code_actions(&self, uri: &Uri, range: lsp_types::Range) -> serde_json::Value {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
+            return serde_json::Value::Null;
+        };
+        let start = convert::offset(&doc.index, range.start);
+        let end = convert::offset(&doc.index, range.end);
+        let file = doc.document.file;
+        let actions: Vec<CodeActionOrCommand> = doc
+            .parse_diagnostics
+            .iter()
+            .filter(|d| d.span.file == file && d.span.start <= end && start <= d.span.end)
+            .filter_map(|d| {
+                let fix = d.fix.as_ref()?;
+                let edit = TextEdit::new(
+                    convert::range(&doc.index, fix.span),
+                    fix.replacement.clone(),
+                );
+                Some(CodeActionOrCommand::CodeAction(CodeAction {
+                    title: format!(
+                        "Replace with `{}`",
+                        fix.replacement.lines().next().unwrap_or_default()
+                    ),
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: convert::diagnostic(uri, &doc.index, file, d).map(|d| vec![d]),
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(HashMap::from([(uri.clone(), vec![edit])])),
+                        ..Default::default()
+                    }),
+                    is_preferred: Some(true),
+                    ..Default::default()
+                }))
+            })
+            .collect();
+        serde_json::to_value(actions).expect("actions serialise")
     }
 
     fn completion(&self, uri: &Uri, position: lsp_types::Position) -> serde_json::Value {

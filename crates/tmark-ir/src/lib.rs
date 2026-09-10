@@ -53,7 +53,7 @@ pub use table::{
     Align, Cell, Column, ColumnConfig, ColumnGroup, DataRow, LeafColumn, Row, Separator,
     TableModel, TableSettings,
 };
-pub use walk::{plain_text, walk, walk_blocks, walk_inlines, NodeRef};
+pub use walk::{find, nodes_at, plain_text, walk, walk_blocks, walk_inlines, NodeRef};
 
 /// The JSON schema of a public shape, by name: `"ir"` (a `Document`),
 /// `"frontmatter"` (the `Keys` of the front matter). The example

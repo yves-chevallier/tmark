@@ -419,3 +419,103 @@ fn completion_offers_labels_and_roles() {
     );
     client.shutdown(handle);
 }
+
+#[test]
+fn navigation_across_an_include() {
+    let dir = std::env::temp_dir().join(format!("tmark-lsp-nav-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("part.md"), "## Part {#sec:part}\n\nText.\n").unwrap();
+    let main = dir.join("main.tmd");
+    let main_text =
+        "# Main {#sec:main}\n\n{include}(part.md)\n\nSee @sec:part and @[sec:main; sec:part].\n";
+    std::fs::write(&main, main_text).unwrap();
+    let uri = format!("file://{}", main.display());
+    let part_uri = format!("file://{}", dir.join("part.md").display());
+    let (mut client, handle) = Client::start();
+    client.open(&uri, "tmark", main_text);
+    let _ = client.diagnostics(&uri);
+    let (_, all) = client.diagnostics(&uri);
+    assert!(all.is_empty(), "every reference resolves: {all:?}");
+
+    // Definition of `@sec:part` (line 4, col 5) is the id in part.md.
+    let def = client.request(
+        "textDocument/definition",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 4, "character": 6}}),
+    );
+    assert_eq!(def[0]["uri"], part_uri);
+    assert_eq!(
+        def[0]["range"]["start"],
+        json!({"line": 0, "character": 10}),
+        "after the `#`"
+    );
+    assert_eq!(def[0]["range"]["end"], json!({"line": 0, "character": 18}));
+
+    // References of `sec:main` from its definition (line 0, col 9).
+    let refs = client.request(
+        "textDocument/references",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 0, "character": 10}, "context": {"includeDeclaration": true}}),
+    );
+    let refs = refs.as_array().unwrap();
+    assert_eq!(refs.len(), 2, "{refs:?}");
+    assert_eq!(
+        refs[1]["range"]["start"],
+        json!({"line": 4, "character": 20})
+    );
+
+    // Rename `sec:part` from the reference: two files change.
+    let prepared = client.request(
+        "textDocument/prepareRename",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 4, "character": 6}}),
+    );
+    assert_eq!(prepared["placeholder"], "sec:part");
+    let edit = client.request(
+        "textDocument/rename",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 4, "character": 6}, "newName": "sec:appendix"}),
+    );
+    let changes = edit["changes"].as_object().unwrap();
+    assert_eq!(changes[&part_uri][0]["newText"], "sec:appendix");
+    assert_eq!(changes[&part_uri][0]["range"]["start"]["character"], 10);
+    let main_edits = changes[uri.as_str()].as_array().unwrap();
+    assert_eq!(main_edits.len(), 2, "{main_edits:?}");
+    assert!(main_edits.iter().all(|e| e["newText"] == "sec:appendix"));
+
+    // Hover on `@[sec:main` names the host and its heading text.
+    let hover = client.request(
+        "textDocument/hover",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 4, "character": 22}}),
+    );
+    let value = hover["contents"]["value"].as_str().unwrap();
+    assert!(
+        value.contains("section") && value.contains("Main"),
+        "{value}"
+    );
+
+    // The include is a document link.
+    let links = client.request(
+        "textDocument/documentLink",
+        json!({"textDocument": {"uri": uri}}),
+    );
+    assert_eq!(links[0]["target"], part_uri);
+    client.shutdown(handle);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn code_actions_fix_deprecated_spellings() {
+    let (mut client, handle) = Client::start();
+    let uri = "file:///tmp/tmark-test/fix.tmd";
+    client.open(uri, "tmark", "Raw {latex}[x] here.\n");
+    let (_, diags) = client.diagnostics(uri);
+    assert!(diags.iter().any(|d| d["code"] == "deprecated"));
+    let actions = client.request(
+        "textDocument/codeAction",
+        json!({"textDocument": {"uri": uri}, "range": {"start": {"line": 0, "character": 5}, "end": {"line": 0, "character": 5}}, "context": {"diagnostics": []}}),
+    );
+    let action = &actions[0];
+    assert_eq!(action["kind"], "quickfix");
+    let edit = &action["edit"]["changes"][uri][0];
+    assert_eq!(edit["newText"], "{raw latex}(x)");
+    assert_eq!(edit["range"]["start"]["character"], 4);
+    assert_eq!(edit["range"]["end"]["character"], 14);
+    client.shutdown(handle);
+}

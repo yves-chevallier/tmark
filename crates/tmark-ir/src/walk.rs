@@ -32,7 +32,7 @@ impl NodeRef<'_> {
 /// Visits every block and inline of the document in pre-order: the body,
 /// then the footnote definitions. Table cells, captions, admonition titles,
 /// image alt texts and index paths are descended into.
-pub fn walk(doc: &Document, f: &mut impl FnMut(NodeRef)) {
+pub fn walk<'a>(doc: &'a Document, f: &mut impl FnMut(NodeRef<'a>)) {
     walk_blocks(&doc.blocks, f);
     for footnote in &doc.footnotes {
         walk_blocks(&footnote.content, f);
@@ -68,19 +68,44 @@ pub fn plain_text(inlines: &[Inline]) -> String {
     out
 }
 
-pub fn walk_blocks(blocks: &[Block], f: &mut impl FnMut(NodeRef)) {
+/// The node with id `id`, if any. A full walk: microseconds on the largest
+/// document of the repository, so no index is kept (design 03 §Identity).
+pub fn find(doc: &Document, id: NodeId) -> Option<NodeRef<'_>> {
+    let mut found = None;
+    walk(doc, &mut |node: NodeRef| {
+        if found.is_none() && node.id() == id {
+            found = Some(node);
+        }
+    });
+    found
+}
+
+/// Every node whose span contains `offset` (a cursor at the end of a span
+/// counts), outermost first: the ancestor chain of the innermost node.
+pub fn nodes_at(doc: &Document, offset: u32) -> Vec<NodeRef<'_>> {
+    let mut chain = Vec::new();
+    walk(doc, &mut |node: NodeRef| {
+        let span = node.span();
+        if span.file == doc.file && span.start <= offset && offset <= span.end {
+            chain.push(node);
+        }
+    });
+    chain
+}
+
+pub fn walk_blocks<'a>(blocks: &'a [Block], f: &mut impl FnMut(NodeRef<'a>)) {
     for block in blocks {
         walk_block(block, f);
     }
 }
 
-pub fn walk_inlines(inlines: &[Inline], f: &mut impl FnMut(NodeRef)) {
+pub fn walk_inlines<'a>(inlines: &'a [Inline], f: &mut impl FnMut(NodeRef<'a>)) {
     for inline in inlines {
         walk_inline(inline, f);
     }
 }
 
-fn walk_block(block: &Block, f: &mut impl FnMut(NodeRef)) {
+fn walk_block<'a>(block: &'a Block, f: &mut impl FnMut(NodeRef<'a>)) {
     f(NodeRef::Block(block));
     match block {
         Block::Para(n) => {
@@ -138,7 +163,7 @@ fn walk_block(block: &Block, f: &mut impl FnMut(NodeRef)) {
     }
 }
 
-fn walk_inline(inline: &Inline, f: &mut impl FnMut(NodeRef)) {
+fn walk_inline<'a>(inline: &'a Inline, f: &mut impl FnMut(NodeRef<'a>)) {
     f(NodeRef::Inline(inline));
     match inline {
         Inline::Emph(n) => walk_inlines(&n.content, f),

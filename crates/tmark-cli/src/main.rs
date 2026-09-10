@@ -55,14 +55,19 @@ enum Command {
         /// Lint levels, `code=off|hint|info|warning|error`, repeatable.
         #[arg(long = "level", value_name = "CODE=LEVEL")]
         levels: Vec<String>,
+        /// Apply the safe fixes (deprecated spellings) in place.
+        #[arg(long)]
+        fix: bool,
     },
-    /// Alias of `check` (fixes arrive with milestone 3).
+    /// Alias of `check`.
     Lint {
         files: Vec<PathBuf>,
         #[arg(long)]
         strict: bool,
         #[arg(long = "level", value_name = "CODE=LEVEL")]
         levels: Vec<String>,
+        #[arg(long)]
+        fix: bool,
     },
     /// Print a JSON schema: `ir` or `frontmatter`.
     Schema { name: String },
@@ -81,12 +86,14 @@ fn main() -> ExitCode {
             files,
             strict,
             levels,
+            fix,
         }
         | Command::Lint {
             files,
             strict,
             levels,
-        } => cmd_check(&files, strict, &levels),
+            fix,
+        } => cmd_check(&files, strict, &levels, fix),
         Command::Schema { name } => cmd_schema(&name),
     }
 }
@@ -123,7 +130,33 @@ fn apply_levels(config: &mut LintConfig, levels: &[String]) -> Result<(), ExitCo
     Ok(())
 }
 
-fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
+/// Splice every fix into `text`, last first so that earlier spans stay
+/// valid; overlapping fixes after the first are skipped.
+fn apply_fixes(text: &str, diagnostics: &[tmark::Diagnostic]) -> (String, usize) {
+    let mut fixes: Vec<&tmark::ir::Fix> = diagnostics
+        .iter()
+        .filter_map(|d| d.fix.as_ref())
+        .filter(|f| f.span.file == FileId::default())
+        .collect();
+    fixes.sort_by_key(|f| std::cmp::Reverse(f.span.start));
+    let mut out = text.to_string();
+    let mut applied = 0;
+    let mut limit = text.len() as u32;
+    for fix in fixes {
+        if fix.span.end > limit {
+            continue;
+        }
+        out.replace_range(
+            fix.span.start as usize..fix.span.end as usize,
+            &fix.replacement,
+        );
+        limit = fix.span.start;
+        applied += 1;
+    }
+    (out, applied)
+}
+
+fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String], fix: bool) -> ExitCode {
     let bibliography: Vec<PathBuf> = files
         .iter()
         .filter(|f| f.extension().is_some_and(|e| e == "bib"))
@@ -168,8 +201,21 @@ fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
         );
         let index = LineIndex::new(&text);
         let name = file.display().to_string();
+        if fix && file.as_os_str() != "-" {
+            let (fixed, applied) = apply_fixes(&text, &diagnostics);
+            if applied > 0 {
+                if let Err(error) = std::fs::write(file, &fixed) {
+                    eprintln!("tmark: {}: {error}", file.display());
+                    failed = true;
+                }
+                eprintln!("{name}: {applied} fix(es) applied");
+            }
+        }
         for d in &diagnostics {
             if d.span.file != FileId::default() {
+                continue;
+            }
+            if fix && d.fix.is_some() {
                 continue;
             }
             let at = index.line_col(d.span.start);
