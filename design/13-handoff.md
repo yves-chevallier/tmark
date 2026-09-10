@@ -20,13 +20,12 @@ the inside of the work: verify it, do not trust it.
   `nodes_at`, `plain_text` in `tmark-ir`, `Severity::as_str/parse`, the
   `fs` feature as a real opt-in, the grammar tables exported from
   `tmark-ir` (`examples/registries.rs` → `scripts/registries.json`).
-- Reviews under `design/reviews/`: `02-spec-conformance.md`,
-  `04-ir-review.md`, `05-architecture.md` were run and acted on (see
-  below). **Mandates 1 (parser adversary), 3 (printer critic) and 6
-  (performance) were not run**: the reviewer agents died on usage limits
-  twice. Run them before M4 touches `tmark-fmt` and `tmark-markdown`; the
-  prompts are in the previous version of this file (`git show
-  f3443a6:design/13-handoff.md`).
+- Reviews under `design/reviews/`: all six mandates have a report.
+  `02-spec-conformance.md`, `04-ir-review.md`, `05-architecture.md` and
+  `03-printer-critic.md` were written by reviewer agents;
+  `01-parser-adversary.md` (a compact pass) and `06-performance.md` by
+  the implementing agent after the reviewer agents died on usage limits
+  (twice for the parser one). What was acted on is listed below.
 
 ## What the reviews said and what was done
 
@@ -51,6 +50,22 @@ M4); the `ResolveOptions.bibliography` relativisation duplicated in the
 CLI and `Config` (`pathdiff`/`relative_to`); `has_press_key` re-scans the
 front matter in the LSP instead of reading `Document.front_matter`.
 
+From `03-printer-critic.md` (11 under-escaping findings, over-escaping
+measured as rare): U1 fixed (`escape::text` now treats the first run of a
+block as a line start, so `- \# x` and `# \# x` round-trip; heading
+content passes `block_start`). U2–U11 are open; U4 (`"` inside attribute
+values, the only corpus file that fails the fixed point) needs a spec
+decision first (`12-spec-challenges.md` C25 candidate: either `\"` is an
+escape in a quoted value or `"` is unrepresentable).
+
+From `01-parser-adversary.md`: P1 is an upstream markdown-rs 1.0.0 panic
+(unclosed fence in a list item followed by a list of another kind), now
+caught in `Lowerer::tree` and reported as `parse-internal`; the tokenizer
+itself is not fixed (`construct/document.rs` exit ordering; report it
+upstream with `spec/conformance/diag-parse-internal.md`'s input). P2 and
+P3 fixed. `reviews/06`: no fork overhead; the tokenizer is superlinear in
+the number of blocks, in upstream too.
+
 From `02-spec-conformance.md`: nothing fixed in code, by mandate. Its
 ranking for M3 is the to-do list of the next pass; C18–C24 were added to
 `12-spec-challenges.md`. The one I checked myself: D13 (anchors with an
@@ -59,6 +74,12 @@ now C24.
 
 ## What M3 still lacks (against `11-roadmap.md` §M3 and `08-lsp.md`)
 
+0. **Printer findings U2–U11** of `reviews/03` before `tmark fmt` runs on
+   TeXSmith's corpus (M4 gate): `|` in code spans and column names, bare
+   link destinations, `"` in values (spec decision), adjacent lists,
+   line breaks and numeric-looking YAML cells, `IndexEntry` before `[`,
+   unbalanced `)` in raw arguments, GFM autolink literals, backslashes in
+   link titles. Each has a minimal input and a proposed fixture name.
 1. **A person installing the `.vsix` and trying it.** Everything is tested
    over the in-memory connection and the binary over stdio; nobody has
    opened VS Code. Expect small things: activation on `.md` files without

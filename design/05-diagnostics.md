@@ -25,7 +25,7 @@ code: message`; the LSP maps the fields one to one.
 
 | Stage | Examples | Owner |
 | ----- | -------- | ----- |
-| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling) | `tmark-syntax` |
+| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing` | `tmark-registry` |
 | Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip` | `tmark-lint` |
 
