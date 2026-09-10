@@ -6,8 +6,8 @@ use tmark_ir::{
     registry::{self, ArgStyle},
     Aside, Attrs, Block, Code, CodeInline, Comment, CounterItem, Emph, Highlight, Image,
     IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, RawInline, Ref, Side,
-    SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong, Subscript, Superscript, Target,
-    Underline, Var,
+    SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong, SubSpan, Subscript, Superscript,
+    Target, Underline, Var,
 };
 use tmark_markdown::mdast::{Node, TmarkMarkKind};
 use tmark_markdown::tmark::looks_like_attributes;
@@ -223,16 +223,30 @@ impl Lowerer {
                 }
                 Node::TmarkReference(n) => {
                     let meta = self.meta_at(ctx, n.position.as_ref());
+                    let local = n.position.as_ref().map_or(0, |p| p.start.offset);
                     let (items, bracketed) = match n.value.strip_prefix('[') {
-                        Some(inner) => (
-                            // Pandoc's `[@key, …]` import form carries `@` before each
-                            // key; the item grammar is the same.
-                            parse_ref_items(&inner.trim_end_matches(']').replace('@', "")),
-                            true,
-                        ),
+                        Some(inner) => {
+                            // Pandoc's `[@key, …]` import form carries `@` before
+                            // each key; the item grammar is the same. The inner
+                            // text starts after the `[` of the source.
+                            let open = ctx.slice(n.position.as_ref()).find('[').unwrap_or(0);
+                            let base = local + open + 1;
+                            let mut items = parse_ref_items(inner.trim_end_matches(']'));
+                            for item in &mut items {
+                                let (s, e) =
+                                    (item.key_span.0.start as usize, item.key_span.0.end as usize);
+                                item.key_span = SubSpan(self.span_of(ctx, base + s, base + e));
+                            }
+                            (items, true)
+                        }
                         None => (
                             vec![tmark_ir::RefItem {
                                 key: doi_key(&n.value),
+                                key_span: SubSpan(self.span_of(
+                                    ctx,
+                                    local + 1,
+                                    local + 1 + n.value.len(),
+                                )),
                                 ..Default::default()
                             }],
                             false,
@@ -366,7 +380,7 @@ impl Lowerer {
         nodes: &[Node],
         index: &mut usize,
         position: Option<&tmark_markdown::unist::Position>,
-        _ctx: &Ctx,
+        ctx: &Ctx,
     ) -> (Attrs, Option<usize>) {
         if let Some(Node::TmarkBrace(brace)) = nodes.get(*index) {
             let adjacent = match (position, brace.position.as_ref()) {
@@ -374,8 +388,11 @@ impl Lowerer {
                 _ => false,
             };
             if adjacent && !brace.moustache {
-                if let BraceKind::Attrs(attrs) = classify(brace) {
+                if let BraceKind::Attrs(mut attrs) = classify(brace) {
                     *index += 1;
+                    if let Some(p) = brace.position.as_ref() {
+                        self.relocate_attrs(ctx, &mut attrs, p.start.offset + 1);
+                    }
                     return (attrs, brace.position.as_ref().map(|p| p.end.offset));
                 }
             }
@@ -409,10 +426,13 @@ impl Lowerer {
                 let meta = self.meta(span);
                 out.push(Inline::Var(Var { meta, path }));
             }
-            BraceKind::Attrs(attrs) => {
+            BraceKind::Attrs(mut attrs) => {
                 // `{margin}[…]{l}`-style suffixes are handled by the role;
                 // here an attribute list needs a host: the previous inline
                 // when adjacent, else the block when last, else nowhere.
+                if let Some(p) = node.position.as_ref() {
+                    self.relocate_attrs(ctx, &mut attrs, p.start.offset + 1);
+                }
                 if last {
                     trim_trailing_space(out);
                     return Some((attrs, span));
@@ -629,7 +649,15 @@ impl Lowerer {
                 })
             }
             "counter" => match parse_counter(&argument.unwrap().value) {
-                Some((prefix, key)) => Inline::CounterItem(CounterItem { meta, prefix, key }),
+                Some((prefix, key)) => {
+                    let key_span = self.counter_key_span(ctx, argument.unwrap(), &prefix, &key);
+                    Inline::CounterItem(CounterItem {
+                        meta,
+                        prefix,
+                        key,
+                        key_span,
+                    })
+                }
                 None => {
                     self.diag(
                         Code::RoleDanglingHead,
@@ -672,6 +700,21 @@ impl Lowerer {
         out.push(inline);
     }
 
+    /// The range of `key` inside a `(prefix:key)` argument.
+    fn counter_key_span(
+        &self,
+        ctx: &Ctx,
+        argument: &tmark_markdown::mdast::TmarkArgument,
+        prefix: &str,
+        key: &str,
+    ) -> SubSpan {
+        let Some(p) = argument.position.as_ref() else {
+            return SubSpan::default();
+        };
+        let start = p.start.offset + 1 + prefix.len() + 1;
+        SubSpan(self.span_of(ctx, start, start + key.len()))
+    }
+
     /// `#[…]…` index entries and `#(prefix:key)` counter items.
     fn lower_define(
         &mut self,
@@ -699,7 +742,13 @@ impl Lowerer {
                         self.deprecated(span, "#{prefix:key}", "#(prefix:key)");
                     }
                     let meta = self.meta(span);
-                    out.push(Inline::CounterItem(CounterItem { meta, prefix, key }));
+                    let key_span = self.counter_key_span(ctx, argument, &prefix, &key);
+                    out.push(Inline::CounterItem(CounterItem {
+                        meta,
+                        prefix,
+                        key,
+                        key_span,
+                    }));
                 }
                 None => out.push(self.literal_text(span, ctx.slice(node.position.as_ref()))),
             }

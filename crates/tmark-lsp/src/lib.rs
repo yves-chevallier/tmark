@@ -386,15 +386,17 @@ impl Server {
                 let at = p.text_document_position;
                 self.completion(&at.text_document.uri, at.position)
             }),
-            _ => Err(Response::new_err(
-                id.clone(),
-                ErrorCode::MethodNotFound as i32,
-                format!("unsupported request `{}`", req.method),
-            )),
+            _ => {
+                return Response::new_err(
+                    id,
+                    ErrorCode::MethodNotFound as i32,
+                    format!("unsupported request `{}`", req.method),
+                )
+            }
         };
         match result {
             Ok(value) => Response::new_ok(id, value),
-            Err(response) => response,
+            Err(message) => Response::new_err(id, ErrorCode::InvalidParams as i32, message),
         }
     }
 
@@ -478,19 +480,15 @@ impl Server {
     }
 }
 
-/// Deserialise the request's params and run `f`, or answer with an
-/// `InvalidParams` error.
+/// Deserialise the request's params and run `f`, or report the error
+/// message for an `InvalidParams` answer.
 fn with_params<P: serde::de::DeserializeOwned>(
     req: Request,
     f: impl FnOnce(P) -> serde_json::Value,
-) -> Result<serde_json::Value, Response> {
+) -> Result<serde_json::Value, String> {
     match serde_json::from_value::<P>(req.params) {
         Ok(p) => Ok(f(p)),
-        Err(error) => Err(Response::new_err(
-            req.id,
-            ErrorCode::InvalidParams as i32,
-            error.to_string(),
-        )),
+        Err(error) => Err(error.to_string()),
     }
 }
 

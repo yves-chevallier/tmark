@@ -47,8 +47,10 @@ impl Lowerer {
             Node::Paragraph(p) => {
                 let span = self.span(ctx, p.position.as_ref());
                 if let Some(defs) = abbreviations(ctx.slice(p.position.as_ref())) {
-                    for (key, expansion) in defs {
-                        let meta = self.meta(span);
+                    let local = p.position.as_ref().map_or(0, |p| p.start.offset);
+                    for (at, len, key, expansion) in defs {
+                        // Each definition owns its line.
+                        let meta = self.meta(self.span_of(ctx, local + at, local + at + len));
                         document.abbreviations.push(AbbrDef {
                             meta,
                             key,
@@ -131,7 +133,7 @@ impl Lowerer {
             }
             Node::Math(math) => {
                 let meta = self.meta_at(ctx, math.position.as_ref());
-                let attrs = math
+                let mut attrs = math
                     .meta
                     .as_deref()
                     .map(str::trim)
@@ -139,6 +141,10 @@ impl Lowerer {
                     .and_then(|m| m.strip_suffix('}'))
                     .and_then(parse_attrs)
                     .unwrap_or_default();
+                match self.attrs_base(ctx, math.position.as_ref()) {
+                    Some(base) => self.relocate_attrs(ctx, &mut attrs, base),
+                    None => attrs.id_span = None,
+                }
                 out.push(Item::Block(Block::MathBlock(MathBlock {
                     meta,
                     text: math.value.clone(),
@@ -527,6 +533,10 @@ impl Lowerer {
         let meta = self.meta(span);
         let (name, attrs, valid) = parse_container_info(&c.info);
         let mut attrs = attrs.unwrap_or_default();
+        match self.attrs_base(ctx, c.position.as_ref()) {
+            Some(base) => self.relocate_attrs(ctx, &mut attrs, base),
+            None => attrs.id_span = None,
+        }
         if !valid {
             self.diag(
                 Code::AttrNoHost,
@@ -787,22 +797,35 @@ fn take_trailing_attrs(content: &mut Vec<Inline>) -> Option<Attrs> {
     };
     let text = last.text.trim_end();
     let inner = text.strip_prefix('{')?.strip_suffix('}')?;
-    let attrs = parse_attrs(inner)?;
+    // The text is decoded, so the id's position is not known.
+    let mut attrs = parse_attrs(inner)?;
+    attrs.id_span = None;
     content.pop();
     trim_trailing_space(content);
     Some(attrs)
 }
 
-/// `*[KEY]: expansion` lines (spec §Glossary and acronyms).
-fn abbreviations(text: &str) -> Option<Vec<(String, String)>> {
+/// `*[KEY]: expansion` lines (spec §Glossary and acronyms), each with the
+/// byte offset and length of its line in `text`.
+fn abbreviations(text: &str) -> Option<Vec<(usize, usize, String, String)>> {
     let mut out = Vec::new();
-    for line in text.lines() {
-        let rest = line.trim().strip_prefix("*[")?;
+    let mut at = 0;
+    for raw in text.split_inclusive('\n') {
+        let line = raw.trim_end_matches(['\n', '\r']);
+        let start = at + (line.len() - line.trim_start().len());
+        at += raw.len();
+        let trimmed = line.trim();
+        let rest = trimmed.strip_prefix("*[")?;
         let (key, expansion) = rest.split_once("]:")?;
         if key.is_empty() || key.contains(']') {
             return None;
         }
-        out.push((key.to_string(), expansion.trim().to_string()));
+        out.push((
+            start,
+            trimmed.len(),
+            key.to_string(),
+            expansion.trim().to_string(),
+        ));
     }
     (!out.is_empty()).then_some(out)
 }

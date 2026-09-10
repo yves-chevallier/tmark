@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use tmark_ir::{
-    frontmatter, registry, Code, Diagnostic, Document, FileId, FrontMatter, Inline, Meta, NodeId,
-    Span, Str,
+    frontmatter, registry, Attrs, Code, Diagnostic, Document, FileId, FrontMatter, Inline, Meta,
+    NodeId, Span, Str, SubSpan,
 };
 use tmark_markdown::{mdast::Node, to_mdast, unist::Position, ParseOptions};
 
@@ -179,6 +179,24 @@ impl Lowerer {
             ctx.map.translate(start) as u32,
             ctx.map.translate(end) as u32,
         )
+    }
+
+    /// Moves the sub-spans of a parsed attribute list from offsets
+    /// relative to its text to file offsets, `base` being the local offset
+    /// of that text.
+    pub fn relocate_attrs(&self, ctx: &Ctx, attrs: &mut Attrs, base: usize) {
+        if let Some(sub) = attrs.id_span {
+            let (s, e) = (sub.0.start as usize, sub.0.end as usize);
+            attrs.id_span = Some(SubSpan(self.span_of(ctx, base + s, base + e)));
+        }
+    }
+
+    /// The local offset of the first `{` on the first line of `position`,
+    /// plus one: where an attribute list on that line starts.
+    pub fn attrs_base(&self, ctx: &Ctx, position: Option<&Position>) -> Option<usize> {
+        let position = position?;
+        let first = ctx.slice(Some(position)).lines().next()?;
+        Some(position.start.offset + first.find('{')? + 1)
     }
 
     pub fn meta_at(&mut self, ctx: &Ctx, position: Option<&Position>) -> Meta {

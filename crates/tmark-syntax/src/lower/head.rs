@@ -2,7 +2,7 @@
 //! role heads, reference items, fence info strings, container and
 //! admonition info. Spec §Lexical grammar.
 
-use tmark_ir::{Attrs, RefItem};
+use tmark_ir::{Attrs, RefItem, SubSpan};
 use tmark_markdown::tmark::{is_ident_byte, is_ident_start};
 
 /// Splits `s` into whitespace-separated tokens, keeping `"…"` values whole.
@@ -56,9 +56,15 @@ fn key_value(token: &str) -> Option<(String, String)> {
     Some((key.to_string(), unquote(value)))
 }
 
+/// Byte offset of `token` inside `s`, of which it is a slice.
+fn offset_in(s: &str, token: &str) -> u32 {
+    (token.as_ptr() as usize - s.as_ptr() as usize) as u32
+}
+
 /// Parses the inside of an attribute list (`#id .class key=value`).
 /// `None` when a token is not an attribute: the group is not an attribute
-/// list (spec: "there are no bare-word attributes").
+/// list (spec: "there are no bare-word attributes"). `id_span` is relative
+/// to `s`; the caller relocates it (`Lowerer::relocate_attrs`) or drops it.
 pub fn parse_attrs(s: &str) -> Option<Attrs> {
     let mut attrs = Attrs::new();
     let list = tokens(s);
@@ -75,6 +81,12 @@ pub fn parse_attrs(s: &str) -> Option<Attrs> {
                 return None;
             }
             attrs.id = Some(id.to_string());
+            let start = offset_in(s, token) + 1;
+            attrs.id_span = Some(SubSpan::new(
+                Default::default(),
+                start,
+                start + id.len() as u32,
+            ));
         } else if let Some(class) = token.strip_prefix('.') {
             if !is_key(class) {
                 return None;
@@ -141,47 +153,58 @@ fn is_ref_key(s: &str) -> bool {
 
 /// Parses the items of a bracketed reference (`see ein05, pp. 33-35; -AI2027`):
 /// Pandoc's item grammar, one item per `;`, each with an optional prefix, an
-/// optional `-`, the key and an optional suffix after the first `,`.
+/// optional `-`, the key and an optional suffix after the first `,`. A `@`
+/// before a key (Pandoc's `[@key]` import form) is accepted and dropped.
+/// `key_span` is relative to `inner`; the caller relocates it.
 pub fn parse_ref_items(inner: &str) -> Vec<RefItem> {
-    inner
-        .split(';')
-        .map(|item| {
-            let item = item.trim();
-            let (head, suffix) = match item.split_once(',') {
-                Some((head, suffix)) => (head.trim(), Some(suffix.trim().to_string())),
-                None => (item, None),
-            };
-            let mut words: Vec<&str> = head.split_whitespace().collect();
-            let mut suppress_author = false;
-            let key = match words.pop() {
-                Some(word) => {
-                    let candidate = word.strip_prefix('-').unwrap_or(word);
-                    if candidate != word {
-                        suppress_author = true;
-                    }
-                    if is_ref_key(candidate) {
-                        candidate.to_string()
-                    } else {
-                        // Not a key: the whole item is the key, as typed.
-                        words.clear();
-                        suppress_author = false;
-                        item.to_string()
-                    }
-                }
-                None => item.to_string(),
-            };
-            RefItem {
-                prefix: if words.is_empty() {
-                    None
-                } else {
-                    Some(words.join(" "))
-                },
-                suppress_author,
-                key,
-                suffix: suffix.filter(|s| !s.is_empty()),
-            }
-        })
-        .collect()
+    let mut out = Vec::new();
+    let mut item_start = 0usize;
+    for raw in inner.split(';') {
+        let base = item_start;
+        item_start += raw.len() + 1;
+        let lead = raw.len() - raw.trim_start().len();
+        let item = raw.trim();
+        let item_at = base + lead;
+        let (head, suffix) = match item.split_once(',') {
+            Some((head, suffix)) => (head.trim_end(), Some(suffix.trim().to_string())),
+            None => (item, None),
+        };
+        let word_at = head.rfind(char::is_whitespace).map_or(0, |i| i + 1);
+        let word = &head[word_at..];
+        let mut suppress_author = false;
+        let mut candidate = word;
+        let mut skipped = 0;
+        if let Some(rest) = candidate.strip_prefix('-') {
+            suppress_author = true;
+            candidate = rest;
+            skipped += 1;
+        }
+        if let Some(rest) = candidate.strip_prefix('@') {
+            candidate = rest;
+            skipped += 1;
+        }
+        let (prefix, key, key_at, key_len) = if !word.is_empty() && is_ref_key(candidate) {
+            let words = head[..word_at].trim_end();
+            (
+                (!words.is_empty()).then(|| words.split_whitespace().collect::<Vec<_>>().join(" ")),
+                candidate.to_string(),
+                item_at + word_at + skipped,
+                candidate.len(),
+            )
+        } else {
+            // Not a key: the whole item is the key, as typed.
+            suppress_author = false;
+            (None, item.replace('@', ""), item_at, item.len())
+        };
+        out.push(RefItem {
+            prefix,
+            suppress_author,
+            key,
+            key_span: SubSpan::new(Default::default(), key_at as u32, (key_at + key_len) as u32),
+            suffix: suffix.filter(|s| !s.is_empty()),
+        });
+    }
+    out
 }
 
 /// A parsed fence info string (family 4).
@@ -307,6 +330,30 @@ mod tests {
         assert_eq!(items[1].key, "AI2027");
         assert_eq!(items[2].key, "fig:a");
         assert!(items[2].prefix.is_none() && items[2].suffix.is_none());
+        let inner = "see ein05, pp. 33-35; -AI2027, ch. 1; fig:a";
+        let spans: Vec<&str> = items
+            .iter()
+            .map(|i| &inner[i.key_span.0.start as usize..i.key_span.0.end as usize])
+            .collect();
+        assert_eq!(spans, ["ein05", "AI2027", "fig:a"]);
+        let items = parse_ref_items("@ab; -@bc, p. 1; not a key!");
+        assert_eq!(items[0].key, "ab");
+        assert_eq!((items[0].key_span.0.start, items[0].key_span.0.end), (1, 3));
+        assert!(items[1].suppress_author);
+        assert_eq!(items[1].key, "bc");
+        assert_eq!((items[1].key_span.0.start, items[1].key_span.0.end), (7, 9));
+        assert_eq!(items[2].key, "not a key!");
+        assert_eq!(
+            (items[2].key_span.0.start, items[2].key_span.0.end),
+            (17, 27)
+        );
+    }
+
+    #[test]
+    fn attrs_id_span() {
+        let attrs = parse_attrs(" .draft #sec:intro lang=en").unwrap();
+        let span = attrs.id_span.unwrap().0;
+        assert_eq!((span.start, span.end), (9, 18));
     }
 
     #[test]

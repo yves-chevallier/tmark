@@ -106,5 +106,5 @@ See @sec:intro, @Sec:intro and [the intro](#sec:intro), but not @sec:nope.
 ## resolution
 
 ```text
-ref-unresolved @ 3:65-3:74
+ref-unresolved @ 3:66-3:74
 ```

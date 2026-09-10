@@ -82,8 +82,8 @@ fn roundtrip(name: &str, text: &str) -> Vec<String> {
     let second = parse(&printed, FileId::default()).document;
     // Compare modulo ids, spans and the fields that record which spelling
     // was used (the printer normalises them), as the conformance runner does.
-    let a = serde_json::to_string_pretty(&strip(serde_json::to_value(&first).unwrap())).unwrap();
-    let b = serde_json::to_string_pretty(&strip(serde_json::to_value(&second).unwrap())).unwrap();
+    let a = serde_json::to_string_pretty(&tmark_ir::structural_json(&first)).unwrap();
+    let b = serde_json::to_string_pretty(&tmark_ir::structural_json(&second)).unwrap();
     if a != b {
         let diff = first_difference(&a, &b);
         failures.push(format!("{name}: parse(format(doc)) != doc\n{diff}"));
@@ -94,32 +94,6 @@ fn roundtrip(name: &str, text: &str) -> Vec<String> {
         failures.push(format!("{name}: format is not idempotent\n{diff}"));
     }
     failures
-}
-
-/// Fields that record a spelling rather than a node (see the conformance
-/// runner).
-const SUGAR_FIELDS: &[&str] = &["position", "bracketed"];
-
-/// Drop ids, spans and sugar fields, which legitimately differ between the
-/// two parses.
-fn strip(value: serde_json::Value) -> serde_json::Value {
-    match value {
-        serde_json::Value::Object(map) => {
-            let node = map.contains_key("span");
-            serde_json::Value::Object(
-                map.into_iter()
-                    .filter(|(k, _)| {
-                        k != "span" && !(node && k == "id") && !SUGAR_FIELDS.contains(&k.as_str())
-                    })
-                    .map(|(k, v)| (k, strip(v)))
-                    .collect(),
-            )
-        }
-        serde_json::Value::Array(items) => {
-            serde_json::Value::Array(items.into_iter().map(strip).collect())
-        }
-        other => other,
-    }
 }
 
 /// A few lines around the first differing line of two texts.

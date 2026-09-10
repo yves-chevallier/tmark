@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::attrs::Attrs;
 use crate::frontmatter::FrontMatter;
-use crate::span::{FileId, NodeId, Span};
+use crate::span::{FileId, NodeId, Span, SubSpan};
 pub use crate::table::{
     Align, Cell, Column, ColumnConfig, ColumnGroup, DataRow, LeafColumn, Row, Separator,
     TableModel, TableSettings,
@@ -90,6 +90,61 @@ fn meta_of(n: NodeRef<'_>) -> &Meta {
     }
 }
 
+/// Fields that record which spelling was written rather than what the node
+/// is (`Caption.position`, `Ref.bracketed`). Every input of a conformance
+/// fixture must agree on everything else (design 10 §Conformance fixtures).
+pub const SUGAR_FIELDS: &[&str] = &["position", "bracketed"];
+
+/// The document as JSON without identity and spelling: the file id, node
+/// ids, spans (`span` and every `*_span` field), the [`SUGAR_FIELDS`], and
+/// absent-equivalent values (`null`, empty strings, arrays and objects;
+/// booleans and numbers stay). What conformance fixtures store and what the
+/// round-trip tests compare (spec §Round-trip and source spans: "modulo
+/// source spans"); the JSON twin of [`eq_with_spans`]'s complement.
+pub fn structural_json(doc: &Document) -> serde_json::Value {
+    let mut value = serde_json::to_value(doc).expect("the IR serialises");
+    if let serde_json::Value::Object(map) = &mut value {
+        // Not `remove`: with `preserve_order` that swaps the last key in.
+        map.shift_remove("file");
+    }
+    strip_identity(value)
+}
+
+fn strip_identity(value: serde_json::Value) -> serde_json::Value {
+    use serde_json::Value;
+    match value {
+        Value::Object(map) => {
+            // `id` next to a `span` is a node identity; `attrs.id` is content.
+            let node = map.contains_key("span");
+            Value::Object(
+                map.into_iter()
+                    .filter(|(k, _)| {
+                        k != "span"
+                            && !(node && k == "id")
+                            && !k.ends_with("_span")
+                            && !SUGAR_FIELDS.contains(&k.as_str())
+                    })
+                    .map(|(k, v)| (k, strip_identity(v)))
+                    .filter(|(_, v)| !is_absent(v))
+                    .collect(),
+            )
+        }
+        Value::Array(items) => Value::Array(items.into_iter().map(strip_identity).collect()),
+        other => other,
+    }
+}
+
+fn is_absent(value: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    match value {
+        Value::Null => true,
+        Value::Array(a) => a.is_empty(),
+        Value::Object(o) => o.is_empty(),
+        Value::String(s) => s.is_empty(),
+        Value::Bool(_) | Value::Number(_) => false,
+    }
+}
+
 /// A `*[HTML]: HyperText Markup Language` definition. Spec §Glossary and
 /// acronyms.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -138,6 +193,11 @@ pub struct RefItem {
     pub suppress_author: bool,
     /// The key as written, prefix included (`fig:boot`, `ein05`, `Fig:x`).
     pub key: String,
+    /// Source range of `key` alone: no `@`, `-`, prefix or suffix (spec
+    /// §Round-trip and source spans; design 03 §Identity and spans).
+    /// `Span::default()` when the item was built from JSON.
+    #[serde(default)]
+    pub key_span: SubSpan,
     /// Locator or suffix text (`p. 33`, `column 3`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suffix: Option<String>,
@@ -193,6 +253,27 @@ pub enum CaptionKind {
     Table,
     Figure,
     Listing,
+}
+
+impl CaptionKind {
+    /// The caption word as written (`Table:`). Spec §Caption.
+    pub fn word(self) -> &'static str {
+        match self {
+            CaptionKind::Table => "Table",
+            CaptionKind::Figure => "Figure",
+            CaptionKind::Listing => "Listing",
+        }
+    }
+
+    /// The conventional counter prefix of the float (spec §Anchor: `tbl:`,
+    /// `fig:`, `lst:`), an entry of `registry::PREFIXES`.
+    pub fn prefix(self) -> &'static str {
+        match self {
+            CaptionKind::Table => "tbl",
+            CaptionKind::Figure => "fig",
+            CaptionKind::Listing => "lst",
+        }
+    }
 }
 
 /// Source position of a caption line relative to its float. Spec §Caption:
@@ -424,6 +505,9 @@ pub struct CounterItem {
     pub meta: Meta,
     pub prefix: String,
     pub key: String,
+    /// Source range of `key` alone (design 03 §Identity and spans).
+    #[serde(default)]
+    pub key_span: SubSpan,
 }
 
 /// `{keys}[ctrl+s]`, `++ctrl+s++`. Spec §Inline text.

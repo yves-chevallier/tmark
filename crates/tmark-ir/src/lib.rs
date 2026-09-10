@@ -39,16 +39,16 @@ pub use frontmatter::{
     Press, Sources,
 };
 pub use node::{
-    eq_with_spans, Abbr, AbbrDef, Admonition, Aside, Block, BlockQuote, BulletList, Caption,
-    CaptionKind, CaptionPosition, Code as CodeInline, CodeBlock, Comment, CounterItem,
-    DefinitionList, Div, Document, Emph, Figure, Footnote, Header, Highlight, HorizontalRule,
-    Image, Include, IndexEntry, Inline, Keystroke, LineBreak, Link, ListItem, ListStyle, Math,
-    MathBlock, Meta, Note, OrderedList, Para, Plain, QuoteKind, Quoted, RawBlock, RawInline, Ref,
-    RefItem, Side, SmallCaps, SoftBreak, Space, SpanNode, Str, Strikeout, Strong, Subscript,
-    Superscript, Table, TableConfig, Target, Task, Underline, Var,
+    eq_with_spans, structural_json, Abbr, AbbrDef, Admonition, Aside, Block, BlockQuote,
+    BulletList, Caption, CaptionKind, CaptionPosition, Code as CodeInline, CodeBlock, Comment,
+    CounterItem, DefinitionList, Div, Document, Emph, Figure, Footnote, Header, Highlight,
+    HorizontalRule, Image, Include, IndexEntry, Inline, Keystroke, LineBreak, Link, ListItem,
+    ListStyle, Math, MathBlock, Meta, Note, OrderedList, Para, Plain, QuoteKind, Quoted, RawBlock,
+    RawInline, Ref, RefItem, Side, SmallCaps, SoftBreak, Space, SpanNode, Str, Strikeout, Strong,
+    Subscript, Superscript, Table, TableConfig, Target, Task, Underline, Var, SUGAR_FIELDS,
 };
 pub use registry::Scope;
-pub use span::{FileId, LineCol, LineColUtf16, LineIndex, NodeId, Span};
+pub use span::{FileId, LineCol, LineColUtf16, LineIndex, NodeId, Span, SubSpan};
 pub use table::{
     Align, Cell, Column, ColumnConfig, ColumnGroup, DataRow, LeafColumn, Row, Separator,
     TableModel, TableSettings,

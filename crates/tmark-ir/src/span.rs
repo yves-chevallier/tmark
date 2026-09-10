@@ -114,6 +114,45 @@ impl JsonSchema for Span {
     }
 }
 
+/// The source range of one token inside a node: a reference key, an
+/// attribute id, a counter key. Design `03-ir.md` §Identity and spans
+/// ("sub-spans that tools need are stored as fields of the node"); spec
+/// §Round-trip and source spans. Serialised like [`Span`]. Equality is
+/// always `true`, as for `Meta`, so that derived node equality stays
+/// structural; compare the inner `Span` for positions.
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SubSpan(pub Span);
+
+impl SubSpan {
+    pub fn new(file: FileId, start: u32, end: u32) -> Self {
+        SubSpan(Span::new(file, start, end))
+    }
+}
+
+impl PartialEq for SubSpan {
+    fn eq(&self, _: &SubSpan) -> bool {
+        true
+    }
+}
+
+impl Eq for SubSpan {}
+
+impl JsonSchema for SubSpan {
+    fn schema_name() -> String {
+        "SubSpan".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let mut schema = <[u32; 3]>::json_schema(gen);
+        if let schemars::schema::Schema::Object(obj) = &mut schema {
+            obj.metadata().description =
+                Some("Byte span of a token inside its node, as [file, start, end]".into());
+        }
+        schema
+    }
+}
+
 /// Zero-based line and byte column.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LineCol {
@@ -160,6 +199,9 @@ impl WideChar {
 pub struct LineIndex {
     /// Byte offset of the first character of every line; `line_starts[0] == 0`.
     line_starts: Vec<u32>,
+    /// Byte offset of the line terminator of every line (the end of the
+    /// text for the last one); `line_ends[i] >= line_starts[i]`.
+    line_ends: Vec<u32>,
     /// Non-ASCII characters, sorted by `(line, col)`.
     wide: Vec<WideChar>,
     /// Total length in bytes.
@@ -169,6 +211,7 @@ pub struct LineIndex {
 impl LineIndex {
     pub fn new(text: &str) -> Self {
         let mut line_starts = vec![0];
+        let mut line_ends = Vec::new();
         let mut wide = Vec::new();
         let mut line = 0u32;
         let mut line_start = 0u32;
@@ -180,6 +223,7 @@ impl LineIndex {
                 '\n' => {
                     if !prev_cr {
                         line += 1;
+                        line_ends.push(offset);
                     }
                     // `\r\n`: the line already started after the `\r`; fix it up.
                     if prev_cr {
@@ -191,6 +235,7 @@ impl LineIndex {
                 }
                 '\r' => {
                     line += 1;
+                    line_ends.push(offset);
                     line_starts.push(after);
                     line_start = after;
                 }
@@ -203,8 +248,10 @@ impl LineIndex {
             }
             prev_cr = ch == '\r';
         }
+        line_ends.push(text.len() as u32);
         LineIndex {
             line_starts,
+            line_ends,
             wide,
             len: text.len() as u32,
         }
@@ -218,6 +265,12 @@ impl LineIndex {
     /// Byte offset where `line` starts, or `None` past the last line.
     pub fn line_start(&self, line: u32) -> Option<u32> {
         self.line_starts.get(line as usize).copied()
+    }
+
+    /// Byte offset of the line terminator of `line` (the end of the text
+    /// for the last line), or `None` past the last line.
+    pub fn line_end(&self, line: u32) -> Option<u32> {
+        self.line_ends.get(line as usize).copied()
     }
 
     /// Total length of the text in bytes.
@@ -239,13 +292,13 @@ impl LineIndex {
         }
     }
 
-    /// Byte offset of a line and byte column. Clamps to the end of the line
-    /// (and of the text) when the column runs past it.
+    /// Byte offset of a line and byte column. A column past the end of the
+    /// line clamps to the line's end, before its terminator (LSP: "defaults
+    /// back to the line length"); a line past the text clamps to its end.
     pub fn offset(&self, pos: LineCol) -> u32 {
-        let Some(start) = self.line_start(pos.line) else {
+        let (Some(start), Some(end)) = (self.line_start(pos.line), self.line_end(pos.line)) else {
             return self.len;
         };
-        let end = self.line_start(pos.line + 1).unwrap_or(self.len);
         (start + pos.col).min(end)
     }
 
@@ -255,18 +308,24 @@ impl LineIndex {
         &self.wide[lo..hi]
     }
 
-    /// Converts a byte column to a UTF-16 column.
+    /// Converts a byte column to a UTF-16 column. A column inside a
+    /// multibyte character snaps to that character's start.
     pub fn to_utf16(&self, pos: LineCol) -> LineColUtf16 {
+        let mut shrink = 0;
         let mut col = pos.col;
         for w in self.wide_in_line(pos.line) {
             if w.col >= pos.col {
                 break;
             }
-            col -= u32::from(w.len) - w.utf16_len();
+            if pos.col < w.col + u32::from(w.len) {
+                col = w.col;
+                break;
+            }
+            shrink += u32::from(w.len) - w.utf16_len();
         }
         LineColUtf16 {
             line: pos.line,
-            col,
+            col: col.saturating_sub(shrink),
         }
     }
 
@@ -319,7 +378,7 @@ mod tests {
         assert_eq!(idx.line_col(9), lc(3, 2));
         assert_eq!(idx.line_col(99), lc(3, 2));
         assert_eq!(idx.offset(lc(1, 1)), 4);
-        assert_eq!(idx.offset(lc(1, 50)), 6);
+        assert_eq!(idx.offset(lc(1, 50)), 5, "clamps before the line break");
         assert_eq!(idx.offset(lc(9, 0)), 9);
     }
 
@@ -360,6 +419,37 @@ mod tests {
         assert_eq!(idx.from_utf16(LineColUtf16 { line: 1, col: 2 }), lc(1, 2));
         // Past the end of the line: keep the excess.
         assert_eq!(idx.from_utf16(LineColUtf16 { line: 0, col: 9 }), lc(0, 14));
+    }
+
+    #[test]
+    fn byte_column_inside_a_multibyte_char_snaps() {
+        let idx = LineIndex::new("😀b\néb");
+        assert_eq!(idx.to_utf16(lc(0, 1)), LineColUtf16 { line: 0, col: 0 });
+        assert_eq!(idx.to_utf16(lc(0, 3)), LineColUtf16 { line: 0, col: 0 });
+        assert_eq!(idx.to_utf16(lc(0, 4)), LineColUtf16 { line: 0, col: 2 });
+        assert_eq!(idx.to_utf16(lc(1, 1)), LineColUtf16 { line: 1, col: 0 });
+        assert_eq!(idx.to_utf16(lc(1, 2)), LineColUtf16 { line: 1, col: 1 });
+    }
+
+    #[test]
+    fn column_past_line_end_stays_on_the_line() {
+        let idx = LineIndex::new("é\nb\r\nc");
+        assert_eq!(idx.line_end(0), Some(2));
+        assert_eq!(idx.line_end(1), Some(4));
+        assert_eq!(idx.line_end(2), Some(7));
+        assert_eq!(idx.offset(lc(0, 6)), 2, "before the `\\n`");
+        assert_eq!(idx.offset(lc(1, 9)), 4, "before the `\\r\\n`");
+        assert_eq!(idx.offset(lc(2, 9)), 7);
+        assert_eq!(idx.offset(lc(7, 0)), 7);
+    }
+
+    #[test]
+    fn sub_span_equality_is_structural() {
+        let a = SubSpan::new(FileId(0), 1, 2);
+        let b = SubSpan::new(FileId(0), 5, 9);
+        assert_eq!(a, b);
+        assert_ne!(a.0, b.0);
+        assert_eq!(serde_json::to_string(&a).unwrap(), "[0,1,2]");
     }
 
     #[test]

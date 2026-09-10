@@ -82,5 +82,5 @@ See @fwrev:fw:x.
 ```text
 crossref-inventory-missing @ 1:1-5:4
 include-missing @ 7:1-7:28
-ref-unresolved @ 9:5-9:16
+ref-unresolved @ 9:6-9:16
 ```

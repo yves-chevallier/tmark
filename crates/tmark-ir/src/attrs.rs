@@ -6,6 +6,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::span::{FileId, SubSpan};
+
 /// The attribute list of a host element.
 ///
 /// Order is normalised by the printer (`#id`, `.class`, keys in source
@@ -16,6 +18,11 @@ pub struct Attrs {
     /// `#id`: an anchor (spec §Anchor).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Source range of the id token without its `#`, when the list was
+    /// parsed from text (spec §Round-trip and source spans; design 03
+    /// §Identity and spans). `None` when built by a pass or from JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id_span: Option<SubSpan>,
     /// `.class` entries, in source order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub classes: Vec<String>,
@@ -60,6 +67,17 @@ impl Attrs {
     pub fn is_empty(&self) -> bool {
         self.id.is_none() && self.classes.is_empty() && self.kv.is_empty()
     }
+
+    /// Moves `id_span` from offsets relative to the list's text to
+    /// offsets in `file`, `base` being where that text starts. A parser
+    /// that does not know the base drops the sub-span instead.
+    pub fn relocate(&mut self, file: FileId, base: u32) {
+        if let Some(SubSpan(span)) = &mut self.id_span {
+            span.file = file;
+            span.start += base;
+            span.end += base;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -70,6 +88,7 @@ mod tests {
     fn accessors() {
         let attrs = Attrs {
             id: Some("sec:intro".into()),
+            id_span: None,
             classes: vec!["epigraph".into()],
             kv: vec![
                 ("lang".into(), "fr".into()),

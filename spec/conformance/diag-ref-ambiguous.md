@@ -40,8 +40,8 @@ press:
         "sources": {
           "bibliography": {
             "stock": {
-              "title": "Stock",
-              "type": "misc"
+              "type": "misc",
+              "title": "Stock"
             }
           }
         }

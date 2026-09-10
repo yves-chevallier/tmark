@@ -90,41 +90,24 @@ fn load(path: &Path) -> Fixture {
     fixture
 }
 
-/// Fields that record which spelling was used rather than what the node is:
-/// every input of a fixture must agree on everything else.
-const SUGAR_FIELDS: &[&str] = &["position", "bracketed"];
-
-/// Drop ids, spans, sugar fields and empty/default values so that a fixture
-/// only states what matters.
-fn normalise(value: Value) -> Value {
+/// A fixture may spell absent values explicitly; `structural_json` never
+/// does.
+fn strip_absent(value: Value) -> Value {
     match value {
-        Value::Object(map) => {
-            // `id` next to a `span` is a node identity; `attrs.id` is content.
-            let node = map.contains_key("span");
-            Value::Object(
-                map.into_iter()
-                    .filter(|(k, _)| {
-                        k != "span" && !(node && k == "id") && !SUGAR_FIELDS.contains(&k.as_str())
-                    })
-                    .map(|(k, v)| (k, normalise(v)))
-                    .filter(|(_, v)| !is_default(v))
-                    .collect(),
-            )
-        }
-        Value::Array(items) => Value::Array(items.into_iter().map(normalise).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(k, v)| (k, strip_absent(v)))
+                .filter(|(_, v)| match v {
+                    Value::Null => false,
+                    Value::Array(a) => !a.is_empty(),
+                    Value::Object(o) => !o.is_empty(),
+                    Value::String(s) => !s.is_empty(),
+                    Value::Bool(_) | Value::Number(_) => true,
+                })
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.into_iter().map(strip_absent).collect()),
         other => other,
-    }
-}
-
-/// Absent-equivalent values. Booleans stay: `false` is meaningful in a
-/// feature map, and the IR already skips its own boolean defaults.
-fn is_default(value: &Value) -> bool {
-    match value {
-        Value::Null => true,
-        Value::Array(a) => a.is_empty(),
-        Value::Object(o) => o.is_empty(),
-        Value::String(s) => s.is_empty(),
-        Value::Bool(_) | Value::Number(_) => false,
     }
 }
 
@@ -148,16 +131,12 @@ fn inputs_parse_to_the_ir() {
         let Some(expected) = &fixture.ir else {
             continue;
         };
-        let expected = normalise(expected.clone());
+        let expected = strip_absent(expected.clone());
         let mut cases = fixture.inputs.clone();
         cases.extend(fixture.canonical.clone());
         for (index, input) in cases.iter().enumerate() {
             let parsed = parse(input, FileId::default());
-            let mut actual = normalise(serde_json::to_value(&parsed.document).unwrap());
-            // The fixture states the document without its file id.
-            if let Value::Object(map) = &mut actual {
-                map.remove("file");
-            }
+            let actual = tmark::ir::structural_json(&parsed.document);
             if actual != expected {
                 failures.push(format!(
                     "{} input #{}:\n--- expected\n{}\n--- actual\n{}\n--- diagnostics\n{}",

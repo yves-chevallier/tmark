@@ -4,8 +4,9 @@
     cargo build -p tmark-syntax --example dump
     python3 scripts/fixture-ir.py spec/conformance/*.md
 
-The output is the parser's opinion, normalised like the conformance runner
-(ids, spans, sugar fields and defaults dropped). REVIEW EVERY DIFF before
+The output is the parser's opinion, normalised by `tmark_ir::structural_json`
+(ids, spans, sugar fields and defaults dropped; the one definition, shared
+with the conformance runner). REVIEW EVERY DIFF before
 committing: a fixture records the intended IR, not whatever the parser
 produced. Diagnostics of the canonical input are printed for information.
 """
@@ -18,26 +19,6 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DUMP = ROOT / "target/debug/examples/dump"
-SUGAR_FIELDS = {"position", "bracketed"}
-
-
-def normalise(value):
-    if isinstance(value, dict):
-        node = "span" in value
-        out = {}
-        for key, item in value.items():
-            if key == "span" or (node and key == "id") or key in SUGAR_FIELDS:
-                continue
-            item = normalise(item)
-            if item is None or (not isinstance(item, bool) and item in ([], {}, "")):
-                continue
-            out[key] = item
-        return out
-    if isinstance(value, list):
-        return [normalise(item) for item in value]
-    return value
-
-
 def main(paths):
     if not DUMP.exists():
         sys.exit("build the dump example first: cargo build -p tmark-syntax --example dump")
@@ -50,9 +31,10 @@ def main(paths):
             continue
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as tmp:
             tmp.write(canonical.group(2))
-        result = subprocess.run([str(DUMP), tmp.name], capture_output=True, text=True, check=True)
-        document = normalise(json.loads(result.stdout))
-        document.pop("file", None)
+        result = subprocess.run(
+            [str(DUMP), "--structural", tmp.name], capture_output=True, text=True, check=True
+        )
+        document = json.loads(result.stdout)
         new = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
         if new != ir.group(1):
             path.write_text(text[: ir.start(1)] + new + text[ir.end(1) :])

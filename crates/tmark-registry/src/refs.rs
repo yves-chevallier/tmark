@@ -36,6 +36,8 @@ pub enum Resolution {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RefResolution {
     pub node: NodeId,
+    /// The key token (the whole node for an anchor link, or when the item
+    /// came from JSON without a key span).
     pub span: Span,
     /// The key as written.
     pub key: String,
@@ -49,7 +51,12 @@ pub fn resolve_all(doc: &tmark_ir::Document, resolved: &mut Resolved) {
             match inline {
                 Inline::Ref(r) => {
                     for item in &r.items {
-                        found.push((r.meta.id, r.meta.span, item.key.clone()));
+                        let span = if item.key_span.0.is_empty() {
+                            r.meta.span
+                        } else {
+                            item.key_span.0
+                        };
+                        found.push((r.meta.id, span, item.key.clone()));
                     }
                 }
                 Inline::Link(l) => {

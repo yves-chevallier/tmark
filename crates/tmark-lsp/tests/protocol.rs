@@ -147,7 +147,10 @@ fn diagnostics_arrive_in_two_waves() {
     assert_eq!(unresolved["source"], "tmark");
     assert_eq!(unresolved["severity"], 2);
     assert_eq!(unresolved["range"]["start"]["line"], 2);
-    assert_eq!(unresolved["range"]["start"]["character"], 19);
+    assert_eq!(
+        unresolved["range"]["start"]["character"], 20,
+        "the key, not the `@`"
+    );
     assert!(second.iter().any(|d| d["code"] == "role-unknown"));
     client.shutdown(handle);
 }

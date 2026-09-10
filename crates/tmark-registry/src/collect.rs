@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use tmark_ir::{
-    plain_text, walk, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline, NodeId,
-    NodeRef, Span,
+    plain_text, walk, Attrs, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline,
+    NodeId, NodeRef, Span,
 };
 
 use crate::counters::Counters;
@@ -53,7 +53,11 @@ pub struct Label {
     pub key: String,
     pub host: Host,
     pub node: NodeId,
+    /// The whole host node.
     pub span: Span,
+    /// The id token alone, when the parser recorded it (design 03
+    /// §Identity and spans): what rename and go-to-definition select.
+    pub id_span: Option<Span>,
     /// Position in the series (TeXSmith-numbered series only).
     pub number: Option<u32>,
 }
@@ -139,28 +143,22 @@ impl<'a> Collector<'a> {
 
     fn block(&mut self, block: &Block, includes: &mut Vec<(Span, String, Option<String>)>) {
         match block {
-            Block::Header(h) => self.define(h.attrs.id(), Host::Header, h.meta.id, h.meta.span),
+            Block::Header(h) => self.define(&h.attrs, Host::Header, h.meta.id, h.meta.span),
             Block::Caption(c) => {
                 let host = match c.kind {
                     CaptionKind::Table => Host::Table,
                     CaptionKind::Figure => Host::Figure,
                     CaptionKind::Listing => Host::Listing,
                 };
-                self.define(c.attrs.id(), host, c.meta.id, c.meta.span);
+                self.define(&c.attrs, host, c.meta.id, c.meta.span);
             }
-            Block::Table(t) => self.define(t.attrs.id(), Host::Table, t.meta.id, t.meta.span),
-            Block::Figure(f) => self.define(f.attrs.id(), Host::Figure, f.meta.id, f.meta.span),
-            Block::MathBlock(m) => {
-                self.define(m.attrs.id(), Host::Equation, m.meta.id, m.meta.span)
-            }
-            Block::CodeBlock(c) => {
-                self.define(c.options.id(), Host::Listing, c.meta.id, c.meta.span)
-            }
-            Block::Admonition(a) => {
-                self.define(a.attrs.id(), Host::Admonition, a.meta.id, a.meta.span)
-            }
-            Block::Div(d) => self.define(d.attrs.id(), Host::Anchor, d.meta.id, d.meta.span),
-            Block::BlockQuote(q) => self.define(q.attrs.id(), Host::Anchor, q.meta.id, q.meta.span),
+            Block::Table(t) => self.define(&t.attrs, Host::Table, t.meta.id, t.meta.span),
+            Block::Figure(f) => self.define(&f.attrs, Host::Figure, f.meta.id, f.meta.span),
+            Block::MathBlock(m) => self.define(&m.attrs, Host::Equation, m.meta.id, m.meta.span),
+            Block::CodeBlock(c) => self.define(&c.options, Host::Listing, c.meta.id, c.meta.span),
+            Block::Admonition(a) => self.define(&a.attrs, Host::Admonition, a.meta.id, a.meta.span),
+            Block::Div(d) => self.define(&d.attrs, Host::Anchor, d.meta.id, d.meta.span),
+            Block::BlockQuote(q) => self.define(&q.attrs, Host::Anchor, q.meta.id, q.meta.span),
             Block::Include(i) => includes.push((i.meta.span, i.path.clone(), i.base.clone())),
             _ => {}
         }
@@ -168,8 +166,8 @@ impl<'a> Collector<'a> {
 
     fn inline(&mut self, inline: &Inline) {
         match inline {
-            Inline::Image(i) => self.define(i.attrs.id(), Host::Figure, i.meta.id, i.meta.span),
-            Inline::Span(s) => self.define(s.attrs.id(), Host::Anchor, s.meta.id, s.meta.span),
+            Inline::Image(i) => self.define(&i.attrs, Host::Figure, i.meta.id, i.meta.span),
+            Inline::Span(s) => self.define(&s.attrs, Host::Anchor, s.meta.id, s.meta.span),
             Inline::CounterItem(c) => {
                 // Spec §CounterItem: "An undeclared prefix warns."
                 if !self.counters.is_declared(&c.prefix) {
@@ -187,6 +185,7 @@ impl<'a> Collector<'a> {
                     host: Host::CounterItem,
                     node: c.meta.id,
                     span: c.meta.span,
+                    id_span: (!c.key_span.0.is_empty()).then_some(c.key_span.0),
                     number: None,
                 });
             }
@@ -204,8 +203,9 @@ impl<'a> Collector<'a> {
 
     /// An `#id` on a host. The prefix, when present, must agree with the
     /// host (`prefix-host-mismatch`); a bare id takes the host's counter.
-    fn define(&mut self, id: Option<&str>, host: Host, node: NodeId, span: Span) {
-        let Some(id) = id else { return };
+    fn define(&mut self, attrs: &Attrs, host: Host, node: NodeId, span: Span) {
+        let Some(id) = attrs.id() else { return };
+        let id_span = attrs.id_span.map(|s| s.0);
         let (prefix, key) = match id.split_once(':') {
             Some((p, k)) if !p.is_empty() && !k.is_empty() => (Some(p.to_string()), k.to_string()),
             _ => (None, id.to_string()),
@@ -242,6 +242,7 @@ impl<'a> Collector<'a> {
             host,
             node,
             span,
+            id_span,
             number: None,
         });
     }

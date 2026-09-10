@@ -33,12 +33,12 @@
     "front_matter": {
       "default": {
         "id": 0,
-        "keys": {},
         "span": [
           0,
           0,
           0
-        ]
+        ],
+        "keys": {}
       },
       "allOf": [
         {
@@ -141,6 +141,17 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "id_span": {
+          "description": "Source range of the id token without its `#`, when the list was parsed from text (spec §Round-trip and source spans; design 03 §Identity and spans). `None` when built by a pass or from JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SubSpan"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "kv": {
@@ -2241,6 +2252,19 @@
             "key": {
               "type": "string"
             },
+            "key_span": {
+              "description": "Source range of `key` alone (design 03 §Identity and spans).",
+              "default": [
+                0,
+                0,
+                0
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SubSpan"
+                }
+              ]
+            },
             "prefix": {
               "type": "string"
             },
@@ -2698,6 +2722,19 @@
           "description": "The key as written, prefix included (`fig:boot`, `ein05`, `Fig:x`).",
           "type": "string"
         },
+        "key_span": {
+          "description": "Source range of `key` alone: no `@`, `-`, prefix or suffix (spec §Round-trip and source spans; design 03 §Identity and spans). `Span::default()` when the item was built from JSON.",
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "allOf": [
+            {
+              "$ref": "#/definitions/SubSpan"
+            }
+          ]
+        },
         "prefix": {
           "description": "Text before the key (`see`).",
           "type": [
@@ -2808,6 +2845,17 @@
     },
     "Span": {
       "description": "Byte span as [file, start, end]",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0.0
+      },
+      "maxItems": 3,
+      "minItems": 3
+    },
+    "SubSpan": {
+      "description": "Byte span of a token inside its node, as [file, start, end]",
       "type": "array",
       "items": {
         "type": "integer",
