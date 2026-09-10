@@ -177,7 +177,7 @@
       "patterns": [
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(yaml|yml))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(yaml|yml))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -240,7 +240,7 @@
         },
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(python|py|py3))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(python|py|py3))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -303,7 +303,7 @@
         },
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(latex|tex))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(latex|tex))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -366,7 +366,7 @@
         },
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(html|htm))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(html|htm))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -429,7 +429,7 @@
         },
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(typst|typ))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(typst|typ))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -492,7 +492,7 @@
         },
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(mermaid))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:(mermaid))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -555,7 +555,7 @@
         },
         {
           "name": "markup.fenced_code.block.markdown meta.directive.data.tmark",
-          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:([\\w+-]+))(?=[ \\t]+\\S)(?:[ \\t]+(code|table-config|table|image|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
+          "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})[ \\t]*(?i:([\\w+-]+))(?=[ \\t]+\\S)(?:[ \\t]+(table-config|table|image|code|raw)\\b)?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*$",
           "beginCaptures": {
             "0": {
               "name": "meta.directive.head.tmark"
@@ -915,7 +915,7 @@
     },
     "role": {
       "name": "meta.role.tmark",
-      "begin": "(\\{)(index|aside|raw|include|counter|code|lead|sc|del|underline|mark|sub|sup|keys|margin|latex|typst|html)(:[\\w-]+)?(?:[ \\t]+([^\\s=}]+))?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*(\\})(?=[\\[(])",
+      "begin": "(\\{)(lead|sc|del|underline|mark|sub|sup|keys|code|aside|index|counter|raw|include|margin|latex|typst|html)(:[\\w-]+)?(?:[ \\t]+([^\\s=}]+))?((?:[ \\t]+[\\w-]+=(?:\"[^\"]*\"|[^\\s}]+))*)[ \\t]*(\\})(?=[\\[(])",
       "beginCaptures": {
         "0": {
           "name": "meta.role.head.tmark"

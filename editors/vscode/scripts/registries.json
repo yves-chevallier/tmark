@@ -1,0 +1,134 @@
+{
+  "generated_by": "cargo run -p tmark-ir --example registries; do not edit",
+  "roles": [
+    {
+      "name": "lead",
+      "node": "Para",
+      "replaced_by": null
+    },
+    {
+      "name": "sc",
+      "node": "SmallCaps",
+      "replaced_by": null
+    },
+    {
+      "name": "del",
+      "node": "Strikeout",
+      "replaced_by": null
+    },
+    {
+      "name": "underline",
+      "node": "Underline",
+      "replaced_by": null
+    },
+    {
+      "name": "mark",
+      "node": "Highlight",
+      "replaced_by": null
+    },
+    {
+      "name": "sub",
+      "node": "Subscript",
+      "replaced_by": null
+    },
+    {
+      "name": "sup",
+      "node": "Superscript",
+      "replaced_by": null
+    },
+    {
+      "name": "keys",
+      "node": "Keystroke",
+      "replaced_by": null
+    },
+    {
+      "name": "code",
+      "node": "Code",
+      "replaced_by": null
+    },
+    {
+      "name": "aside",
+      "node": "Aside",
+      "replaced_by": null
+    },
+    {
+      "name": "index",
+      "node": "IndexEntry",
+      "replaced_by": null
+    },
+    {
+      "name": "counter",
+      "node": "CounterItem",
+      "replaced_by": null
+    },
+    {
+      "name": "raw",
+      "node": "RawInline",
+      "replaced_by": null
+    },
+    {
+      "name": "include",
+      "node": "Include",
+      "replaced_by": null
+    },
+    {
+      "name": "margin",
+      "node": "Aside",
+      "replaced_by": "aside"
+    },
+    {
+      "name": "latex",
+      "node": "RawInline",
+      "replaced_by": "raw"
+    },
+    {
+      "name": "typst",
+      "node": "RawInline",
+      "replaced_by": "raw"
+    },
+    {
+      "name": "html",
+      "node": "RawInline",
+      "replaced_by": "raw"
+    }
+  ],
+  "node_words": [
+    "code",
+    "table",
+    "table-config",
+    "image",
+    "raw"
+  ],
+  "prefixes": [
+    "part",
+    "chap",
+    "sec",
+    "app",
+    "fig",
+    "tbl",
+    "lst",
+    "eq",
+    "thm",
+    "note",
+    "gls",
+    "doi"
+  ],
+  "admonitions": [
+    "note",
+    "tip",
+    "warning",
+    "important",
+    "danger",
+    "info",
+    "hint",
+    "seealso",
+    "question",
+    "abstract",
+    "theorem",
+    "lemma",
+    "corollary",
+    "proposition",
+    "definition",
+    "proof"
+  ]
+}

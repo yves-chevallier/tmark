@@ -217,7 +217,7 @@
     ]
   },
   "scripts": {
-    "build:grammar": "python3 scripts/build_grammar.py",
+    "build:grammar": "cargo run -q --manifest-path ../../Cargo.toml -p tmark-ir --example registries && python3 scripts/build_grammar.py",
     "build": "esbuild src/extension.js --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.js --minify",
     "bundle:server": "sh scripts/bundle-server.sh",
     "test": "node --test test/grammar.test.mjs",

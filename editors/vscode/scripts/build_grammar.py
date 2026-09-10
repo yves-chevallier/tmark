@@ -36,14 +36,13 @@ REF_GUARD = r"(?<![\w@/:.-])"          # X4: never inside a word, an e-mail or a
 DEFINE_GUARD = r"(?<![\\\w])"           # X5: `\#` escapes
 LINE_START = r"(^|\G)(?<!\S)"           # start of line, or right after a block marker
 
-ROLES = [
-    "index", "aside", "raw", "include", "counter", "code", "lead",
-    "sc", "del", "underline", "mark", "sub", "sup", "keys",
-    # deprecated spellings, still accepted (Appendix "Deprecation schedule")
-    "margin", "latex", "typst", "html",
-]
-DEPRECATED_ROLES = ["margin", "latex", "typst", "html"]
-NODE_WORDS = "code|table-config|table|image|raw"
+# The names come from `tmark_ir::registry` through `registries.json`
+# (`cargo run -p tmark-ir --example registries`): one definition (AGENTS.md).
+REGISTRIES = json.loads((Path(__file__).resolve().parent / "registries.json").read_text())
+ROLES = [role["name"] for role in REGISTRIES["roles"]]
+DEPRECATED_ROLES = [role["name"] for role in REGISTRIES["roles"] if role["replaced_by"]]
+# Longest first so that `table-config` wins over `table`.
+NODE_WORDS = "|".join(sorted(REGISTRIES["node_words"], key=len, reverse=True))
 
 # Data directives: which fenced languages embed which grammar.
 FENCE_LANGUAGES = [
