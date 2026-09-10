@@ -1,7 +1,7 @@
 {
   "name": "vscode-tmark",
   "displayName": "TMark (TeXSmith Markdown)",
-  "description": "Syntax highlighting for TMark, the Markdown dialect of TeXSmith: roles, attributes, references, citations, index entries, counters, containers, data directives and captions.",
+  "description": "TMark, the Markdown dialect of TeXSmith: syntax highlighting and a language server (diagnostics, outline, folding, formatting) for roles, attributes, references, citations, index entries, counters, containers, data directives and captions.",
   "version": "0.1.0",
   "publisher": "texsmith",
   "license": "MIT",
@@ -28,6 +28,11 @@
     "ui",
     "workspace"
   ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:tmark",
+    "onLanguage:markdown"
+  ],
   "contributes": {
     "languages": [
       {
@@ -37,8 +42,9 @@
           "TeXSmith Markdown"
         ],
         "extensions": [
-          ".tmark",
-          ".tmd"
+          ".tm",
+          ".tmd",
+          ".tmark"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -118,17 +124,51 @@
           }
         ]
       }
+    },
+    "commands": [
+      {
+        "command": "tmark.restartServer",
+        "title": "TMark: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "TMark",
+      "properties": {
+        "tmark.serverPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the `tmark-lsp` binary. Empty: the binary bundled with the extension, else `tmark-lsp` on the PATH.",
+          "scope": "machine-overridable"
+        },
+        "tmark.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication with the language server."
+        }
+      }
     }
   },
   "scripts": {
     "build:grammar": "python3 scripts/build_grammar.py",
+    "build": "esbuild src/extension.js --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.js --minify",
+    "bundle:server": "sh scripts/bundle-server.sh",
     "test": "node --test test/grammar.test.mjs",
     "tokens": "node test/tokens.mjs",
+    "vscode:prepublish": "npm run build",
     "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.0.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   }
 }

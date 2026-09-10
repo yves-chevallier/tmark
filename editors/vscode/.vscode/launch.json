@@ -2,13 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "TMark: Extension Development Host",
+      "name": "Run extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "${workspaceFolder}/test/sample.md"
-      ]
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "${workspaceFolder}/test/sample.md"],
+      "env": { "TMARK_DEV": "1" }
     }
   ]
 }

@@ -1,9 +1,31 @@
 # TMark for VS Code
 
-Syntax highlighting for **TMark**, the Markdown dialect of
-[TeXSmith](https://github.com/yves-chevallier/texsmith). The grammar follows
-the recognisers of `spec/tmark.md` (draft 3) and sits on top of VS Code's own
-Markdown grammar, so everything Markdown already does keeps working.
+Syntax highlighting and a language server for **TMark**, the Markdown dialect
+of [TeXSmith](https://github.com/yves-chevallier/texsmith). The grammar
+follows the recognisers of `spec/tmark.md` (draft 3) and sits on top of VS
+Code's own Markdown grammar, so everything Markdown already does keeps
+working. The language server (`tmark-lsp`, in this repository) adds
+diagnostics, the outline, folding and formatting.
+
+## Language server
+
+The extension starts `tmark-lsp` over stdio for `tmark` files and for
+Markdown files, and the server decides which Markdown files are TMark (ADR
+0006: a `press` key in the front matter, or a `tmark.toml` above the file);
+other Markdown files get no diagnostics. The binary is looked up in this
+order:
+
+1. the `tmark.serverPath` setting;
+2. `bin/tmark-lsp` inside the extension (put there by `npm run bundle:server`,
+   which builds it in release mode with cargo);
+3. `tmark-lsp` on the `PATH`.
+
+Features today: parse diagnostics as you type, resolve and lint diagnostics
+150 ms after the last change, the outline (headers, captions, containers,
+counter items), folding (front matter, containers, fences, header sections),
+and *Format Document* (the canonical form of `tmark fmt`). The command
+**TMark: Restart Language Server** restarts it; `tmark.trace.server` logs the
+protocol in the *TMark* output channel.
 
 ## What gets highlighted
 
@@ -41,7 +63,8 @@ From this directory:
 ```sh
 npm install
 npm test                 # tokenise test/sample.md and check the scopes
-npm run package          # builds vscode-tmark-<version>.vsix
+npm run bundle:server    # cargo build --release -p tmark-lsp, copied to bin/
+npm run package          # bundles the client (esbuild) and builds vscode-tmark-<version>.vsix
 code --install-extension vscode-tmark-0.1.0.vsix
 ```
 
