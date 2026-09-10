@@ -381,3 +381,38 @@ fn semantic_tokens_overlay_resolution_state() {
     );
     client.shutdown(handle);
 }
+
+#[test]
+fn completion_offers_labels_and_roles() {
+    let (mut client, handle) = Client::start();
+    let uri = "file:///tmp/tmark-test/complete.tmd";
+    client.open(uri, "tmark", DOC);
+    let _ = client.diagnostics(uri);
+    let _ = client.diagnostics(uri);
+    // Type `@s` at the end.
+    client.change(uri, 2, &format!("{DOC}\nSee @s"));
+    let _ = client.diagnostics(uri);
+    let line = DOC.lines().count() as u64 + 1;
+    let result = client.request(
+        "textDocument/completion",
+        json!({"textDocument": {"uri": uri}, "position": {"line": line, "character": 6}}),
+    );
+    let items = result.as_array().unwrap();
+    let sec = items
+        .iter()
+        .find(|i| i["label"] == "sec:intro")
+        .expect("sec:intro offered");
+    assert_eq!(sec["textEdit"]["range"]["start"]["character"], 5);
+    assert_eq!(sec["textEdit"]["range"]["end"]["character"], 6);
+    assert!(items.iter().any(|i| i["label"] == "tbl:t"));
+    let result = client.request(
+        "textDocument/completion",
+        json!({"textDocument": {"uri": uri}, "position": {"line": 5, "character": 13}}),
+    );
+    let items = result.as_array().unwrap();
+    assert!(
+        items.iter().any(|i| i["label"] == "aside"),
+        "role names after `{{`"
+    );
+    client.shutdown(handle);
+}

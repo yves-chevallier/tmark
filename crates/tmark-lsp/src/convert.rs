@@ -20,7 +20,6 @@ pub fn range(index: &LineIndex, span: Span) -> Range {
     Range::new(position(index, span.start), position(index, span.end))
 }
 
-#[allow(dead_code)] // hover, completion and navigation arrive next
 pub fn offset(index: &LineIndex, position: Position) -> u32 {
     let at = index.from_utf16(LineColUtf16 {
         line: position.line,

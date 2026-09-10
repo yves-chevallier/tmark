@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+mod completion;
 mod convert;
 mod outline;
 mod semantic;
@@ -22,12 +23,13 @@ use lsp_types::notification::{
     Notification as _, PublishDiagnostics, ShowMessage,
 };
 use lsp_types::request::{
-    DocumentSymbolRequest, FoldingRangeRequest, Formatting, Request as _,
+    Completion, DocumentSymbolRequest, FoldingRangeRequest, Formatting, Request as _,
     SemanticTokensFullRequest, SemanticTokensRefresh,
 };
 use lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFormattingParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
+    CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
+    DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
     FoldingRangeProviderCapability, InitializeParams, InitializeResult, MessageType, OneOf,
     PublishDiagnosticsParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensParams, SemanticTokensResult, ServerCapabilities, ServerInfo, ShowMessageParams,
@@ -72,6 +74,10 @@ fn capabilities() -> ServerCapabilities {
         document_symbol_provider: Some(OneOf::Left(true)),
         folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
+        completion_provider: Some(CompletionOptions {
+            trigger_characters: Some(completion::TRIGGERS.iter().map(|s| s.to_string()).collect()),
+            ..Default::default()
+        }),
         semantic_tokens_provider: Some(
             SemanticTokensOptions {
                 legend: semantic::legend(),
@@ -376,6 +382,10 @@ impl Server {
             SemanticTokensFullRequest::METHOD => with_params(req, |p: SemanticTokensParams| {
                 self.semantic_tokens(&p.text_document.uri)
             }),
+            Completion::METHOD => with_params(req, |p: CompletionParams| {
+                let at = p.text_document_position;
+                self.completion(&at.text_document.uri, at.position)
+            }),
             _ => Err(Response::new_err(
                 id.clone(),
                 ErrorCode::MethodNotFound as i32,
@@ -410,6 +420,22 @@ impl Server {
         };
         serde_json::to_value(outline::folding_ranges(&doc.document, &doc.index))
             .expect("folds serialise")
+    }
+
+    fn completion(&self, uri: &Uri, position: lsp_types::Position) -> serde_json::Value {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
+            return serde_json::Value::Null;
+        };
+        let offset = convert::offset(&doc.index, position);
+        // The last analysis is good enough for labels even when a newer
+        // version is being typed: a stale list beats an empty one.
+        let resolved = doc.analysis.as_ref().map(|a| &a.resolved);
+        match completion::complete(&doc.text, &doc.index, &doc.document, resolved, offset) {
+            Some(items) => {
+                serde_json::to_value(CompletionResponse::Array(items)).expect("items serialise")
+            }
+            None => serde_json::Value::Null,
+        }
     }
 
     fn semantic_tokens(&self, uri: &Uri) -> serde_json::Value {
