@@ -183,25 +183,27 @@ pub fn parse_ref_items(inner: &str) -> Vec<RefItem> {
             candidate = rest;
             skipped += 1;
         }
-        let (prefix, key, key_at, key_len) = if !word.is_empty() && is_ref_key(candidate) {
+        let (prefix, key, key_at, key_len, suffix) = if !word.is_empty() && is_ref_key(candidate) {
             let words = head[..word_at].trim_end();
             (
                 (!words.is_empty()).then(|| words.split_whitespace().collect::<Vec<_>>().join(" ")),
                 candidate.to_string(),
                 item_at + word_at + skipped,
                 candidate.len(),
+                suffix.filter(|s| !s.is_empty()),
             )
         } else {
-            // Not a key: the whole item is the key, as typed.
+            // Not a key: the whole item is the key, as typed (the suffix
+            // is part of it, so it is not repeated).
             suppress_author = false;
-            (None, item.replace('@', ""), item_at, item.len())
+            (None, item.replace('@', ""), item_at, item.len(), None)
         };
         out.push(RefItem {
             prefix,
             suppress_author,
             key,
             key_span: SubSpan::new(Default::default(), key_at as u32, (key_at + key_len) as u32),
-            suffix: suffix.filter(|s| !s.is_empty()),
+            suffix,
         });
     }
     out
@@ -347,6 +349,11 @@ mod tests {
             (items[2].key_span.0.start, items[2].key_span.0.end),
             (17, 27)
         );
+        // A one-letter key is not a key (spec grammar: two characters at
+        // least); the whole item is, without a repeated suffix.
+        let items = parse_ref_items("-@b, p. 3");
+        assert_eq!(items[0].key, "-b, p. 3");
+        assert!(items[0].suffix.is_none() && !items[0].suppress_author);
     }
 
     #[test]

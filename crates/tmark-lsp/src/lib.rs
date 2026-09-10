@@ -681,6 +681,15 @@ impl Server {
         let Some(doc) = self.docs.get(uri.as_str()) else {
             return serde_json::Value::Null;
         };
+        if doc
+            .parse_diagnostics
+            .iter()
+            .any(|d| d.code == tmark::ir::Code::ParseInternal)
+        {
+            // A tokenizer failure: the document is a stand-in, not a
+            // parse; formatting it would replace the file with prose.
+            return serde_json::to_value(Vec::<TextEdit>::new()).expect("edits serialise");
+        }
         let formatted = tmark::format(&doc.document, doc.config.profile);
         let edits: Vec<TextEdit> = if formatted == doc.text {
             Vec::new()

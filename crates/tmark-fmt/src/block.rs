@@ -120,7 +120,14 @@ pub fn block(out: &mut Out, b: &Block) {
         Block::Header(h) => {
             out.push(&"#".repeat(usize::from(h.level).clamp(1, 6)));
             out.push(" ");
-            inlines(out, &h.content, Context::default());
+            inlines(
+                out,
+                &h.content,
+                Context {
+                    block_start: true,
+                    ..Context::default()
+                },
+            );
             attrs::write(out, &h.attrs, " ");
             out.ensure_newline();
         }

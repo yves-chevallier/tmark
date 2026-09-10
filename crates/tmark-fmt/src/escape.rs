@@ -36,7 +36,10 @@ pub struct Context {
 pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     let chars: Vec<char> = text.chars().collect();
     let mut prev = out.last_char();
-    let mut line_start = out.at_line_start();
+    // The first run of a block opens a line for the block recognisers
+    // even after a marker (`- `, `> `, `# `): the column is not zero but
+    // `# x` would still start a heading there.
+    let mut line_start = out.at_line_start() || ctx.block_start;
     let mut buf = String::with_capacity(text.len() + 8);
     // Index of a character a line-start rule decided to escape later on the
     // line (the `.` of `1.`, the `:` of `Table:`).

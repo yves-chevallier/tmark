@@ -333,6 +333,18 @@ fn cmd_fmt(files: &[PathBuf], profile: Option<&str>, check: bool, write: bool) -
             },
         };
         let parsed = tmark::parse_with(&text, FileId::default(), profile);
+        if parsed
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Code::ParseInternal)
+        {
+            eprintln!(
+                "tmark: {}: the tokenizer failed on this file; not formatted",
+                file.display()
+            );
+            failed = true;
+            continue;
+        }
         let formatted = format(&parsed.document, profile);
         if check {
             if formatted != text {

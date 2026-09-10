@@ -141,7 +141,7 @@ impl Lowerer {
                     .and_then(|m| m.strip_suffix('}'))
                     .and_then(parse_attrs)
                     .unwrap_or_default();
-                match self.attrs_base(ctx, math.position.as_ref()) {
+                match self.attrs_base_last_line(ctx, math.position.as_ref()) {
                     Some(base) => self.relocate_attrs(ctx, &mut attrs, base),
                     None => attrs.id_span = None,
                 }
@@ -330,9 +330,13 @@ impl Lowerer {
         let attrs = match children.next() {
             None => Attrs::new(),
             Some(Node::TmarkBrace(brace)) if !brace.moustache => {
-                let attrs = parse_attrs(&brace.value)?;
+                let mut attrs = parse_attrs(&brace.value)?;
                 if children.next().is_some() {
                     return None;
+                }
+                match brace.position.as_ref() {
+                    Some(p) => self.relocate_attrs(ctx, &mut attrs, p.start.offset + 1),
+                    None => attrs.id_span = None,
                 }
                 attrs
             }

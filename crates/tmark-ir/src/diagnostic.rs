@@ -75,6 +75,10 @@ pub enum Code {
     FrontmatterUnknownKey,
     /// Appendix "Deprecation schedule": a deprecated spelling.
     Deprecated,
+    /// The tokenizer failed on the file (a bug in it, never in the input):
+    /// the document is one paragraph of the text. AGENTS.md: "parsing
+    /// never fails".
+    ParseInternal,
     // --- Resolve (tmark-registry) ---
     /// Spec §Ref: a key found in no registry.
     RefUnresolved,
@@ -127,6 +131,7 @@ impl Code {
         Code::FrontmatterYaml,
         Code::FrontmatterUnknownKey,
         Code::Deprecated,
+        Code::ParseInternal,
         Code::RefUnresolved,
         Code::RefAmbiguous,
         Code::PrefixUnknown,
@@ -165,6 +170,7 @@ impl Code {
             Code::FrontmatterYaml => "frontmatter-yaml",
             Code::FrontmatterUnknownKey => "frontmatter-unknown-key",
             Code::Deprecated => "deprecated",
+            Code::ParseInternal => "parse-internal",
             Code::RefUnresolved => "ref-unresolved",
             Code::RefAmbiguous => "ref-ambiguous",
             Code::PrefixUnknown => "prefix-unknown",
@@ -187,9 +193,10 @@ impl Code {
     /// Design `05-diagnostics.md` §Severities by default.
     pub fn default_severity(self) -> Severity {
         match self {
-            Code::FrontmatterYaml | Code::FrontmatterUnknownKey | Code::StrictXConstruct => {
-                Severity::Error
-            }
+            Code::FrontmatterYaml
+            | Code::FrontmatterUnknownKey
+            | Code::StrictXConstruct
+            | Code::ParseInternal => Severity::Error,
             Code::AttrNoHost
             | Code::RoleDanglingHead
             | Code::CaptionNoHost

@@ -122,10 +122,15 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
     };
     let document = match lowerer.tree(text) {
         Ok(tree) => lowerer.lower_root(&tree, &ctx),
-        // Only the MDX constructs can fail, and they are off; be total anyway.
+        // A tokenizer error or panic: the text as one paragraph, plus the
+        // diagnostic that names the bug (fixture `diag-parse-internal`).
         Err(message) => {
             let span = Span::new(file, 0, text.len() as u32);
-            lowerer.diag(Code::FrontmatterYaml, span, message.reason.to_string());
+            lowerer.diag(
+                Code::ParseInternal,
+                span,
+                format!("the tokenizer failed on this file ({message}); shown as plain text"),
+            );
             let meta = lowerer.meta(span);
             let inline = Inline::Str(Str {
                 meta: lowerer.meta(span),
@@ -149,8 +154,22 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
 }
 
 impl Lowerer {
-    pub fn tree(&self, text: &str) -> Result<Node, tmark_markdown::message::Message> {
-        to_mdast(text, &ParseOptions::tmark())
+    /// The mdast tree of `text`. A panic inside the vendored tokenizer
+    /// (markdown-rs 1.0.0 has at least one: an unclosed fence in a list
+    /// item followed by a list of another kind) is caught and reported as
+    /// an error, so that parsing never fails (AGENTS.md).
+    pub fn tree(&self, text: &str) -> Result<Node, String> {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            to_mdast(text, &ParseOptions::tmark())
+        })) {
+            Ok(Ok(tree)) => Ok(tree),
+            Ok(Err(message)) => Err(message.reason.to_string()),
+            Err(panic) => Err(panic
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| panic.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_else(|| "tokenizer panic".to_string())),
+        }
     }
 
     /// Allocate the next node id (dense, document order: call before
@@ -192,11 +211,20 @@ impl Lowerer {
     }
 
     /// The local offset of the first `{` on the first line of `position`,
-    /// plus one: where an attribute list on that line starts.
+    /// plus one: where an attribute list on that line starts (containers).
     pub fn attrs_base(&self, ctx: &Ctx, position: Option<&Position>) -> Option<usize> {
         let position = position?;
         let first = ctx.slice(Some(position)).lines().next()?;
         Some(position.start.offset + first.find('{')? + 1)
+    }
+
+    /// Same on the last line of `position` (display math: the list follows
+    /// the closing `$$`).
+    pub fn attrs_base_last_line(&self, ctx: &Ctx, position: Option<&Position>) -> Option<usize> {
+        let position = position?;
+        let src = ctx.slice(Some(position));
+        let last_start = src.rfind('\n').map_or(0, |i| i + 1);
+        Some(position.start.offset + last_start + src[last_start..].find('{')? + 1)
     }
 
     pub fn meta_at(&mut self, ctx: &Ctx, position: Option<&Position>) -> Meta {
