@@ -83,11 +83,14 @@ keys, `:::`, fence node words, front-matter keys), definition, references,
 rename across an include, hover, document links, quick fixes for
 deprecated spellings, `tmark.toml`; the extension bundles the binary and
 packages as a `.vsix` (verified with `vsce`, not yet installed in a VS Code
-session by a person). The grammar tables come from `tmark-ir`. Open: the
-front-matter completion does not merge an external `press` schema (the
-`[press] schema` key is parsed, unused); included files get no diagnostics
-of their own; `lint --fix` and the code actions cover `deprecated` only.
-See `13-handoff.md`.
+session by a person). The grammar tables come from `tmark-ir`; the
+external `press` schema of `tmark.toml` is merged into front-matter
+completion; included files get their parse diagnostics published under
+their own URI; completion also covers `{.` classes, `{{` paths and
+image/include paths. Open: references inside included files are not
+resolved (the collector keeps their labels only); `lint --fix` and the
+code actions cover `deprecated` only; range formatting; a real VS Code
+session. See `13-handoff.md`.
 
 ## M4 — Writers and preview
 
