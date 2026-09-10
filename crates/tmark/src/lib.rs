@@ -15,7 +15,9 @@ pub use tmark_ir::{Diagnostic, Document, FileId};
 pub use tmark_lint::{lint, Config as LintConfig};
 #[cfg(feature = "fs")]
 pub use tmark_registry::FsLoader;
-pub use tmark_registry::{resolve, Loader, MemoryLoader, ResolveOptions, Resolved};
+pub use tmark_registry::{
+    resolve, Label, Loader, MemoryLoader, RefResolution, Resolution, ResolveOptions, Resolved,
+};
 pub use tmark_syntax::{parse, parse_strict, Parsed};
 
 /// Every diagnostic of a file: parse, resolve and lint, in that order.

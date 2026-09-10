@@ -14,15 +14,17 @@ use tmark::{Diagnostic, Document, FileId, FsLoader, LintConfig, ResolveOptions, 
 /// Quiet time after the last change before an analysis starts.
 pub const DEBOUNCE: Duration = Duration::from_millis(150);
 
+pub struct Check {
+    pub uri: Uri,
+    pub version: i32,
+    pub options: ResolveOptions,
+    pub text: String,
+    pub document: Document,
+    pub lint: LintConfig,
+}
+
 pub enum Job {
-    Check {
-        uri: Uri,
-        version: i32,
-        options: ResolveOptions,
-        text: String,
-        document: Document,
-        lint: LintConfig,
-    },
+    Check(Box<Check>),
     /// The document was closed: forget any pending analysis.
     Drop(Uri),
 }
@@ -39,7 +41,9 @@ pub struct Analysis {
 /// Runs until the job channel closes. Jobs for the same document replace
 /// each other; the batch runs once `DEBOUNCE` passes without a new job.
 pub fn run(jobs: Receiver<Job>, results: Sender<Analysis>) {
-    let mut pending: HashMap<Uri, Job> = HashMap::new();
+    // Keyed by the URI text: `Uri` has interior mutability (clippy's
+    // `mutable_key_type`).
+    let mut pending: HashMap<String, Box<Check>> = HashMap::new();
     loop {
         let job = if pending.is_empty() {
             match jobs.recv() {
@@ -50,11 +54,9 @@ pub fn run(jobs: Receiver<Job>, results: Sender<Analysis>) {
             match jobs.recv_timeout(DEBOUNCE) {
                 Ok(job) => job,
                 Err(RecvTimeoutError::Timeout) => {
-                    for job in pending.drain().map(|(_, job)| job) {
-                        if let Some(analysis) = analyse(job) {
-                            if results.send(analysis).is_err() {
-                                return;
-                            }
+                    for check in pending.drain().map(|(_, check)| check) {
+                        if results.send(analyse(*check)).is_err() {
+                            return;
                         }
                     }
                     continue;
@@ -64,35 +66,32 @@ pub fn run(jobs: Receiver<Job>, results: Sender<Analysis>) {
         };
         match job {
             Job::Drop(uri) => {
-                pending.remove(&uri);
+                pending.remove(uri.as_str());
             }
-            Job::Check { ref uri, .. } => {
-                pending.insert(uri.clone(), job);
+            Job::Check(check) => {
+                pending.insert(check.uri.as_str().to_string(), check);
             }
         }
     }
 }
 
-fn analyse(job: Job) -> Option<Analysis> {
-    let Job::Check {
+fn analyse(check: Check) -> Analysis {
+    let Check {
         uri,
         version,
         options,
         text,
         document,
         lint,
-    } = job
-    else {
-        return None;
-    };
+    } = check;
     let resolved = tmark::resolve(&document, &FsLoader, &options);
     let mut diagnostics = resolved.diagnostics.clone();
     diagnostics.extend(tmark::lint(&document, &resolved, &text, &lint));
     debug_assert_eq!(document.file, FileId::default());
-    Some(Analysis {
+    Analysis {
         uri,
         version,
         resolved,
         diagnostics,
-    })
+    }
 }

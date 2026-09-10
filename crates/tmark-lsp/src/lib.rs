@@ -9,6 +9,7 @@
 
 mod convert;
 mod outline;
+mod semantic;
 mod worker;
 
 use std::collections::HashMap;
@@ -20,18 +21,22 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
     Notification as _, PublishDiagnostics, ShowMessage,
 };
-use lsp_types::request::{DocumentSymbolRequest, FoldingRangeRequest, Formatting, Request as _};
+use lsp_types::request::{
+    DocumentSymbolRequest, FoldingRangeRequest, Formatting, Request as _,
+    SemanticTokensFullRequest, SemanticTokensRefresh,
+};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFormattingParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
     FoldingRangeProviderCapability, InitializeParams, InitializeResult, MessageType, OneOf,
-    PublishDiagnosticsParams, ServerCapabilities, ServerInfo, ShowMessageParams,
+    PublishDiagnosticsParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensResult, ServerCapabilities, ServerInfo, ShowMessageParams,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
 };
 use tmark::ir::LineIndex;
 use tmark::{Config, Diagnostic, Document, FileId, Profile, Resolved};
 
-use worker::{Analysis, Job};
+use worker::{Analysis, Check, Job};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -67,6 +72,14 @@ fn capabilities() -> ServerCapabilities {
         document_symbol_provider: Some(OneOf::Left(true)),
         folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(
+            SemanticTokensOptions {
+                legend: semantic::legend(),
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+                ..Default::default()
+            }
+            .into(),
+        ),
         ..Default::default()
     }
 }
@@ -74,6 +87,7 @@ fn capabilities() -> ServerCapabilities {
 /// One open document: its text, the parse of that text, and the latest
 /// analysis that the worker finished (possibly of an older version).
 struct Doc {
+    uri: Uri,
     text: String,
     version: i32,
     index: LineIndex,
@@ -92,7 +106,6 @@ struct Doc {
 impl Doc {
     /// The resolution matching the current text, if the worker has caught
     /// up.
-    #[allow(dead_code)] // navigation and completion arrive next
     fn resolved(&self) -> Option<&Resolved> {
         self.analysis
             .as_ref()
@@ -104,8 +117,14 @@ impl Doc {
 struct Server {
     sender: Sender<Message>,
     jobs: Sender<Job>,
-    docs: HashMap<Uri, Doc>,
+    /// Keyed by the URI text (`Uri` has interior mutability, which clippy
+    /// refuses in a key).
+    docs: HashMap<String, Doc>,
     hierarchical_symbols: bool,
+    /// The client re-requests semantic tokens when asked to.
+    semantic_refresh: bool,
+    /// Ids of the requests this server sends to the client.
+    next_request: i32,
     /// The last configuration error shown, so that it is shown once.
     config_error: Option<String>,
 }
@@ -119,11 +138,20 @@ impl Server {
             .and_then(|t| t.document_symbol.as_ref())
             .and_then(|d| d.hierarchical_document_symbol_support)
             .unwrap_or(false);
+        let semantic_refresh = init
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|w| w.semantic_tokens.as_ref())
+            .and_then(|s| s.refresh_support)
+            .unwrap_or(false);
         Server {
             sender,
             jobs,
             docs: HashMap::new(),
             hierarchical_symbols,
+            semantic_refresh,
+            next_request: 0,
             config_error: None,
         }
     }
@@ -172,27 +200,33 @@ impl Server {
                 let uri = p.text_document.uri;
                 let language_id = self
                     .docs
-                    .get(&uri)
+                    .get(uri.as_str())
                     .map_or("markdown".to_string(), |doc| doc.language_id.clone());
                 self.update(uri, p.text_document.version, change.text, language_id)?;
             }
             DidChangeWatchedFiles::METHOD => {
                 // `tmark.toml` or a `.bib` changed: every document re-reads
                 // its configuration and re-analyses.
-                let uris: Vec<Uri> = self.docs.keys().cloned().collect();
-                for uri in uris {
-                    let Some(doc) = self.docs.get(&uri) else {
-                        continue;
-                    };
-                    let (version, text, language_id) =
-                        (doc.version, doc.text.clone(), doc.language_id.clone());
+                let open: Vec<(Uri, i32, String, String)> = self
+                    .docs
+                    .values()
+                    .map(|doc| {
+                        (
+                            doc.uri.clone(),
+                            doc.version,
+                            doc.text.clone(),
+                            doc.language_id.clone(),
+                        )
+                    })
+                    .collect();
+                for (uri, version, text, language_id) in open {
                     self.update(uri, version, text, language_id)?;
                 }
             }
             DidCloseTextDocument::METHOD => {
                 let p: DidCloseTextDocumentParams = serde_json::from_value(n.params)?;
                 let uri = p.text_document.uri;
-                if self.docs.remove(&uri).is_some() {
+                if self.docs.remove(uri.as_str()).is_some() {
                     let _ = self.jobs.send(Job::Drop(uri.clone()));
                     self.send_diagnostics(uri, Vec::new(), None)?;
                 }
@@ -229,8 +263,9 @@ impl Server {
             tmark::parse(&text, FileId::default())
         };
         let index = LineIndex::new(&text);
-        let analysis = self.docs.remove(&uri).and_then(|old| old.analysis);
+        let analysis = self.docs.remove(uri.as_str()).and_then(|old| old.analysis);
         let doc = Doc {
+            uri: uri.clone(),
             index,
             document: parsed.document,
             parse_diagnostics: parsed.diagnostics,
@@ -243,22 +278,22 @@ impl Server {
             text,
         };
         if detected {
-            let _ = self.jobs.send(Job::Check {
+            let _ = self.jobs.send(Job::Check(Box::new(Check {
                 uri: uri.clone(),
                 version,
                 options: doc.config.resolve_options(&doc.path),
                 text: doc.text.clone(),
                 document: doc.document.clone(),
                 lint: doc.config.lint.clone(),
-            });
+            })));
         }
-        self.docs.insert(uri.clone(), doc);
+        self.docs.insert(uri.as_str().to_string(), doc);
         self.publish(&uri)
     }
 
     fn on_analysis(&mut self, analysis: Analysis) -> Result<(), Error> {
         let uri = analysis.uri.clone();
-        let Some(doc) = self.docs.get_mut(&uri) else {
+        let Some(doc) = self.docs.get_mut(uri.as_str()) else {
             return Ok(());
         };
         if analysis.version != doc.version {
@@ -266,13 +301,24 @@ impl Server {
             return Ok(());
         }
         doc.analysis = Some(analysis);
-        self.publish(&uri)
+        self.publish(&uri)?;
+        // The overlay (unresolved references) is only known now.
+        if self.semantic_refresh {
+            self.next_request += 1;
+            let request = Request::new(
+                RequestId::from(self.next_request),
+                SemanticTokensRefresh::METHOD.into(),
+                serde_json::Value::Null,
+            );
+            self.sender.send(request.into())?;
+        }
+        Ok(())
     }
 
     /// Diagnostics of the current text: parse ones, plus resolve and lint
     /// ones when the analysis matches the version.
     fn publish(&self, uri: &Uri) -> Result<(), Error> {
-        let Some(doc) = self.docs.get(uri) else {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
             return Ok(());
         };
         if !doc.detected {
@@ -327,6 +373,9 @@ impl Server {
             Formatting::METHOD => with_params(req, |p: DocumentFormattingParams| {
                 self.formatting(&p.text_document.uri)
             }),
+            SemanticTokensFullRequest::METHOD => with_params(req, |p: SemanticTokensParams| {
+                self.semantic_tokens(&p.text_document.uri)
+            }),
             _ => Err(Response::new_err(
                 id.clone(),
                 ErrorCode::MethodNotFound as i32,
@@ -340,7 +389,7 @@ impl Server {
     }
 
     fn document_symbols(&self, uri: &Uri) -> serde_json::Value {
-        let Some(doc) = self.docs.get(uri) else {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
             return serde_json::Value::Null;
         };
         let response = if self.hierarchical_symbols {
@@ -356,17 +405,41 @@ impl Server {
     }
 
     fn folding_ranges(&self, uri: &Uri) -> serde_json::Value {
-        let Some(doc) = self.docs.get(uri) else {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
             return serde_json::Value::Null;
         };
         serde_json::to_value(outline::folding_ranges(&doc.document, &doc.index))
             .expect("folds serialise")
     }
 
+    fn semantic_tokens(&self, uri: &Uri) -> serde_json::Value {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
+            return serde_json::Value::Null;
+        };
+        let analysed = doc
+            .analysis
+            .as_ref()
+            .filter(|a| a.version == doc.version)
+            .map(|a| a.diagnostics.as_slice())
+            .unwrap_or_default();
+        let diagnostics: Vec<Diagnostic> = doc
+            .parse_diagnostics
+            .iter()
+            .chain(analysed)
+            .cloned()
+            .collect();
+        let data = semantic::tokens(&doc.document, &doc.index, doc.resolved(), &diagnostics);
+        serde_json::to_value(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: None,
+            data,
+        }))
+        .expect("tokens serialise")
+    }
+
     /// Whole-document formatting: one edit replacing everything, or none
     /// when the text is already in normal form.
     fn formatting(&self, uri: &Uri) -> serde_json::Value {
-        let Some(doc) = self.docs.get(uri) else {
+        let Some(doc) = self.docs.get(uri.as_str()) else {
             return serde_json::Value::Null;
         };
         let formatted = tmark::format(&doc.document, doc.config.profile);

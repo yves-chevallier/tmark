@@ -121,6 +121,13 @@
             "settings": {
               "fontStyle": "strikethrough"
             }
+          },
+          {
+            "scope": "invalid.unresolved.reference.tmark, invalid.unknown.role.tmark",
+            "settings": {
+              "foreground": "#E5534B",
+              "fontStyle": "underline"
+            }
           }
         ]
       }
@@ -151,7 +158,63 @@
           "description": "Traces the communication with the language server."
         }
       }
-    }
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "reference",
+        "superType": "variable",
+        "description": "A TMark reference that resolves"
+      },
+      {
+        "id": "unresolvedReference",
+        "superType": "variable",
+        "description": "A TMark reference found in no registry"
+      },
+      {
+        "id": "citation",
+        "superType": "variable",
+        "description": "A TMark citation of a bibliography entry"
+      },
+      {
+        "id": "label",
+        "superType": "property",
+        "description": "A TMark definition: counter item, index entry"
+      },
+      {
+        "id": "unknownRole",
+        "superType": "function",
+        "description": "A brace group that names no role"
+      },
+      {
+        "id": "deprecated",
+        "superType": "variable",
+        "description": "A deprecated TMark spelling"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "scopes": {
+          "reference": [
+            "support.type.reference.tmark"
+          ],
+          "unresolvedReference": [
+            "invalid.unresolved.reference.tmark"
+          ],
+          "citation": [
+            "support.type.reference.citation.tmark"
+          ],
+          "label": [
+            "entity.other.attribute-name.counter.tmark"
+          ],
+          "unknownRole": [
+            "invalid.unknown.role.tmark"
+          ],
+          "deprecated": [
+            "invalid.deprecated.tmark"
+          ]
+        }
+      }
+    ]
   },
   "scripts": {
     "build:grammar": "python3 scripts/build_grammar.py",

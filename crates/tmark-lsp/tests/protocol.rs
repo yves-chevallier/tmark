@@ -27,7 +27,8 @@ impl Client {
                 "capabilities": {
                     "textDocument": {
                         "documentSymbol": { "hierarchicalDocumentSymbolSupport": true }
-                    }
+                    },
+                    "workspace": { "semanticTokens": { "refreshSupport": true } }
                 }
             }),
         );
@@ -327,4 +328,56 @@ fn tmark_toml_detects_markdown_and_sets_lint_levels() {
     );
     client.shutdown(handle);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn semantic_tokens_overlay_resolution_state() {
+    let (mut client, handle) = Client::start();
+    let uri = "file:///tmp/tmark-test/tokens.tmd";
+    client.open(uri, "tmark", DOC);
+    let _ = client.diagnostics(uri);
+    let _ = client.diagnostics(uri);
+    // The analysis asks the client to refresh its tokens.
+    loop {
+        if let Message::Request(r) = client.recv() {
+            assert_eq!(r.method, "workspace/semanticTokens/refresh");
+            break;
+        }
+    }
+    let result = client.request(
+        "textDocument/semanticTokens/full",
+        json!({"textDocument": {"uri": uri}}),
+    );
+    let data: Vec<u64> = result["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_u64().unwrap())
+        .collect();
+    // Absolute (line, col, len, type) from the deltas.
+    let mut tokens = Vec::new();
+    let (mut line, mut col) = (0, 0);
+    for t in data.chunks(5) {
+        line += t[0];
+        col = if t[0] == 0 { col + t[1] } else { t[1] };
+        tokens.push((line, col, t[2], t[3]));
+    }
+    // Legend: 0 reference, 1 unresolvedReference, 2 citation, 3 label, 4 unknownRole, 5 deprecated.
+    assert!(
+        tokens.contains(&(2, 4, 10, 0)),
+        "@sec:intro resolved: {tokens:?}"
+    );
+    assert!(
+        tokens.contains(&(2, 19, 12, 1)),
+        "@fig:missing unresolved: {tokens:?}"
+    );
+    assert!(
+        tokens.contains(&(2, 51, 10, 0)),
+        "after non-ASCII, UTF-16 columns: {tokens:?}"
+    );
+    assert!(
+        tokens.iter().any(|t| t.0 == 5 && t.3 == 4),
+        "unknown role: {tokens:?}"
+    );
+    client.shutdown(handle);
 }
