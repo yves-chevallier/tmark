@@ -91,15 +91,6 @@ fn main() -> ExitCode {
     }
 }
 
-fn severity_name(severity: Severity) -> &'static str {
-    match severity {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        Severity::Info => "info",
-        Severity::Hint => "hint",
-    }
-}
-
 /// The `tmark.toml` above `file`, or the defaults; a file that does not
 /// parse is a usage error.
 fn config_for(file: &std::path::Path) -> Result<Config, ExitCode> {
@@ -179,7 +170,7 @@ fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
                 "{name}:{}:{}: {} {}: {}",
                 at.line + 1,
                 at.col + 1,
-                severity_name(d.severity),
+                d.severity.as_str(),
                 d.code.id(),
                 d.message
             );
@@ -234,19 +225,12 @@ fn cmd_parse(file: &PathBuf, compact: bool) -> ExitCode {
     let name = file.display().to_string();
     for d in &parsed.diagnostics {
         let at = index.line_col(d.span.start);
-        let severity = match d.code.default_severity() {
-            Severity::Error => {
-                errors = true;
-                "error"
-            }
-            Severity::Warning => "warning",
-            Severity::Info => "info",
-            Severity::Hint => "hint",
-        };
+        errors |= d.severity == Severity::Error;
         eprintln!(
-            "{name}:{}:{}: {severity} {}: {}",
+            "{name}:{}:{}: {} {}: {}",
             at.line + 1,
             at.col + 1,
+            d.severity.as_str(),
             d.code.id(),
             d.message
         );

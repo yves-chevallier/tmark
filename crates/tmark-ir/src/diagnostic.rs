@@ -19,6 +19,29 @@ pub enum Severity {
     Error,
 }
 
+impl Severity {
+    /// The word the CLI prints and `tmark.toml` reads.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Severity::Hint => "hint",
+            Severity::Info => "info",
+            Severity::Warning => "warning",
+            Severity::Error => "error",
+        }
+    }
+
+    /// The inverse of [`Severity::as_str`].
+    pub fn parse(s: &str) -> Option<Severity> {
+        match s {
+            "hint" => Some(Severity::Hint),
+            "info" => Some(Severity::Info),
+            "warning" => Some(Severity::Warning),
+            "error" => Some(Severity::Error),
+            _ => None,
+        }
+    }
+}
+
 /// Stable diagnostic identifiers. Design `05-diagnostics.md` §Who emits what.
 #[derive(
     Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,

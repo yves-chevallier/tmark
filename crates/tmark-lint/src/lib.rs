@@ -36,11 +36,10 @@ impl Config {
     pub fn set(&mut self, code: Code, level: &str) -> Result<(), String> {
         let level = match level {
             "off" => None,
-            "hint" => Some(Severity::Hint),
-            "info" => Some(Severity::Info),
-            "warning" => Some(Severity::Warning),
-            "error" => Some(Severity::Error),
-            other => return Err(format!("unknown lint level `{other}`")),
+            other => match Severity::parse(other) {
+                Some(severity) => Some(severity),
+                None => return Err(format!("unknown lint level `{other}`")),
+            },
         };
         self.levels.insert(code, level);
         Ok(())
