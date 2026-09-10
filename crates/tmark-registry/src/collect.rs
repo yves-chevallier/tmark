@@ -5,7 +5,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use tmark_ir::{
-    walk, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline, NodeId, NodeRef, Span,
+    plain_text, walk, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline, NodeId,
+    NodeRef, Span,
 };
 
 use crate::counters::Counters;
@@ -190,7 +191,7 @@ impl<'a> Collector<'a> {
                 });
             }
             Inline::IndexEntry(e) => {
-                let path = e.path.iter().map(|group| plain(group)).collect();
+                let path = e.path.iter().map(|group| plain_text(group)).collect();
                 self.index
                     .entries
                     .entry(e.registry.clone())
@@ -261,25 +262,6 @@ impl<'a> Collector<'a> {
         self.labels.by_id.insert(key, label.clone());
         self.labels.in_order.push(label);
     }
-}
-
-/// Plain text of inlines (index paths, glossary keys).
-pub fn plain(inlines: &[Inline]) -> String {
-    let mut out = String::new();
-    for inline in inlines {
-        match inline {
-            Inline::Str(s) => out.push_str(&s.text),
-            Inline::Code(c) => out.push_str(&c.text),
-            Inline::Emph(n) => out.push_str(&plain(&n.content)),
-            Inline::Strong(n) => out.push_str(&plain(&n.content)),
-            Inline::SmallCaps(n) => out.push_str(&plain(&n.content)),
-            Inline::Span(n) => out.push_str(&plain(&n.content)),
-            Inline::Link(n) => out.push_str(&plain(&n.content)),
-            Inline::SoftBreak(_) | Inline::Space(_) => out.push(' '),
-            _ => {}
-        }
-    }
-    out
 }
 
 /// Glossary and acronym terms: `declare.glossary`, `declare.acronyms`

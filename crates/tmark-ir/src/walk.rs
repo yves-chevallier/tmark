@@ -39,6 +39,35 @@ pub fn walk(doc: &Document, f: &mut impl FnMut(NodeRef)) {
     }
 }
 
+/// Plain text of inlines: the concatenated `Str`, code and math text with
+/// breaks as spaces and every other node dropped. Used for table column
+/// names, index paths, glossary keys, keystrokes, and outline labels.
+pub fn plain_text(inlines: &[Inline]) -> String {
+    let mut out = String::new();
+    for inline in inlines {
+        match inline {
+            Inline::Str(s) => out.push_str(&s.text),
+            Inline::Space(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) => out.push(' '),
+            Inline::Code(c) => out.push_str(&c.text),
+            Inline::Math(m) => out.push_str(&m.text),
+            Inline::Emph(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Strong(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Strikeout(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Underline(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Highlight(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Subscript(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Superscript(n) => out.push_str(&plain_text(&n.content)),
+            Inline::SmallCaps(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Quoted(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Link(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Span(n) => out.push_str(&plain_text(&n.content)),
+            Inline::Abbr(a) => out.push_str(&a.text),
+            _ => {}
+        }
+    }
+    out
+}
+
 pub fn walk_blocks(blocks: &[Block], f: &mut impl FnMut(NodeRef)) {
     for block in blocks {
         walk_block(block, f);
