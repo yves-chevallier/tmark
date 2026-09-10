@@ -10,7 +10,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use tmark::ir::{Code, LineIndex, Severity};
-use tmark::{check, format, parse, FileId, FsLoader, LintConfig, Profile, ResolveOptions};
+use tmark::{check, format, parse, Config, FileId, FsLoader, LintConfig, Profile, ResolveOptions};
 
 #[derive(Parser)]
 #[command(name = "tmark", version, about = "The TMark language toolchain")]
@@ -33,9 +33,10 @@ enum Command {
     Fmt {
         /// The files to format; `-` for standard input.
         files: Vec<PathBuf>,
-        /// `canonical` (default), `strict` or `mkdocs`.
-        #[arg(long, default_value = "canonical")]
-        profile: String,
+        /// `canonical`, `strict` or `mkdocs`; default from `tmark.toml`,
+        /// else `canonical`.
+        #[arg(long)]
+        profile: Option<String>,
         /// Exit 1 when a file is not already in normal form; print nothing.
         #[arg(long)]
         check: bool,
@@ -75,7 +76,7 @@ fn main() -> ExitCode {
             profile,
             check,
             write,
-        } => cmd_fmt(&files, &profile, check, write),
+        } => cmd_fmt(&files, profile.as_deref(), check, write),
         Command::Check {
             files,
             strict,
@@ -99,22 +100,39 @@ fn severity_name(severity: Severity) -> &'static str {
     }
 }
 
-fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
-    let mut config = LintConfig::default();
+/// The `tmark.toml` above `file`, or the defaults; a file that does not
+/// parse is a usage error.
+fn config_for(file: &std::path::Path) -> Result<Config, ExitCode> {
+    match Config::discover(file) {
+        None => Ok(Config::default()),
+        Some(Ok(config)) => Ok(config),
+        Some(Err(error)) => {
+            eprintln!("tmark: {error}");
+            Err(ExitCode::from(2))
+        }
+    }
+}
+
+/// `--level` overrides on top of the file's lint configuration.
+fn apply_levels(config: &mut LintConfig, levels: &[String]) -> Result<(), ExitCode> {
     for level in levels {
         let Some((code, value)) = level.split_once('=') else {
             eprintln!("tmark: --level takes CODE=LEVEL, got `{level}`");
-            return ExitCode::from(2);
+            return Err(ExitCode::from(2));
         };
         let Some(code) = Code::from_id(code) else {
             eprintln!("tmark: unknown diagnostic code `{code}`");
-            return ExitCode::from(2);
+            return Err(ExitCode::from(2));
         };
         if let Err(error) = config.set(code, value) {
             eprintln!("tmark: {error}");
-            return ExitCode::from(2);
+            return Err(ExitCode::from(2));
         }
     }
+    Ok(())
+}
+
+fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
     let bibliography: Vec<PathBuf> = files
         .iter()
         .filter(|f| f.extension().is_some_and(|e| e == "bib"))
@@ -134,19 +152,21 @@ fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String]) -> ExitCode {
                 continue;
             }
         };
-        let options = ResolveOptions {
-            path: file.clone(),
-            bibliography: bibliography
-                .iter()
-                .map(|b| {
-                    // `.bib` paths are given relative to the working directory;
-                    // the loader resolves them from the document's directory.
-                    let base = file.parent().unwrap_or(std::path::Path::new(""));
-                    pathdiff(b, base)
-                })
-                .collect(),
-            ..Default::default()
+        let workspace = match config_for(file) {
+            Ok(config) => config,
+            Err(code) => return code,
         };
+        let mut config = workspace.lint.clone();
+        if let Err(code) = apply_levels(&mut config, levels) {
+            return code;
+        }
+        let mut options: ResolveOptions = workspace.resolve_options(file);
+        options.bibliography.extend(bibliography.iter().map(|b| {
+            // `.bib` paths are given relative to the working directory;
+            // the loader resolves them from the document's directory.
+            let base = file.parent().unwrap_or(std::path::Path::new(""));
+            pathdiff(b, base)
+        }));
         let (_, diagnostics) = check(&text, FileId::default(), &FsLoader, &options, &config);
         let index = LineIndex::new(&text);
         let name = file.display().to_string();
@@ -246,12 +266,13 @@ fn cmd_parse(file: &PathBuf, compact: bool) -> ExitCode {
     }
 }
 
-fn cmd_fmt(files: &[PathBuf], profile: &str, check: bool, write: bool) -> ExitCode {
-    let profile = match profile {
-        "canonical" => Profile::Canonical,
-        "strict" => Profile::Strict,
-        "mkdocs" => Profile::Mkdocs,
-        other => {
+fn cmd_fmt(files: &[PathBuf], profile: Option<&str>, check: bool, write: bool) -> ExitCode {
+    let flag = match profile {
+        None => None,
+        Some("canonical") => Some(Profile::Canonical),
+        Some("strict") => Some(Profile::Strict),
+        Some("mkdocs") => Some(Profile::Mkdocs),
+        Some(other) => {
             eprintln!("tmark: unknown profile `{other}` (canonical, strict, mkdocs)");
             return ExitCode::from(2);
         }
@@ -266,6 +287,13 @@ fn cmd_fmt(files: &[PathBuf], profile: &str, check: bool, write: bool) -> ExitCo
                 failed = true;
                 continue;
             }
+        };
+        let profile = match flag {
+            Some(profile) => profile,
+            None => match config_for(file) {
+                Ok(config) => config.profile,
+                Err(code) => return code,
+            },
         };
         let parsed = if profile == Profile::Strict {
             tmark::parse_strict(&text, FileId::default())

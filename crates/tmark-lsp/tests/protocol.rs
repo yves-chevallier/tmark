@@ -276,3 +276,55 @@ fn symbols_folds_and_formatting() {
     );
     client.shutdown(handle);
 }
+
+#[test]
+fn tmark_toml_detects_markdown_and_sets_lint_levels() {
+    let dir = std::env::temp_dir().join(format!("tmark-lsp-{}", std::process::id()));
+    let docs = dir.join("docs");
+    std::fs::create_dir_all(&docs).unwrap();
+    std::fs::write(
+        dir.join("tmark.toml"),
+        "[lint]\nposition-word = \"off\"\nheading-skip = \"error\"\n",
+    )
+    .unwrap();
+    let file = docs.join("chapter.md");
+    let uri = format!("file://{}", file.display());
+    let (client, handle) = Client::start();
+    // Detected through the tmark.toml above the file: diagnostics flow.
+    client.open(
+        &uri,
+        "markdown",
+        "# One\n\n### Three\n\nSee the figure below.\n",
+    );
+    let (_, parse) = client.diagnostics(&uri);
+    assert!(parse.is_empty());
+    let (_, all) = client.diagnostics(&uri);
+    let skip = all
+        .iter()
+        .find(|d| d["code"] == "heading-skip")
+        .expect("heading-skip");
+    assert_eq!(skip["severity"], 1, "raised to error by tmark.toml");
+    assert!(
+        !all.iter().any(|d| d["code"] == "position-word"),
+        "switched off: {all:?}"
+    );
+    // A broken configuration is reported once, and the file keeps working.
+    std::fs::write(dir.join("tmark.toml"), "profile = \"nope\"\n").unwrap();
+    client.notify("workspace/didChangeWatchedFiles", json!({"changes": [{"uri": format!("file://{}", dir.join("tmark.toml").display()), "type": 2}]}));
+    loop {
+        if let Message::Notification(n) = client.recv() {
+            if n.method == "window/showMessage" {
+                assert!(n.params["message"].as_str().unwrap().contains("nope"));
+                break;
+            }
+        }
+    }
+    let (_, _) = client.diagnostics(&uri);
+    let (_, all) = client.diagnostics(&uri);
+    assert!(
+        all.iter().any(|d| d["code"] == "position-word"),
+        "defaults again: {all:?}"
+    );
+    client.shutdown(handle);
+    let _ = std::fs::remove_dir_all(&dir);
+}

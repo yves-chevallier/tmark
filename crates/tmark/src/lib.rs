@@ -5,6 +5,9 @@
 
 #![forbid(unsafe_code)]
 
+mod config;
+
+pub use config::Config;
 pub use tmark_fmt::{edit, format, NodeEdit, Profile, Replacement};
 pub use tmark_ir as ir;
 pub use tmark_ir::schema;

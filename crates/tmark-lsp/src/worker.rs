@@ -5,7 +5,6 @@
 //! the parsed document here; a request never waits for this thread.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
@@ -19,7 +18,7 @@ pub enum Job {
     Check {
         uri: Uri,
         version: i32,
-        path: PathBuf,
+        options: ResolveOptions,
         text: String,
         document: Document,
         lint: LintConfig,
@@ -78,17 +77,13 @@ fn analyse(job: Job) -> Option<Analysis> {
     let Job::Check {
         uri,
         version,
-        path,
+        options,
         text,
         document,
         lint,
     } = job
     else {
         return None;
-    };
-    let options = ResolveOptions {
-        path,
-        ..Default::default()
     };
     let resolved = tmark::resolve(&document, &FsLoader, &options);
     let mut diagnostics = resolved.diagnostics.clone();

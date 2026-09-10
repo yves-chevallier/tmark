@@ -17,6 +17,10 @@ tmark-registry = { path = "../tmark-registry", default-features = false }
 tmark-fmt = { path = "../tmark-fmt" }
 tmark-lint = { path = "../tmark-lint" }
 tmark-writers = { path = "../tmark-writers" }
+# `tmark.toml` parsing (design/08-lsp.md §Workspace); no I/O here, the
+# edges hand over the text (`Config::discover` is behind `fs`, like FsLoader).
+toml = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 serde_json.workspace = true

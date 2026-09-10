@@ -12,24 +12,24 @@ mod outline;
 mod worker;
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crossbeam_channel::{select, Receiver, Sender};
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::{
-    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
-    PublishDiagnostics,
+    DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
+    Notification as _, PublishDiagnostics, ShowMessage,
 };
 use lsp_types::request::{DocumentSymbolRequest, FoldingRangeRequest, Formatting, Request as _};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFormattingParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
-    FoldingRangeProviderCapability, InitializeParams, InitializeResult, OneOf,
-    PublishDiagnosticsParams, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextEdit, Uri,
+    FoldingRangeProviderCapability, InitializeParams, InitializeResult, MessageType, OneOf,
+    PublishDiagnosticsParams, ServerCapabilities, ServerInfo, ShowMessageParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
 };
 use tmark::ir::LineIndex;
-use tmark::{Diagnostic, Document, FileId, LintConfig, Profile, Resolved};
+use tmark::{Config, Diagnostic, Document, FileId, Profile, Resolved};
 
 use worker::{Analysis, Job};
 
@@ -82,6 +82,10 @@ struct Doc {
     /// Design ADR 0006: `.md` files that are not detected as TMark get no
     /// diagnostics.
     detected: bool,
+    language_id: String,
+    path: PathBuf,
+    /// The nearest `tmark.toml`, or the defaults.
+    config: Config,
     analysis: Option<Analysis>,
 }
 
@@ -102,8 +106,8 @@ struct Server {
     jobs: Sender<Job>,
     docs: HashMap<Uri, Doc>,
     hierarchical_symbols: bool,
-    lint: LintConfig,
-    profile: Profile,
+    /// The last configuration error shown, so that it is shown once.
+    config_error: Option<String>,
 }
 
 impl Server {
@@ -120,8 +124,7 @@ impl Server {
             jobs,
             docs: HashMap::new(),
             hierarchical_symbols,
-            lint: LintConfig::default(),
-            profile: Profile::Canonical,
+            config_error: None,
         }
     }
 
@@ -158,8 +161,7 @@ impl Server {
             DidOpenTextDocument::METHOD => {
                 let p: DidOpenTextDocumentParams = serde_json::from_value(n.params)?;
                 let d = p.text_document;
-                let detected = is_tmark(&d.language_id, &d.text, &d.uri);
-                self.update(d.uri, d.version, d.text, detected)?;
+                self.update(d.uri, d.version, d.text, d.language_id)?;
             }
             DidChangeTextDocument::METHOD => {
                 let p: DidChangeTextDocumentParams = serde_json::from_value(n.params)?;
@@ -168,11 +170,24 @@ impl Server {
                     return Ok(());
                 };
                 let uri = p.text_document.uri;
-                let detected = match self.docs.get(&uri) {
-                    Some(doc) => doc.detected,
-                    None => is_tmark("markdown", &change.text, &uri),
-                };
-                self.update(uri, p.text_document.version, change.text, detected)?;
+                let language_id = self
+                    .docs
+                    .get(&uri)
+                    .map_or("markdown".to_string(), |doc| doc.language_id.clone());
+                self.update(uri, p.text_document.version, change.text, language_id)?;
+            }
+            DidChangeWatchedFiles::METHOD => {
+                // `tmark.toml` or a `.bib` changed: every document re-reads
+                // its configuration and re-analyses.
+                let uris: Vec<Uri> = self.docs.keys().cloned().collect();
+                for uri in uris {
+                    let Some(doc) = self.docs.get(&uri) else {
+                        continue;
+                    };
+                    let (version, text, language_id) =
+                        (doc.version, doc.text.clone(), doc.language_id.clone());
+                    self.update(uri, version, text, language_id)?;
+                }
             }
             DidCloseTextDocument::METHOD => {
                 let p: DidCloseTextDocumentParams = serde_json::from_value(n.params)?;
@@ -193,9 +208,22 @@ impl Server {
         uri: Uri,
         version: i32,
         text: String,
-        detected: bool,
+        language_id: String,
     ) -> Result<(), Error> {
-        let parsed = if self.profile == Profile::Strict {
+        let path = convert::uri_to_path(&uri).unwrap_or_else(|| PathBuf::from(uri.as_str()));
+        let (config, has_config) = match Config::discover(&path) {
+            None => (Config::default(), false),
+            Some(Ok(config)) => (config, true),
+            Some(Err(error)) => {
+                if self.config_error.as_deref() != Some(&error) {
+                    self.show_message(MessageType::WARNING, error.clone())?;
+                    self.config_error = Some(error);
+                }
+                (Config::default(), true)
+            }
+        };
+        let detected = is_tmark(&language_id, &text, has_config);
+        let parsed = if config.profile == Profile::Strict {
             tmark::parse_strict(&text, FileId::default())
         } else {
             tmark::parse(&text, FileId::default())
@@ -207,6 +235,9 @@ impl Server {
             document: parsed.document,
             parse_diagnostics: parsed.diagnostics,
             detected,
+            language_id,
+            path,
+            config,
             analysis,
             version,
             text,
@@ -215,10 +246,10 @@ impl Server {
             let _ = self.jobs.send(Job::Check {
                 uri: uri.clone(),
                 version,
-                path: convert::uri_to_path(&uri).unwrap_or_else(|| PathBuf::from(uri.as_str())),
+                options: doc.config.resolve_options(&doc.path),
                 text: doc.text.clone(),
                 document: doc.document.clone(),
-                lint: self.lint.clone(),
+                lint: doc.config.lint.clone(),
             });
         }
         self.docs.insert(uri.clone(), doc);
@@ -261,6 +292,13 @@ impl Server {
             .filter_map(|d| convert::diagnostic(uri, &doc.index, file, d))
             .collect();
         self.send_diagnostics(uri.clone(), diagnostics, Some(doc.version))
+    }
+
+    fn show_message(&self, typ: MessageType, message: String) -> Result<(), Error> {
+        let params = ShowMessageParams { typ, message };
+        self.sender
+            .send(Notification::new(ShowMessage::METHOD.into(), params).into())?;
+        Ok(())
     }
 
     fn send_diagnostics(
@@ -331,7 +369,7 @@ impl Server {
         let Some(doc) = self.docs.get(uri) else {
             return serde_json::Value::Null;
         };
-        let formatted = tmark::format(&doc.document, self.profile);
+        let formatted = tmark::format(&doc.document, doc.config.profile);
         let edits: Vec<TextEdit> = if formatted == doc.text {
             Vec::new()
         } else {
@@ -359,13 +397,10 @@ fn with_params<P: serde::de::DeserializeOwned>(
 
 /// ADR 0006: `tmark` files always; Markdown when the front matter has a
 /// `press` key or a `tmark.toml` sits in a directory above the file.
-fn is_tmark(language_id: &str, text: &str, uri: &Uri) -> bool {
+fn is_tmark(language_id: &str, text: &str, has_config: bool) -> bool {
     match language_id {
         "tmark" => true,
-        "markdown" => {
-            has_press_key(text)
-                || convert::uri_to_path(uri).is_some_and(|p| find_config(&p).is_some())
-        }
+        "markdown" => has_config || has_press_key(text),
         _ => false,
     }
 }
@@ -385,14 +420,6 @@ fn has_press_key(text: &str) -> bool {
         }
     }
     false
-}
-
-/// The nearest `tmark.toml` above `path`.
-fn find_config(path: &Path) -> Option<PathBuf> {
-    path.ancestors()
-        .skip(1)
-        .map(|dir| dir.join("tmark.toml"))
-        .find(|candidate| candidate.is_file())
 }
 
 /// Requests need an id; notifications do not. Kept for the tests.
