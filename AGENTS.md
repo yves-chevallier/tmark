@@ -11,6 +11,9 @@ human. It is deliberately short. The design documents carry the detail.
 3. Read the design document and the ADRs of the part you touch.
 4. Check `design/11-roadmap.md` for the milestone you are in and its
    definition of done. Do not start a later milestone's work early.
+5. Read `design/13-handoff.md`: the previous agent's state, self-critique
+   and review mandates. Run the reviews it asks for before building on
+   the crates they concern.
 
 ## Principles, in priority order
 
