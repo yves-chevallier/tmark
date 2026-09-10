@@ -20,12 +20,19 @@ order:
    which builds it in release mode with cargo);
 3. `tmark-lsp` on the `PATH`.
 
-Features today: parse diagnostics as you type, resolve and lint diagnostics
-150 ms after the last change, the outline (headers, captions, containers,
-counter items), folding (front matter, containers, fences, header sections),
-and *Format Document* (the canonical form of `tmark fmt`). The command
-**TMark: Restart Language Server** restarts it; `tmark.trace.server` logs the
-protocol in the *TMark* output channel.
+Features: parse diagnostics as you type, resolve and lint diagnostics
+150 ms after the last change (included files get theirs under their own
+file), the outline (headers, captions, containers, asides, counter items),
+folding, *Format Document* (the canonical form of `tmark fmt`), semantic
+highlighting of the resolution state (unresolved references and unknown
+roles are underlined), completion (`@` labels, citations, glossary terms;
+`{` roles and their keys; `{.` classes; `:::` admonitions; fence node words;
+`{{` front-matter paths; image and include paths; front-matter keys, merged
+with the `press` schema named in `tmark.toml`), go to definition,
+references, rename (across includes), hover, document links, and quick
+fixes for deprecated spellings. The command **TMark: Restart Language
+Server** restarts it; `tmark.trace.server` logs the protocol in the *TMark*
+output channel.
 
 ## What gets highlighted
 
