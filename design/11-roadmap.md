@@ -76,6 +76,19 @@ generator moves to `tmark-ir`.
   `@` and `{`, formats on save, shows unresolved references, and renames a
   label across a two-file document with an include.
 
+Status (2026-09-10): the server implements diagnostics (parse at once,
+resolve and lint after a 150 ms debounce), document symbols, folding,
+formatting, semantic tokens (resolution state), completion (`@`, `{`, role
+keys, `:::`, fence node words, front-matter keys), definition, references,
+rename across an include, hover, document links, quick fixes for
+deprecated spellings, `tmark.toml`; the extension bundles the binary and
+packages as a `.vsix` (verified with `vsce`, not yet installed in a VS Code
+session by a person). The grammar tables come from `tmark-ir`. Open: the
+front-matter completion does not merge an external `press` schema (the
+`[press] schema` key is parsed, unused); included files get no diagnostics
+of their own; `lint --fix` and the code actions cover `deprecated` only.
+See `13-handoff.md`.
+
 ## M4 — Writers and preview
 
 Crates: `tmark-writers` (LaTeX, Typst, HTML, CommonMark profiles), the

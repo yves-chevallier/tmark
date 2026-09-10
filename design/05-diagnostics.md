@@ -36,12 +36,16 @@ configure.
 ## Rules
 
 ```rust
+pub struct Context<'a> { pub doc: &'a Document, pub resolved: &'a Resolved, pub text: &'a str }
+
 pub trait Rule {
     fn code(&self) -> Code;
-    fn default_severity(&self) -> Severity;
-    fn check(&self, doc: &Document, res: &Resolved, out: &mut Vec<Diagnostic>);
+    fn check(&self, ctx: &Context, out: &mut Vec<Diagnostic>);
 }
 ```
+
+The severity comes from `Code::default_severity`, overridden by the
+configuration.
 
 One file per rule under `crates/tmark-lint/src/rules/`, registered in a
 `const RULES: &[&dyn Rule]`. A rule is pure and stateless. A rule that needs
@@ -83,8 +87,19 @@ spelling is safe, guessing a label for an unresolved reference is not.
   (milestone 5); `deprecated-frontmatter-key` and `role-unknown` are emitted
   by the parser, not by a rule.
 - `Config` maps a `Code` to `off | hint | info | warning | error`; the CLI
-  takes `--level code=level`. `tmark.toml` is a milestone-3 item with the
-  language server.
+  takes `--level code=level` and the `[lint]` table of `tmark.toml`
+  (`tmark::Config`, milestone 3).
+
+## Implementation notes (milestone 3)
+
+- Fixes exist for `deprecated`: `tmark::fixes` finds the node whose span is
+  the diagnostic's and reprints it canonically (`tmark_fmt::print_node`).
+  The language server offers them as quick fixes; `tmark lint --fix`
+  applies them last-first. No other code carries a fix yet; the spec
+  conformance audit (`reviews/02`) lists deprecation rows that emit no
+  diagnostic at all (D5–D8).
+- `ref-unresolved` is reported on the key token (`RefItem.key_span`), not
+  on the whole `@[…]` group.
 - `Code` gained `ALL` and `from_id` (the CLI and the LSP parse codes).
 - `tmark check FILE… [.bib…] [--strict] [--level …]` prints parse, resolve
   and lint diagnostics and exits 1 on errors (warnings under `--strict`);

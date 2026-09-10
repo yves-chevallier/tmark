@@ -63,3 +63,55 @@ contributes the injected grammar and stays quiet (no diagnostics on a README).
   not open (the workspace folder is the boundary).
 - Every request is answered from the last complete snapshot; a request never
   waits for a parse.
+
+## Implementation notes (milestone 3)
+
+Decisions taken in `crates/tmark-lsp` that refine the text above.
+
+- **Shape.** `run(connection)` in the library, `main.rs` only opens stdio,
+  so the tests drive the server over `Connection::memory()`
+  (`tests/protocol.rs`). The main loop `select!`s over the client's channel
+  and the worker's result channel. Full text sync: a change replaces the
+  text, the main loop parses (`tmark::parse_with` with the profile of the
+  nearest `tmark.toml`) and publishes parse diagnostics with fixes attached;
+  the worker (`worker.rs`) runs `tmark::analyse` 150 ms after the last
+  change and returns `Resolved` plus the resolve and lint diagnostics. A
+  result older than the document's version is dropped. Every request reads
+  the store on the main loop; navigation and completion use the last
+  analysis even when it is one version behind (a stale list beats none).
+- **Measured.** The parser runs at about 510 ms/MB in release on this
+  machine (spec ×14, 1 MB; the tokenizer alone is 500 of those), so a
+  100 KB chapter costs 50 ms per keystroke on the main loop and a 1 MB file
+  half a second. Acceptable for M3; the performance mandate of
+  `13-handoff.md` (profiling, incremental sync) was not run.
+- **Detection (ADR 0006).** `tmark` language id always; `markdown` when
+  the front matter has a top-level `press:` line or a `tmark.toml` sits
+  above the file. Undetected Markdown gets no diagnostics but answers
+  structural requests. The client sends every Markdown document.
+- **Positions.** `convert.rs`: `LineIndex` both ways, `file:` URIs to
+  paths and back (percent-encoding, Windows drive letters). Included files
+  are located through `Resolved.files`; their text is read from disk for
+  rename edits (an unsaved editor buffer of an included file is not seen).
+- **Sub-spans.** Completion ranges come from the text at the cursor (a key
+  being typed is not a node). Definition, references, rename and hover use
+  `RefItem.key_span`, `Label.id_span` and `CounterItem.key_span` (IR review
+  C1–C3); a rename is a `WorkspaceEdit` of those tokens, never a reprint.
+  Labels are looked up by id, not by node id: node ids restart in every
+  included file.
+- **Semantic tokens.** Six custom types mapped to the grammar's scopes in
+  `package.json` (`semanticTokenScopes`): `reference`,
+  `unresolvedReference`, `citation`, `label`, `unknownRole`, `deprecated`.
+  One token per line; the server sends `workspace/semanticTokens/refresh`
+  when an analysis lands.
+- **Outline.** Headers nest by level and own their section; captions,
+  figures, admonitions, divs, includes and counter items are symbols. A
+  `::: aside` (`Para([Aside])`) and a generated image are not listed or
+  folded yet (three lines in `outline.rs`, IR review §2–3).
+- **Configuration.** `tmark::Config` from the nearest `tmark.toml`
+  (profile, bibliography, `[lint]`, `[press] schema`); re-read for every
+  open document on `workspace/didChangeWatchedFiles`; a broken file is
+  reported once through `window/showMessage`. The `press` schema path is
+  parsed but not yet merged into front-matter completion.
+- **Not done.** Range formatting; diagnostics for included files; hover on
+  front-matter keys; completion of `{.` classes, image paths and `{{`
+  paths; the `press` schema merge; incremental text sync.

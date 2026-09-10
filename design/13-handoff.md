@@ -1,195 +1,148 @@
-# 13 — Handoff notes (end of milestones 1 and 2)
+# 13 — Handoff notes (milestone 3, first pass)
 
-Written by the agent that implemented M1 and M2, for the agent that takes
-over. Read `AGENTS.md`, then this file, then `11-roadmap.md`. Everything
-below is opinion from the inside of the work: verify it, do not trust it.
+Written by the agent that implemented most of M3 on top of M1–M2, for the
+agent that takes over. Read `AGENTS.md`, then this file, then
+`11-roadmap.md`, then `design/reviews/`. Everything below is opinion from
+the inside of the work: verify it, do not trust it.
 
 ## State of the repository
 
-- `main` at commit `97ce734` (2026-09-10), workspace green: `cargo test
-  --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`,
-  `cargo fmt --check`. Not pushed at the time of writing; the owner pushes.
-- Working crates: `tmark-ir`, `tmark-markdown` (vendored fork),
-  `tmark-syntax`, `tmark-fmt`, `tmark-registry`, `tmark-lint`, `tmark`
-  (facade), `tmark-cli` (`parse`, `fmt`, `check`, `lint`, `schema`).
-  Skeletons only: `tmark-writers`, `tmark-lsp`, `tmark-py`, `tmark-wasm`.
-- 38 conformance fixtures under `spec/conformance/`; the runner is
-  `crates/tmark/tests/conformance.rs`; `scripts/fixture-ir.py` regenerates
-  `ir` blocks from the parser (review every diff, it prints the parser's
-  opinion, not the truth).
-- M1 is complete except one criterion that depends on TeXSmith (caption
-  line after a table, see `11-roadmap.md`). M2 is complete.
+- `main`, workspace green: `cargo test --workspace`, `cargo clippy
+  --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`,
+  `npm test` in `editors/vscode`. Not pushed; the owner pushes.
+- New since M2: `tmark-lsp` (server library plus binary, `crates/tmark-lsp`),
+  the VS Code client (`editors/vscode/src/extension.js`, esbuild bundle,
+  `bin/tmark-lsp` bundled by `npm run bundle:server`, `.vsix` verified
+  with `vsce`), `tmark::Config` (`tmark.toml`), `tmark::parse_with`,
+  `tmark::analyse`, `tmark::fixes`, `tmark lint --fix`, sub-spans in the IR
+  (`SubSpan`: `RefItem.key_span`, `Attrs.id_span`, `CounterItem.key_span`),
+  `tmark_ir::structural_json` (the one fixture normaliser), `find` and
+  `nodes_at`, `plain_text` in `tmark-ir`, `Severity::as_str/parse`, the
+  `fs` feature as a real opt-in, the grammar tables exported from
+  `tmark-ir` (`examples/registries.rs` → `scripts/registries.json`).
+- Reviews under `design/reviews/`: `02-spec-conformance.md`,
+  `04-ir-review.md`, `05-architecture.md` were run and acted on (see
+  below). **Mandates 1 (parser adversary), 3 (printer critic) and 6
+  (performance) were not run**: the reviewer agents died on usage limits
+  twice. Run them before M4 touches `tmark-fmt` and `tmark-markdown`; the
+  prompts are in the previous version of this file (`git show
+  f3443a6:design/13-handoff.md`).
 
-## Retrospective mandates: review this work before building on it
+## What the reviews said and what was done
 
-The work was done fast, by one agent, with the tests it chose itself. Spawn
-reviewers with these mandates *before* M3 touches the crates they depend on.
-Each mandate says what to attack and how to report (a list of findings with
-a minimal input each, filed as fixtures or issues, not fixed silently).
+From `04-ir-review.md` (all five changes landed): C1–C3 sub-spans, C4
+`structural_json` + `SUGAR_FIELDS`, C5 `LineIndex` fixes (snap inside a
+multibyte character, clamp before the line break; `line_end` added). Also
+done from its side findings: each `AbbrDef` owns its line; `print_node`
+exposed by `tmark-fmt`. Not done: node ids are not pre-order/dense
+(`03-ir.md` §Identity overclaims; either fix the three allocation sites in
+`tmark-syntax` or weaken the doc); `#id` on fence info strings is dropped
+(spec question, `reviews/02` D2); `edit()` is single-shot and returns a
+`String`.
 
-1. **Parser adversary** (`tmark-markdown` + `tmark-syntax`). Attack the
-   TMark constructs with the CommonMark edge cases they interleave with:
-   links inside groups inside links, attributes after images inside
-   emphasis, `@` next to punctuation of every Unicode class, `#[` at line
-   starts inside lists and block quotes, nested containers of equal length
-   in lists, tabs instead of spaces in admonition bodies, CRLF files,
-   fences of tildes, empty groups, `{}` and `{{}}`, roles split across a
-   soft break. Check every span against `is_char_boundary` and against the
-   source slice it claims. Report as fixtures.
-2. **Spec conformance auditor**. Take `spec/tmark.md` construct by construct
-   (§Node catalogue, §Lexical grammar, Appendix PyMdownX, Appendix
-   Deprecations) and list what the parser and printer do differently from
-   the text, beyond the entries already in `12-spec-challenges.md` and the
-   "Implementation notes" sections of `02`, `03`, `04`, `05`, `06`. Known
-   gaps to confirm: grid tables, critic markup, progress bars, wiki links,
-   inline footnotes `^[…]`, fancy list styles, `Space` nodes never emitted,
-   `Quoted` never produced, strict profile only partially implemented,
-   `Mkdocs` profile a stub, footnote-versus-citation shadowing absent.
-3. **Printer critic** (`tmark-fmt`). The escaping in `escape.rs` was
-   written by a previous agent and adjusted by tests until the round-trip
-   held on two documents; it is likely over-escaping in prose (`\@`, `\#`,
-   `\{` where nothing would fire) and may under-escape in places the
-   fixtures do not cover (YAML tables with Markdown in cells, pipe cells
-   with `|` inside code, attribute values with quotes, `]` inside role
-   groups). Run the round-trip on a large corpus (the TeXSmith docs under
-   `/home/ycr/texsmith/docs`, ~95 pages) and count the escapes the printer
-   adds to plain prose; every unnecessary one is a diff a user will hate.
-4. **IR reviewer** (`tmark-ir`). Question the decisions listed in
-   `03-ir.md` §Implementation notes: `Meta::eq` always true (surprising for
-   anyone hashing nodes), generated images carried as `Image` attributes
-   (`generate=`, `code=`), asides as `Para([Aside])`, `DefinitionList.items`
-   as a tuple, sub-spans absent (the LSP will want the span of a reference
-   key and of an attribute id). Propose the minimal changes M3 needs and no
-   more.
-5. **Architecture reviewer**. Check the purity rule and the dependency
-   graph against `01-architecture.md`: `FsLoader` sits in `tmark-registry`
-   behind a feature (a deliberate deviation, documented in `06`), the
-   facade's `check` composes three stages; is anything else leaking? Is
-   `tmark-writers` still the right home for the CommonMark writer given
-   that `tmark-fmt` *is* that writer? Challenge the crate count (eleven)
-   against KISS.
-6. **Performance investigator**. The vendored tokenizer runs at ~700 ms/MB
-   in release, identical with plain GFM options, so the cost is upstream
-   markdown-rs, not the TMark constructs. Profile it (`perf`, `cargo
-   flamegraph`) before M3 decides whether the LSP re-parses whole files;
-   check whether the release profile applies to the vendored crate and
-   whether `to_mdast` position bookkeeping dominates.
+From `05-architecture.md`: A1 (feature gate), A2 (documented in `01`), A5
+(dependency comments), A6 (severity words), C3 (`analyse`, `parse_with`),
+A4 (grammar tables from `tmark-ir`) done. Not done: A3 (the caption-kind ↔
+prefix mapping is now `CaptionKind::prefix()` in `tmark-ir` but
+`tmark-lint::caption_id`, `collect.rs` and the heading-class list still
+spell their own copies — small, do it); B4 (inventory schema, `tmark
+schema inventory`, M4); C4 (drop `tmark-writers → tmark-fmt`, decide at
+M4); the `ResolveOptions.bibliography` relativisation duplicated in the
+CLI and `Config` (`pathdiff`/`relative_to`); `has_press_key` re-scans the
+front matter in the LSP instead of reading `Document.front_matter`.
 
-## Self-critique the reviewers should start from
+From `02-spec-conformance.md`: nothing fixed in code, by mandate. Its
+ranking for M3 is the to-do list of the next pass; C18–C24 were added to
+`12-spec-challenges.md`. The one I checked myself: D13 (anchors with an
+undeclared prefix do not resolve) is the spec's lookup rule, not a bug —
+now C24.
 
-- Fixture `ir` blocks were generated by the parser and reviewed by eye by
-  the same agent that wrote the parser. They encode its behaviour, not an
-  independent expectation. The `canonical` blocks were written by hand
-  against the design, which is better, but two of them were changed to
-  follow the printer (pipe table padding, `title=Folded` unquoted).
-- The property tests check totality and round-trip, not correctness:
-  `parse(format(doc)) == doc` holds for documents the parser *already*
-  produced; a document it mis-parses round-trips happily.
-- The X4 guard, the Pandoc citation form and the `\(…\)` construct were
-  added late with narrow tests.
-- `tmark-lint` rules are regex-free hand scanners; `hardcoded-number` is
-  English-only (label words) and `position-word` will fire on innocent
-  prose ("the code below"): both are hints, but their false-positive rate
-  was never measured.
-- The `Resolution` of cross-document references matches `alias:prefix:key`
-  before checking whether `alias` could be a counter prefix; a user counter
-  named like an alias would be shadowed (declared aliases win). Decide and
-  document, or reject the collision at declaration time.
-- Numbering of predeclared backend series (`fig`, `tbl`, …) is deliberately
-  absent (the backend numbers); the MkDocs companion will want it. The
-  design says so, nobody has checked it is enough.
-- `edit()` splices text by span but does not re-escape for context; a
-  replacement `Str` starting with `#` at line start would print as a
-  heading. Fine for the LSP's structured edits (references, labels), wrong
-  for arbitrary text.
+## What M3 still lacks (against `11-roadmap.md` §M3 and `08-lsp.md`)
 
-## Plan of attack for M3 (language server and editor)
+1. **A person installing the `.vsix` and trying it.** Everything is tested
+   over the in-memory connection and the binary over stdio; nobody has
+   opened VS Code. Expect small things: activation on `.md` files without
+   `press` (the client sends them all; the server stays quiet — check
+   that VS Code does not show "TMark" errors for a README), the output
+   channel, the restart command.
+2. **`press` schema merge** into front-matter completion (`Config.press_schema`
+   is parsed, unused). `completion::front_matter` walks `tmark::schema("frontmatter")`;
+   merge the external JSON schema's `properties` under `press` and offer
+   its keys.
+3. **Diagnostics for included files** (`08-lsp.md` says per file). The
+   analysis has the spans with `FileId(n)` and `Resolved.files`; publish a
+   `PublishDiagnostics` per included path (`convert::path_to_uri`).
+4. **Outline and folding** for `Para([Aside])` and generated images
+   (IR review §2–3).
+5. **Completion** of `{.` classes seen in the document, image paths
+   (needs `Loader::list`, or `std::fs::read_dir` at the edge), `{{` paths
+   from the front matter.
+6. **Range formatting** (whole-document diff) and incremental text sync if
+   the 1 MB case matters.
+7. **Fixes beyond `deprecated`**: the audit's D5–D8 rows emit nothing;
+   `caption-id-off-convention` could offer the conventional prefix;
+   `deprecated-frontmatter-key` could move the key under `press`.
+8. **Editor polish**: per-platform download of the binary (only the
+   bundled or PATH binary today), `LICENSE` file for `vsce`, a changelog
+   entry when released, the `TMARK_DEV` variable in `launch.json` is
+   unused.
 
-Design: `08-lsp.md`. Suggested order, each step shippable:
+## Plan of attack for M4 (writers and preview)
 
-1. **`tmark-lsp` skeleton with `lsp-server` + `lsp-types` (ADR 0007)**:
-   initialise, open/change/close, publish parse diagnostics immediately and
-   resolve+lint diagnostics after a 150 ms debounce on a worker thread.
-   `LineIndex::to_utf16` already exists for positions. Test with the
-   `lsp-server` connection in-process (send JSON, assert notifications).
-2. **Document symbols and folding** from the IR (headers, captions,
-   containers, counter items). Cheap, visible, validates the plumbing.
-3. **Formatting** (`textDocument/formatting`, `rangeFormatting` via whole
-   document diff): `tmark::format`. Range formatting can wait.
-4. **Semantic tokens**: node kinds first; then overlay resolution state
-   (unresolved reference, unknown role, deprecated) from `Resolved.refs`
-   and the diagnostics. Keep the TextMate grammar; tokens are an overlay.
-5. **Completion**: `@` → `Resolved.labels`, `bibliography`, `glossary`,
-   inventories, with kind and preview; `{` → `tmark_ir::registry::ROLES`;
-   role keys; `:::` → admonition names plus `figure`, `aside`; front matter
-   → `tmark::schema("frontmatter")`. Completion needs sub-spans of
-   reference keys for replacement ranges: add them to `RefItem` (see the IR
-   review mandate) rather than re-scanning text.
-6. **Navigation**: definition and references through `Resolved.labels`
-   and `Resolved.refs`; rename through `tmark::edit` (one `NodeEdit` per
-   occurrence; group them into a `WorkspaceEdit`).
-7. **Code actions**: apply `Fix`es. Today no diagnostic carries a `Fix`;
-   the natural first fixes are deprecated spellings (the printer knows the
-   canonical form: build the fix in `tmark-syntax` by printing the lowered
-   node with `tmark-fmt`, which creates a dependency `syntax → fmt` the
-   architecture forbids; do it in the facade instead: `tmark::fixes(doc,
-   diagnostics)`).
-8. **`tmark.toml`** (profile, lint levels, `press` schema path, include
-   bases): a small `serde` struct in the facade, read by the CLI and the
-   LSP; no new crate.
-9. **Editor** (`editors/vscode`): LSP client (`vscode-languageclient`),
-   download-or-bundle of the binary per platform (copy `ruff`'s approach),
-   `tmark.serverPath` setting for development; move the TextMate generator
-   from Python to `cargo run -p tmark-ir --example grammar` so role names,
-   node words and prefixes come from the registries (SSOT). Keep the
-   existing `npm test` harness; extend `sample.md` as constructs land.
-10. **File detection** per ADR 0006: `.tm`, `.tmd`, `.tmark`, or `.md`
-    with a `press` key in the front matter or a `tmark.toml` in the
-    workspace; no diagnostics on undetected `.md`.
+Design: `07-writers.md`, with the architecture review's C4 amendment
+(no CommonMark writer: `Profile::Mkdocs` in `tmark-fmt`; `tmark-writers`
+holds `Writer`, `Body`, `Requires`, `SourceMap`, `html`, `latex`, `typst`).
+Suggested order: HTML writer first (the CommonMark suite compares HTML,
+`10-testing.md` §2, and the LSP preview can show it), then LaTeX against
+TeXSmith's output on its docs, then Typst with the in-process preview
+(ADR 0005). Before starting: run the three missing reviews; the printer
+critic's over-escaping count decides whether `tmark fmt` is ready to
+touch TeXSmith's corpus, and the parser adversary decides whether the
+totality property test is enough.
 
-Definition of done is in `11-roadmap.md` §M3; add: the LSP never blocks
-on a request (snapshot reads), and a 1 MB file does not freeze the editor
-(measure; the parser's 700 ms/MB matters here, see mandate 6).
+## Pitfalls learned this pass
 
-## Pitfalls learned, so the next agent does not relearn them
-
-- **vscode-textmate**: `\G` only advances after a `begin` match, never
-  after a `match` rule, so a rule that opens a line (caption, definition,
-  task marker) must be `begin`/`end` to `$` or the paragraph loses inline
-  highlighting. Rules that `include` a grammar the registry cannot load are
-  silently dropped in the test harness (stub missing grammars).
-- **markdown-rs internals**: one `consume()` per state function (the
-  tokenizer asserts it); `attempt` restores on `Nok`; `check` never
-  consumes; constructs that span lines must set `concrete = true` and use
-  `NonLazyContinuationStart`; `to_mdast` retokenises captures with the
-  *stack's* scopes, so capture-0 names do not reach nested captures;
-  `Constructs` flags are the only switch, keep every TMark construct
-  `Nok` when its flag is off (the CommonMark suite runs with them off).
-- **Edition 2018 in the vendored crate**: no implicit format args in
-  `panic!`, `[lints.clippy]` allows in `Cargo.toml` rather than crate
-  attributes, `doctest = false` because the doc examples import
-  `markdown::`.
-- **Python patch scripts against rustfmt**: anchors break after every
-  `cargo fmt`; use `cargo fmt` before patching or match on smaller anchors.
-  Several rounds were lost to this.
-- **Fixture files with nested fences** need four-backtick outer fences;
-  both loaders (`conformance.rs`, `fixture-ir.py`) accept fences of any
-  length ≥ 3 and close on a fence at least as long.
-- **Sugar-recording fields** (`Caption.position`, `Ref.bracketed`) are
-  excluded from IR comparisons everywhere (runner, round-trip test,
-  regeneration script); a new one must be added to all three `SUGAR_FIELDS`
-  lists (a DRY violation worth fixing: put the list in `tmark-ir`).
-- **TeXSmith comparison**: `uv run texsmith FILE -o DIR` (a directory) from
-  `/home/ycr/texsmith`; the Docker/Playwright diagram backends are not
-  needed for the spec.
+- **The shell.** `cargo` is not on `PATH` in the agent's non-interactive
+  shell: `export PATH=$HOME/.cargo/bin:$PATH`. zsh expands a bare `=====`
+  as a command. The `rtk` hook filters command output aggressively (test
+  results and clippy findings vanish); prefix with `rtk proxy` to see
+  everything, and read `~/.local/share/rtk/tee/*.log` when in doubt.
+- **`rustfmt` versus Python patch scripts, again.** Every `cargo fmt` moves
+  the anchors; patch, then format, then verify with a build — never
+  format between writing a patch script and running it. Two commits in
+  this pass were amended because a patch silently failed after a format.
+- **`serde_json` `preserve_order`.** `Value::Object` is an `IndexMap`;
+  `Map::remove` swaps the last key into the hole, `shift_remove` keeps
+  order. `structural_json` depends on this to leave the fixtures' key
+  order untouched.
+- **`lsp_types::Uri` has interior mutability**; clippy refuses it as a map
+  key (`mutable_key_type`). Key maps by `uri.as_str()` and keep the `Uri`
+  in the value; `WorkspaceEdit.changes` is built at the end by `collect`.
+- **Node ids restart in every included file.** `Resolution::Label { target }`
+  alone does not identify a label; look labels up by id (`Labels::get`).
+- **`walk`'s `NodeRef` lifetime** is now tied to the document
+  (`walk<'a>(doc: &'a Document, f: impl FnMut(NodeRef<'a>))`), which is what
+  lets `find` and `nodes_at` return nodes. Closures that collected
+  `NodeRef`s before could not.
+- **The counter item deprecation message** says "write `#(prefix:key)`"
+  while the canonical spelling (and the fix) is `{counter}(prefix:key)`.
+  Harmless, but pick one.
+- **Reviewer agents and usage limits.** Six parallel reviewers were killed
+  by a session limit, then three by an "out of credits" error on the
+  second attempt. Launch them two at a time, and write the report file
+  early and incrementally so a kill loses less.
 
 ## Commands
 
 ```sh
+export PATH=$HOME/.cargo/bin:$PATH
 cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check
-cargo run -q -p tmark-cli -- check spec/tmark.md
-cargo run -q -p tmark-cli -- fmt --check spec/tmark.md        # reports "not in normal form": expected
+cargo run -q -p tmark-ir --example schema && cargo run -q -p tmark-ir --example registries && git diff --exit-code
 cargo build -p tmark-syntax --example dump && python3 scripts/fixture-ir.py   # then review the diff
-cargo run --release -p tmark-syntax --example bench -- spec/tmark.md
-(cd editors/vscode && npm install && npm test)
+cargo run -q -p tmark-cli -- check spec/tmark.md
+cargo run -q -p tmark-cli -- lint --fix FILE
+cargo run -q -p tmark --example fixes -- FILE                                  # what --fix would do
+cargo run --release -q -p tmark-syntax --example bench -- spec/tmark.md
+(cd editors/vscode && npm install && npm test && npm run build:grammar && npm run bundle:server && npm run package)
+code --install-extension editors/vscode/vscode-tmark-0.1.0.vsix
 ```

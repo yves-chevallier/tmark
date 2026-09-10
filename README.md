@@ -18,7 +18,7 @@ This repository is the home of the **language and its core toolchain**:
 | `design/decisions/` | Architecture decision records. Settled questions; do not reopen without a new ADR. |
 | `design/13-handoff.md` | Notes from the agent that built M1 and M2: state, self-critique, review mandates, plan for M3, pitfalls. Start here when taking over. |
 | `crates/` | The Rust workspace, one crate per responsibility (skeleton; see `design/01-architecture.md`). |
-| `editors/vscode/` | The VS Code extension: TextMate grammar today, language-server client tomorrow. |
+| `editors/vscode/` | The VS Code extension: TextMate grammar and the client of `tmark-lsp`. |
 
 The core is **pure**: text in, tree or text out, no I/O, no network, no
 external tool, no template. Everything that touches the world (includes,

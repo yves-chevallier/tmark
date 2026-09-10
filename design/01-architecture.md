@@ -63,19 +63,39 @@ still points at the author's text (`03-ir.md` §Identity).
 
 ## The facade
 
-`tmark` exposes exactly these entry points, all pure:
+`tmark` exposes these entry points (the code is the reference; this list
+says what belongs here):
 
 ```rust
-pub fn parse(text: &str, file: FileId) -> Parsed;              // Document + diagnostics
-pub fn resolve(doc: &Document, loader: &dyn Loader) -> Resolved; // Registries + diagnostics
-pub fn lint(doc: &Document, res: &Resolved) -> Vec<Diagnostic>;
+pub fn parse(text: &str, file: FileId) -> Parsed;                        // Document + diagnostics
+pub fn parse_strict(text: &str, file: FileId) -> Parsed;                 // X-class constructs off
+pub fn parse_with(text: &str, file: FileId, profile: Profile) -> Parsed; // the profile → parser switch
+pub fn resolve(doc: &Document, loader: &dyn Loader, options: &ResolveOptions) -> Resolved;
+pub fn lint(doc: &Document, res: &Resolved, text: &str, config: &LintConfig) -> Vec<Diagnostic>;
+pub fn analyse(doc, text, loader, options, lint) -> (Resolved, Vec<Diagnostic>); // resolve + lint
+pub fn check(text, file, profile, loader, options, lint) -> (Document, Vec<Diagnostic>); // parse + analyse + fixes
+pub fn fixes(doc: &Document, diagnostics: &mut [Diagnostic]);          // deprecated → canonical
 pub fn format(doc: &Document, profile: Profile) -> String;
-pub fn write(doc: &Document, res: &Resolved, backend: Backend, opts: &WriterOptions) -> Body;
-pub fn edit(text: &str, doc: &Document, edit: NodeEdit) -> String; // local splice
+pub fn edit(text: &str, doc: &Document, edit: NodeEdit) -> String;      // local splice
+pub fn print_node(node: NodeRef) -> String;                             // one node, canonical
+pub fn schema(name: &str) -> Option<serde_json::Value>;                 // "ir", "frontmatter"
+pub struct Config;  // tmark.toml: Config::parse(text, dir); Config::discover(path) behind `fs`
 ```
 
-Anything else a binding needs is a composition of these. Bindings do not
-reach into lower crates.
+`write` arrives with milestone 4. Anything else a binding needs is a
+composition of these. Bindings do not reach into lower crates: `tmark::ir`
+re-exports `tmark-ir`, and `Resolved`, `Label`, `RefResolution`,
+`Resolution`, `Host` are re-exported for navigation.
+
+**Feature `fs`.** `FsLoader` and `Config::discover` are the only functions
+in the core that touch the file system; both are absent without the
+feature. `tmark-registry` and `tmark` have it off by default so that
+feature unification through `tmark-lint` and `tmark-writers` cannot switch
+it on; `tmark`'s default turns it on for the native edges (CLI, LSP, PyO3),
+and `tmark-wasm` depends on `tmark` without defaults.
+
+The purity rule applies to library targets; examples and integration tests
+may read the repository.
 
 ## Boundaries that are traits
 
@@ -93,11 +113,13 @@ seems necessary, write the ADR first.
 
 ## Dependencies policy
 
-Allowed in the core: `serde`, `serde_json`, `schemars`, `unicode-*` crates,
-`memchr`, a YAML parser (`serde_yaml` successor of the day), a BibTeX parser
-(`biblatex`), and the vendored CommonMark machinery (ADR 0002). Edges may add
-`clap`, `lsp-server`/`lsp-types`, `pyo3`, `wasm-bindgen`, `typst` (milestone
-4). Nothing async in the core. No `regex` in the parser hot path: constructs
+Allowed in the core: `serde`, `serde_json` (with `preserve_order`, so that
+`structural_json` and the fixtures keep field order), `schemars`,
+`unicode-*` crates, `memchr`, a YAML parser (`serde_yaml` successor of the
+day), a BibTeX parser (`biblatex`), `toml` (facade only, for `tmark.toml`),
+and the vendored CommonMark machinery (ADR 0002). Edges may add `clap`,
+`lsp-server`/`lsp-types`/`crossbeam-channel`, `pyo3`, `wasm-bindgen`,
+`typst` (milestone 4). Nothing async in the core. No `regex` in the parser hot path: constructs
 are hand-written state machines like the rest of the CommonMark core.
 
 ## Repository layout
