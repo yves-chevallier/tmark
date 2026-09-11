@@ -51,13 +51,37 @@ human. It is deliberately short. The design documents carry the detail.
 - Errors are values: parsing never fails; unrecognised input is literal text
   plus a diagnostic. Writers never panic on a valid IR.
 - Tests are the conformance fixtures first (`spec/conformance/`), unit tests
-  second, snapshots (`insta`) for writers, property tests (`proptest`) for
-  round-trip. A construct without a fixture is not implemented.
+  second, snapshots (`insta`) for writers and the `mkdocs` profile,
+  property tests (`proptest`) for round-trip. A construct without a
+  fixture is not implemented.
+- Accept snapshots deliberately: after a parser, printer or writer change
+  run `cargo insta review` (or read the diff `INSTA_UPDATE=always` makes)
+  and accept each moved snapshot on its merits; never accept a run
+  wholesale to make CI green. A new fixture needs one generation run and
+  a reading of its new snapshots.
+- Regenerate the fixture IR after a lowering change: `cargo build -p
+  tmark-syntax --example dump && python3 scripts/fixture-ir.py`, then
+  review the diff of the `ir` blocks before committing. The diagnostic
+  and IR schemas and the registry tables are regenerated with the
+  `schema` and `registries` examples of `tmark-ir`; CI fails when they
+  drift.
+- The Python surface is generated too: a changed `#[pyfunction]`
+  signature or docstring in `crates/tmark-py/src/lib.rs` is followed by
+  `python crates/tmark-py/scripts/gen_stubs.py` (a pytest checks the
+  stub). Check `git status` after `maturin develop`: it drops a `.so`
+  and `__pycache__` into the package, which stay untracked.
 - Commits: `<scope>: <imperative summary>` with the crate as scope
   (`syntax: parse role heads`). One concern per commit.
 - Do not add a dependency without a line in the crate's `Cargo.toml` comment
   saying why, and a mention in `design/01-architecture.md` if it crosses a
-  crate boundary.
+  crate boundary. The workspace MSRV is Rust 1.80 (`rust-version` in
+  `Cargo.toml`): refuse a clippy suggestion that needs a newer std
+  (`Option::is_none_or`) or raise the MSRV on purpose, in its own commit.
+- A change to what crosses the TeXSmith boundary (a node field, a
+  diagnostic code, a `FRAGMENTS` row, a `Requires` field, a `lower_web`
+  wrapper, an option name of the bindings) is a two-repository change:
+  say so in the commit and in `design/13-handoff.md` §The cross-repository
+  contract.
 
 ## Definition of done for any task
 
