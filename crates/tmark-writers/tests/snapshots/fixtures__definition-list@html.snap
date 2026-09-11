@@ -1,0 +1,27 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<dl>
+<dt>Term</dt>
+<dd>
+<p>Definition, indented continuation lines aligned.</p>
+<p>Second paragraph of the definition.</p>
+</dd>
+<dd>Second definition.</dd>
+<dt>Other</dt>
+<dd>Its definition.</dd>
+</dl>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

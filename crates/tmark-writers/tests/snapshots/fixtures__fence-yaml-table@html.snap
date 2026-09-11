@@ -1,0 +1,40 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<table id="tbl:stock">
+<caption>Stock by warehouse.</caption>
+<thead>
+<tr>
+<th rowspan="2">Fruit</th>
+<th colspan="2">Warehouses</th>
+</tr>
+<tr>
+<th>Geneva</th>
+<th>Zurich</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Apples</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td colspan="3">Total</td>
+</tr>
+</tbody>
+</table>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>Call <code class="language-py">print(1)</code> or <code class="language-py">print(1)</code> but never <code>rm -rf</code>.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

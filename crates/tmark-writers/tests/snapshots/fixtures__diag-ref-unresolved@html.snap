@@ -1,0 +1,19 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<h2 id="sec:intro">Intro</h2>
+<p>See <a href="#sec:intro" class="reference">Section 1</a>, <a href="#Sec:intro" class="reference">Section 1</a> and <a href="#sec:intro" class="reference">the intro</a>, but not <span class="unresolved">[?sec:nope]</span>.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

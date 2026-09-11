@@ -29,15 +29,18 @@ pub fn collapse(inlines: &[Inline], is_zero: &dyn Fn(&Inline) -> bool) -> Vec<In
             j += 1;
         }
         let next = inlines.get(j);
-        let next_starts_blank = match next {
-            Some(Inline::Str(s)) => s
-                .text
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_whitespace() || CLOSING_PUNCTUATION.contains(&c)),
-            Some(Inline::Space(_) | Inline::SoftBreak(_) | Inline::LineBreak(_)) => true,
-            _ => false,
-        };
+        // At the end of the sequence the preceding whitespace goes too.
+        let next_starts_blank = next.is_none()
+            || match next {
+                Some(Inline::Str(s)) => s
+                    .text
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_whitespace() || CLOSING_PUNCTUATION.contains(&c)),
+                Some(Inline::Space(_) | Inline::SoftBreak(_) | Inline::LineBreak(_)) => true,
+                _ => false,
+            };
+        // At the start of the sequence the following whitespace goes.
         let prev_is_break = matches!(out.last(), Some(Inline::Space(_) | Inline::SoftBreak(_)));
         if next_starts_blank {
             match out.last_mut() {
@@ -57,6 +60,23 @@ pub fn collapse(inlines: &[Inline], is_zero: &dyn Fn(&Inline) -> bool) -> Vec<In
         }
         out.extend(inlines[i..j].iter().cloned());
         i = j;
+    }
+    // Leading zero-width nodes: the whitespace after them goes.
+    let mut k = 0;
+    while k < out.len() && is_zero(&out[k]) {
+        k += 1;
+    }
+    if k > 0 {
+        match out.get_mut(k) {
+            Some(Inline::Str(s)) => {
+                let trimmed = s.text.trim_start().to_string();
+                s.text = trimmed;
+            }
+            Some(Inline::Space(_) | Inline::SoftBreak(_)) => {
+                out.remove(k);
+            }
+            _ => {}
+        }
     }
     // A `Str` emptied by the trim is dropped.
     out.retain(|n| !matches!(n, Inline::Str(Str { text, .. }) if text.is_empty()));
@@ -121,6 +141,16 @@ mod tests {
     fn several_in_a_row() {
         let v = collapse(&[s("a "), c(), s(" "), c(), s(" b")], &zero);
         assert_eq!(texts(&v), ["a", "<c>", "<c>", " b"]);
+    }
+
+    #[test]
+    fn ends() {
+        let v = collapse(&[s("a "), c()], &zero);
+        assert_eq!(texts(&v), ["a", "<c>"]);
+        let v = collapse(&[c(), s(" a")], &zero);
+        assert_eq!(texts(&v), ["<c>", "a"]);
+        let v = collapse(&[c(), c(), s(" a")], &zero);
+        assert_eq!(texts(&v), ["<c>", "<c>", "a"]);
     }
 
     #[test]
