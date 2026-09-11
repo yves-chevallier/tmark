@@ -8,6 +8,7 @@
 mod block;
 mod inline;
 mod table;
+mod table_yaml;
 
 pub(crate) mod head;
 

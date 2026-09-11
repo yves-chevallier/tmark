@@ -15,7 +15,7 @@ columns: [A, B, C]
 rows:
   - ["1.10", "+1", "0x1F"]
   - [3, "NULL", "Yes"]
-  - [{value: "1e3", cols: 2}, ~, "on"]
+  - [{value: "1e3", cols: 2}, "on"]
 ```
 ````
 
@@ -30,7 +30,7 @@ columns:
 rows:
   - ["1.10", "+1", "0x1F"]
   - [3, "NULL", "Yes"]
-  - [{value: "1e3", cols: 2}, ~, "on"]
+  - [{value: "1e3", cols: 2}, "on"]
 ```
 ````
 
