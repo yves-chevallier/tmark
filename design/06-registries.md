@@ -167,7 +167,11 @@ wins, and the prefix routing rule of the spec (`@a:b` with an undeclared
 head is a bibliography key) does not apply to them: the book entry carries
 its prefix, and the site's counter declarations may live in `mkdocs.yml`
 rather than in every page. `@alias:prefix:key` inventories are the other,
-explicit mechanism and stay as they are.
+explicit mechanism and stay as they are. The writers render a `Sibling`
+as the HTML writer renders any reference, a link to `location` with
+`label` as text; LaTeX and Typst print `label` as text, since a sibling
+outside the build has no `\label` to point to (the web lowering is where
+`Sibling` matters).
 
 The plugin's two passes are then: pre-pass every page with `numbering:
 All` and the chained `start`, collect `book_labels`; lower every page with
@@ -214,10 +218,15 @@ reference), document links for includes.
 - Inventories are read from `sources.crossrefs`; a missing or invalid file
   is `crossref-inventory-missing`. The staleness check (`hash`) waits for
   the writer side in TeXSmith, which fixes the hash algorithm.
-- Footnote-versus-citation shadowing is not implemented: the GFM footnote
-  construct only forms a footnote reference when a definition exists, so a
-  `[^key]` citation never reaches the IR as a `Note`. The deprecated sugar
-  needs its own tokenizer rule if it is ever wanted (milestone 5, or never).
+- Footnote-versus-citation shadowing (decision X7, examples-migration
+  item 2): the tokenizer rule in `tmark_reference.rs` turns a `[^key]`
+  whose label has no `[^key]:` definition (and `^[k1,k2]` groups) into a
+  `Ref`, keyed on the *missing definition*, not on the bibliography (a
+  `.bib` given on the CLI is invisible to the parser). A defined label
+  wins and stays a `Note`, whatever the bibliography holds; the
+  `citation-shadowed-by-footnote` diagnostic for that case is still not
+  emitted. A `[^key]` that resolves nowhere is `ref-unresolved`, which is
+  the loud outcome the spec wants (P4).
 - Glossary terms come from `declare.glossary`, `declare.acronyms` (term to
   string or object with `name`/`description`) and the `*[KEY]: …` lines.
 

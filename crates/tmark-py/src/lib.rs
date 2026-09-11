@@ -30,8 +30,8 @@ use tmark::ir::registry::{
 };
 use tmark::ir::{Block, Code, Inline, LineIndex, NodeId, NodeRef};
 use tmark::{
-    BookLabel, Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit, Numbering,
-    Profile, Replacement, ResolveOptions,
+    BookLabel, Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit, Profile,
+    Replacement, ResolveNumbering, ResolveOptions,
 };
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ struct Options {
     /// document's `next_start`).
     start: BTreeMap<String, u32>,
     /// `backend` (user series only) or `all` (every series, for the web).
-    numbering: Numbering,
+    numbering: ResolveNumbering,
     /// Language of the label words (`fr`, `de-CH`); the front matter's
     /// `lang`, then English, when absent.
     lang: Option<String>,

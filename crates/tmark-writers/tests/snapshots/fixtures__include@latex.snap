@@ -1,0 +1,35 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\input{chapters/boot}
+
+\input{chapters/setup}
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "chapters/boot.md",
+      "node": 1
+    },
+    {
+      "src": "chapters/setup.md",
+      "node": 2,
+      "attrs": [
+        [
+          "base",
+          "chapters"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

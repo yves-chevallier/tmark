@@ -1,0 +1,12 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+\=\=\= "Windows"
+
+A \{--deleted--} word, a bar [=45% "Review"\]{: .thin}, a [[Wiki Page]],
+an emoji :smile: and an icon :material-home:, then \^\^inserted\^\^ text.
+
+a. first fancy item
+
+[TOC]

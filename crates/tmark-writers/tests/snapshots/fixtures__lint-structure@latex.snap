@@ -1,0 +1,42 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\section{Top}\label{top}
+
+\subsubsection{Skipped}\label{skipped}
+
+\tslead{Note.} Promoted.
+
+\begin{table}[H]
+\centering
+\caption{T.}
+\label{fig:t}
+\vspace{0.5em}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X}
+\toprule
+\textbf{a} \\
+\midrule
+1 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+---requires---
+{
+  "packages": [
+    "booktabs",
+    "float",
+    "tabularx"
+  ],
+  "fragments": [
+    "ts-typesetting"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

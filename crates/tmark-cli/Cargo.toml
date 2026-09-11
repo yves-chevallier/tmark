@@ -16,3 +16,5 @@ tmark = { path = "../tmark" }
 clap = { workspace = true }
 # `tmark parse` and `tmark schema` print JSON.
 serde_json = { workspace = true }
+# `tmark lint --fix --diff` prints a unified diff (line LCS; already in the lock file).
+diff = "0.1"

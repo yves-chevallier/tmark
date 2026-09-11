@@ -117,6 +117,14 @@ struct Sequence {
 ///     ^
 /// ```
 pub fn start(tokenizer: &mut Tokenizer) -> State {
+    // TMark: `^[` is the deprecated citation group (or literal text when it
+    // is not one); it never opens a caret superscript (decision X7).
+    if tokenizer.parse_state.options.constructs.tmark_reference
+        && tokenizer.current == Some(b'^')
+        && tokenizer.parse_state.bytes.get(tokenizer.point.index + 1) == Some(&b'[')
+    {
+        return State::Nok;
+    }
     // Emphasis/strong:
     if (tokenizer.parse_state.options.constructs.attention
         && matches!(tokenizer.current, Some(b'*' | b'_')))

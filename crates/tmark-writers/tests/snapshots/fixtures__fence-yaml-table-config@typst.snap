@@ -1,0 +1,26 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#figure(
+  table(
+    columns: (auto, 1fr, auto,),
+    align: (left, right, center,),
+    table.header([A], [B], [C]),
+    [1], [2], [3],
+  ),
+  caption: [Config.],
+) <tbl:cfg>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

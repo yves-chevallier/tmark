@@ -1,0 +1,20 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p><span id="fw:boot-loop" class="counter">FW-01</span> The firmware reboots when the watchdog fires.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": [
+    "fw"
+  ]
+}

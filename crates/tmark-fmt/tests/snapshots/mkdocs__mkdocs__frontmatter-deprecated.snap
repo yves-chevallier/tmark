@@ -1,0 +1,15 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+title: Notes
+authors: [TeXSmith]
+counters:
+  fw:
+    name: Finding
+press:
+  admonition_style: classic
+---
+
+Text.

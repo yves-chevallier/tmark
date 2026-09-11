@@ -37,9 +37,10 @@ neither.
 
 | Stage | Examples | Owner |
 | ----- | -------- | ----- |
-| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
+| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
+| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error), `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` (the `yaml table` schema) | `tmark-syntax` |
 | Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing` | `tmark-registry` |
-| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip` | `tmark-lint` |
+| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum` | `tmark-lint` |
 
 Parse and resolve diagnostics are not optional; they are facts about the
 document. Lint rules are a catalogue the user can enable, disable and
@@ -80,7 +81,8 @@ spelling is safe, guessing a label for an unresolved reference is not.
 
 - Error: front-matter YAML errors, an unknown key under a namespace the spec
   validates (`declare`, `sources`, `features`), an X-class construct under the
-  strict profile.
+  strict profile, a `yaml table` the schema rejects (every `table-*` code
+  but `table-width-sum`).
 - Warning: unresolved and ambiguous references, unknown prefixes, duplicate
   labels, deprecated spellings, missing inventories.
 - Info: sugar the formatter will rewrite, lead-in promotions.
@@ -119,3 +121,67 @@ spelling is safe, guessing a label for an unresolved reference is not.
 - Conformance fixtures gained a `## resolution` section for the resolve
   and lint stages; one fixture per diagnostic code lives under
   `spec/conformance/diag-*.md` and `lint-*.md`.
+
+## Implementation notes (migration wave 1)
+
+- `deprecated-frontmatter-key` carries a fix: the whole YAML island with
+  every deprecated key moved to its canonical place, as a *line edit*
+  (`tmark_ir::yaml_edit::move_key`: the key's block is cut, dedented,
+  renamed when the spelling changes, and re-indented at the end of its
+  target mapping, which is created when missing). Nothing else in the
+  island moves, which is what the printer's byte-for-byte copy of the
+  front matter asks for. A key with a flow value (`press: {…}`) on the
+  path gives no fix. Every deprecated key's diagnostic carries the same
+  replacement, so `lint --fix` moves them all in one pass (overlapping
+  fixes after the first are skipped). The message names the target
+  (`` `counters` is deprecated, write `press.declare.counters` ``);
+  `frontmatter::deprecated_key_target` is the one table.
+- `compat-unsupported` (warning, parse stage, `tmark-syntax/src/lower/compat.rs`)
+  replaces silence for the PyMdownX spellings milestone 5 will implement:
+  content tabs (`=== "Title"` paragraphs), critic markup (a literal brace
+  group `{--…--}`, `{++…++}`, `{~~…~~}`, `{==…==}`, `{>>…<<}`), progress
+  bars (`[=n% "label"]`), wiki links (`[[…]]`), emoji and icon shortcodes
+  (`:smile:`, `:material-…:`, not inside a word), `^^…^^` without
+  `inline.insert`, lower-case fancy list markers (`a.`, `iv.`, `#.`, `1)`)
+  and `[TOC]` at a paragraph start. It is a new code rather than
+  `strict-x-construct` because these are not X-class deviations under a
+  profile: they are constructs of the compatibility appendix that every
+  profile will accept once implemented, and the strict profile must keep
+  reporting X1/X3 separately. A spelling escaped at its first character
+  (`\[TOC]`, `\:smile:`, a paragraph starting with `\`) is the author's
+  literal text and is not reported. The scans are narrow on purpose (a
+  miss is the old behaviour, a false positive is a wrong warning on
+  prose): upper-case list markers (`I. M. Pei`) and shortcodes glued to a
+  word (`a:b:`) are left alone. Fixture `diag-compat-unsupported`.
+- `deprecated` on `[^key]` / `^[k1,k2]` citations, `/// latex`,
+  `/// caption` blocks, `[](gls:term)`, `{index}[…]{b}`, `{index:r}[…]`
+  and the `--8<--` fence body all carry the generic node-reprint fix
+  (`tmark::fixes`), so the fix for a spelling lives in the printer once.
+## Implementation notes (wave 1, tables — decision X9)
+
+The checks of `texsmith.extensions.tables.schema` are split by whether the
+IR can hold the offending shape (design 03 §Tables):
+
+- Parse time (`tmark-syntax::lower::table_yaml`, the port of `parse_table`
+  and `build_matrix`), on the fence span, all errors: `table-yaml` (not
+  YAML, or not a mapping: the fence stays a `CodeBlock` with its info
+  string), `table-unknown-key` (Python `extra="forbid"` at every level),
+  `table-columns` (missing, not a list, fewer than two, a bad descriptor,
+  a group without name or columns), `table-align`, `table-shape` (a value
+  of the wrong type: rows, `long`, widths, cells, separators, named rows),
+  `table-row-width` (extra or missing cells, a list longer than its group),
+  `table-span` (collisions, a value under a row span, spans past the last
+  column or row, a separator inside a span), `table-column-unknown`
+  (named-row mode). The document still parses: the `Table` carries a
+  best-effort model and its `source`, which the printer writes back as
+  typed, and the lint rules skip it.
+- Lint (`tmark-lint`), on tables the model holds faithfully:
+  `table-placement` (error, `^[hHtbpT!]+$`), `table-width` (error: empty,
+  or a percentage outside (0, 100], on the table, a column or a
+  table-config entry), `table-width-sum` (warning: column percentages over
+  100; TeXSmith has no such check, the layout scales silently).
+- One fixture per code under `spec/conformance/diag-table-*.md`; the
+  accepted shapes have `fence-yaml-table-{named,settings,spans,config}.md`.
+- Diagnostics are reported on the whole fence: the YAML reader has no
+  positions. A per-row span is a candidate once the LSP shows the need.
+

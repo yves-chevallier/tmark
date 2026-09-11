@@ -1,0 +1,25 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\href{b\%20c}{a} \href{e)f}{d} \hyperref[h i]{g} \includegraphics[width=1em]{k l.png} \href{n(o)p}{m}
+
+---requires---
+{
+  "packages": [
+    "graphicx"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "k l.png",
+      "node": 11
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

@@ -790,6 +790,12 @@ pub struct Table {
     pub model: TableModel,
     #[serde(default, skip_serializing_if = "Attrs::is_empty")]
     pub attrs: Attrs,
+    /// The body of a `yaml table` fence the parser reported a `table-*`
+    /// diagnostic on: `model` is then a best effort and the printer writes
+    /// this text back as typed (design 03 §Tables). `None` for a table the
+    /// model holds faithfully.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// A `yaml table-config` fence, attached to the preceding [`Table`] by a
@@ -803,6 +809,10 @@ pub struct TableConfig {
     pub columns: Vec<ColumnConfig>,
     #[serde(default)]
     pub settings: TableSettings,
+    /// The fence body when the parser reported a `table-*` diagnostic on
+    /// it; printed back as typed (see [`Table::source`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// `Kind: text {#id}` caption line. Spec §Caption. The anchor lives in

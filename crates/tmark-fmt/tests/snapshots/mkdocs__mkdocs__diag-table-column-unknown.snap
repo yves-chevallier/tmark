@@ -1,0 +1,11 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```yaml table
+columns:
+  - Year
+  - {name: Actual, columns: [H1, H2]}
+rows:
+  - 2024: {Acutal: [6, 7]}
+```

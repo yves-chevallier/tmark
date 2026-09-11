@@ -1,0 +1,15 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```yaml table
+columns:
+  - Product
+  - {name: FY23, columns: [Q1, Q2]}
+  - {name: FY24, columns: [Q1, Q2]}
+rows:
+  - Apples: {FY23: [1, 2], FY24: [3, 4]}
+  - {separator: true, label: Stone fruit}
+  - Cherries: {FY23: [~, 5]}
+  - 2024: {FY24: [6, 7]}
+```

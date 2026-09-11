@@ -1,0 +1,23 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p><a href="b c">a</a> <a href="e)f">d</a> <a href="#h i" class="reference">g</a> <img src="k l.png" alt="j" /> <a href="n(o)p">m</a></p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "k l.png",
+      "node": 11
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

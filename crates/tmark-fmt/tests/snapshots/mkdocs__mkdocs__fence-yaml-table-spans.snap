@@ -1,0 +1,13 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```yaml table
+columns:
+  - Product
+  - {name: 2024, columns: [{name: H1, columns: [Q1, Q2]}, {name: H2, columns: [Q3, Q4]}]}
+rows:
+  - [Alpha, {value: Maria, rows: 2, cols: 2}, [3, 4]]
+  - [Beta, ~, ~, [5, 6]]
+  - [Gamma, [1, 2, {value: Sum, cols: 2, align: center}]]
+```

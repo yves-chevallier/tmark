@@ -79,6 +79,40 @@ pub enum Code {
     /// the document is one paragraph of the text. AGENTS.md: "parsing
     /// never fails".
     ParseInternal,
+    /// Appendix "PyMdownX compatibility profile": a spelling of the profile
+    /// the parser recognises but does not implement yet (milestone 5), so
+    /// it is literal text: content tabs, critic markup, progress bars, wiki
+    /// links, fancy list markers, `^^x^^` without `inline.insert`, emoji
+    /// and icon shortcodes, `[TOC]`. Loud rather than silent (P4).
+    CompatUnsupported,
+    /// Spec §Table rung 5: the payload of a `yaml table` or
+    /// `yaml table-config` fence is not YAML or not a mapping; the fence
+    /// stays a code block.
+    TableYaml,
+    /// Spec §Table rung 5: a key the table schema does not know (top level,
+    /// `table:`, a column, a cell, a separator, a named row). Python
+    /// `extra="forbid"`.
+    TableUnknownKey,
+    /// Spec §Table rung 5: `columns` missing, not a list, fewer than two, a
+    /// descriptor that is neither a name nor a mapping, a group without a
+    /// name or without columns.
+    TableColumns,
+    /// Spec §Table: an `align` value outside `l|c|r|j` and their long forms.
+    TableAlign,
+    /// Spec §Table rung 5: a value of the wrong shape (a row that is neither
+    /// a list nor a mapping, an empty row, a cell mapping without `value`,
+    /// `rows`/`cols` below 1, `long` that is not a boolean or `auto`, a
+    /// width that is not text).
+    TableShape,
+    /// Spec §Table rung 5: a row that does not cover the declared columns
+    /// (extra cells, missing cells, a list longer than its group).
+    TableRowWidth,
+    /// Spec §Table rung 5: a span that collides with another, runs past the
+    /// last column or row, or is not acknowledged with `~`.
+    TableSpan,
+    /// Spec §Table rung 5 (named-row mode): a key that names no top-level
+    /// data column.
+    TableColumnUnknown,
     // --- Resolve (tmark-registry) ---
     /// Spec §Ref: a key found in no registry.
     RefUnresolved,
@@ -115,6 +149,12 @@ pub enum Code {
     LeadPromotion,
     /// Spec §Header: a heading level skipped.
     HeadingSkip,
+    /// Spec §Table rung 5: a `placement` that is not made of `hHtbpT!`.
+    TablePlacement,
+    /// Spec §Table: a width that is empty or a percentage outside (0, 100].
+    TableWidth,
+    /// Spec §Table: column percentages that add up to more than 100.
+    TableWidthSum,
 }
 
 /// The pipeline stage that emits a code. Design `05-diagnostics.md` §Who
@@ -144,6 +184,15 @@ impl Code {
         Code::FrontmatterUnknownKey,
         Code::Deprecated,
         Code::ParseInternal,
+        Code::CompatUnsupported,
+        Code::TableYaml,
+        Code::TableUnknownKey,
+        Code::TableColumns,
+        Code::TableAlign,
+        Code::TableShape,
+        Code::TableRowWidth,
+        Code::TableSpan,
+        Code::TableColumnUnknown,
         Code::RefUnresolved,
         Code::RefAmbiguous,
         Code::PrefixUnknown,
@@ -160,6 +209,9 @@ impl Code {
         Code::DeprecatedFrontmatterKey,
         Code::LeadPromotion,
         Code::HeadingSkip,
+        Code::TablePlacement,
+        Code::TableWidth,
+        Code::TableWidthSum,
     ];
 
     /// The code with this kebab-case identifier.
@@ -183,6 +235,15 @@ impl Code {
             Code::FrontmatterUnknownKey => "frontmatter-unknown-key",
             Code::Deprecated => "deprecated",
             Code::ParseInternal => "parse-internal",
+            Code::CompatUnsupported => "compat-unsupported",
+            Code::TableYaml => "table-yaml",
+            Code::TableUnknownKey => "table-unknown-key",
+            Code::TableColumns => "table-columns",
+            Code::TableAlign => "table-align",
+            Code::TableShape => "table-shape",
+            Code::TableRowWidth => "table-row-width",
+            Code::TableSpan => "table-span",
+            Code::TableColumnUnknown => "table-column-unknown",
             Code::RefUnresolved => "ref-unresolved",
             Code::RefAmbiguous => "ref-ambiguous",
             Code::PrefixUnknown => "prefix-unknown",
@@ -199,6 +260,9 @@ impl Code {
             Code::DeprecatedFrontmatterKey => "deprecated-frontmatter-key",
             Code::LeadPromotion => "lead-promotion",
             Code::HeadingSkip => "heading-skip",
+            Code::TablePlacement => "table-placement",
+            Code::TableWidth => "table-width",
+            Code::TableWidthSum => "table-width-sum",
         }
     }
 
@@ -208,7 +272,17 @@ impl Code {
             Code::FrontmatterYaml
             | Code::FrontmatterUnknownKey
             | Code::StrictXConstruct
-            | Code::ParseInternal => Severity::Error,
+            | Code::ParseInternal
+            | Code::TableYaml
+            | Code::TableUnknownKey
+            | Code::TableColumns
+            | Code::TableAlign
+            | Code::TableShape
+            | Code::TableRowWidth
+            | Code::TableSpan
+            | Code::TableColumnUnknown
+            | Code::TablePlacement
+            | Code::TableWidth => Severity::Error,
             Code::AttrNoHost
             | Code::RoleDanglingHead
             | Code::CaptionNoHost
@@ -217,6 +291,7 @@ impl Code {
             | Code::ContainerUnknown
             | Code::FenceUnknownNodeWord
             | Code::Deprecated
+            | Code::CompatUnsupported
             | Code::RefUnresolved
             | Code::RefAmbiguous
             | Code::PrefixUnknown
@@ -226,7 +301,8 @@ impl Code {
             | Code::CrossrefInventoryMissing
             | Code::CrossrefInventoryStale
             | Code::IncludeMissing
-            | Code::DeprecatedFrontmatterKey => Severity::Warning,
+            | Code::DeprecatedFrontmatterKey
+            | Code::TableWidthSum => Severity::Warning,
             Code::LeadPromotion => Severity::Info,
             Code::RoleUnknown
             | Code::HardcodedNumber
@@ -250,7 +326,16 @@ impl Code {
             | Code::FrontmatterYaml
             | Code::FrontmatterUnknownKey
             | Code::Deprecated
-            | Code::ParseInternal => Stage::Parse,
+            | Code::ParseInternal
+            | Code::CompatUnsupported
+            | Code::TableYaml
+            | Code::TableUnknownKey
+            | Code::TableColumns
+            | Code::TableAlign
+            | Code::TableShape
+            | Code::TableRowWidth
+            | Code::TableSpan
+            | Code::TableColumnUnknown => Stage::Parse,
             Code::RefUnresolved
             | Code::RefAmbiguous
             | Code::PrefixUnknown
@@ -266,7 +351,10 @@ impl Code {
             | Code::StrictXConstruct
             | Code::DeprecatedFrontmatterKey
             | Code::LeadPromotion
-            | Code::HeadingSkip => Stage::Lint,
+            | Code::HeadingSkip
+            | Code::TablePlacement
+            | Code::TableWidth
+            | Code::TableWidthSum => Stage::Lint,
         }
     }
 
@@ -326,7 +414,21 @@ impl Code {
                 "Appendix \"Deprecation schedule\": a deprecated front-matter key"
             }
             Code::LeadPromotion => "Spec §Para: a leading strong span promoted to a lead-in",
+            Code::CompatUnsupported => {
+                "Appendix \"PyMdownX compatibility profile\": a spelling milestone 5 implements, literal today"
+            }
             Code::HeadingSkip => "Spec §Header: a heading level skipped",
+            Code::TableYaml => "Spec §Table rung 5: a `yaml table` payload that is not a YAML mapping",
+            Code::TableUnknownKey => "Spec §Table rung 5: an unknown key in a `yaml table` fence",
+            Code::TableColumns => "Spec §Table rung 5: a `columns` list that is missing, empty or malformed",
+            Code::TableAlign => "Spec §Table rung 5: an unknown column alignment",
+            Code::TableShape => "Spec §Table rung 5: a row or cell of an unexpected shape",
+            Code::TableRowWidth => "Spec §Table rung 5: a row with more or fewer cells than the columns",
+            Code::TableSpan => "Spec §Table rung 5: a `rows`/`cols` span that overlaps or overruns",
+            Code::TableColumnUnknown => "Spec §Table rung 5: a named row addressing an unknown column",
+            Code::TablePlacement => "Spec §Table rung 5: a `placement` that is not made of `hHtbpT!`",
+            Code::TableWidth => "Spec §Table: a width that is empty or a percentage outside (0, 100]",
+            Code::TableWidthSum => "Spec §Table: column percentages adding up to more than 100",
         }
     }
 }

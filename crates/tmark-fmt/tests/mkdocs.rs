@@ -16,14 +16,8 @@ use tmark_syntax::parse;
 /// parser side lands in the `fixes` wave; the profile prints the spellings
 /// now so that the gate goes green on merge. A fixture listed here must
 /// still fail: remove it from the list when it passes.
-const PENDING: &[&str] = &[
-    "attributes-image", // `/// caption` under an image
-    "container-figure", // `/// caption` under `::: figure`
-    "fence-listing",    // `/// caption` after a listing
-    "reference-bare",   // `[^key]` citation
-    "role-index",       // `{index}[…]{b}`
-    "role-raw",         // `/// latex … ///`
-];
+/// Fixtures the parser cannot yet read back under the Mkdocs spelling.
+const PENDING: &[&str] = &[];
 
 fn structural(text: &str) -> String {
     let doc = parse(text, FileId::default()).document;

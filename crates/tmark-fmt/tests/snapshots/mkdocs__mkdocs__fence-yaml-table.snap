@@ -9,6 +9,6 @@ columns:
   - Fruit
   - {name: Warehouses, columns: [Geneva, Zurich]}
 rows:
-  - [Apples, 3, 4]
-  - [{value: Total, cols: 3}, ~, ~]
+  - [Apples, [3, 4]]
+  - [{value: Total, cols: 3}]
 ```

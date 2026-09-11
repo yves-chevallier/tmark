@@ -117,7 +117,24 @@ impl Lowerer {
                     out.push(Inline::LineBreak(LineBreak { meta }));
                 }
                 Node::Link(n) => {
-                    let meta = self.meta_at(ctx, n.position.as_ref());
+                    let span = self.span(ctx, n.position.as_ref());
+                    let meta = self.meta(span);
+                    // Deprecated `[](gls:term)` glossary reference (Appendix
+                    // "Deprecation schedule", C20): a bare `Ref`.
+                    if n.children.is_empty() && n.url.starts_with("gls:") && n.title.is_none() {
+                        let at = n.position.as_ref().map_or(0, |p| p.start.offset) + 3;
+                        self.deprecated(span, "[](gls:term)", "@gls:term");
+                        out.push(Inline::Ref(Ref {
+                            meta,
+                            items: vec![tmark_ir::RefItem {
+                                key: n.url.clone(),
+                                key_span: SubSpan(self.span_of(ctx, at, at + n.url.len())),
+                                ..Default::default()
+                            }],
+                            bracketed: false,
+                        }));
+                        continue;
+                    }
                     let content = self.lower_inlines(&n.children, ctx).inlines;
                     out.push(Inline::Link(Link {
                         meta,
@@ -213,6 +230,10 @@ impl Lowerer {
                             let marker = if n.kind == TmarkMarkKind::Subscript {
                                 "~"
                             } else {
+                                self.compat_unsupported(
+                                    span,
+                                    "`^^…^^` without the `inline.insert` feature",
+                                );
                                 "^^"
                             };
                             out.push(self.literal_text(span, marker));
@@ -222,9 +243,23 @@ impl Lowerer {
                     }
                 }
                 Node::TmarkReference(n) => {
-                    let meta = self.meta_at(ctx, n.position.as_ref());
+                    let span = self.span(ctx, n.position.as_ref());
+                    let meta = self.meta(span);
                     let local = n.position.as_ref().map_or(0, |p| p.start.offset);
                     let (items, bracketed) = match n.value.strip_prefix('[') {
+                        // Deprecated `[^key]` citation (decision X7): one
+                        // item, the fix prints `@key`.
+                        Some(inner) if inner.starts_with('^') => {
+                            let key = inner[1..].trim_end_matches(']');
+                            let at = local + 2;
+                            let item = tmark_ir::RefItem {
+                                key: doi_key(key),
+                                key_span: SubSpan(self.span_of(ctx, at, at + key.len())),
+                                ..Default::default()
+                            };
+                            self.deprecated(span, "[^key]", "@key");
+                            (vec![item], true)
+                        }
                         Some(inner) => {
                             // Pandoc's `[@key, …]` import form carries `@` before
                             // each key; the item grammar is the same. The inner
@@ -237,6 +272,23 @@ impl Lowerer {
                                     (item.key_span.0.start as usize, item.key_span.0.end as usize);
                                 item.key_span = SubSpan(self.span_of(ctx, base + s, base + e));
                             }
+                            (items, true)
+                        }
+                        // Deprecated `^[k1,k2]` citation group: one item per
+                        // comma, the fix prints `@[k1; k2]` (or `@k1`).
+                        None if n.value.starts_with("^[") => {
+                            let inner = n.value[2..].trim_end_matches(']');
+                            let mut at = local + 2;
+                            let mut items = Vec::new();
+                            for key in inner.split(',') {
+                                items.push(tmark_ir::RefItem {
+                                    key: doi_key(key),
+                                    key_span: SubSpan(self.span_of(ctx, at, at + key.len())),
+                                    ..Default::default()
+                                });
+                                at += key.len() + 1;
+                            }
+                            self.deprecated(span, "^[k1,k2]", "@[k1; k2]");
                             (items, true)
                         }
                         None => (
@@ -320,6 +372,7 @@ impl Lowerer {
         out: &mut Vec<Inline>,
     ) {
         let span = self.span(ctx, position);
+        self.compat_scan_text(value, ctx.slice(position), span);
         let pieces: Vec<&str> = value.split('\n').collect();
         if pieces.len() == 1 {
             if !value.is_empty() {
@@ -448,6 +501,7 @@ impl Lowerer {
             }
             BraceKind::Role(head) => self.lower_role(node, head, nodes, index, ctx, out),
             BraceKind::Literal => {
+                self.compat_scan_brace(&node.value, span);
                 out.push(
                     self.literal_text(span, decode_escapes(ctx.slice(node.position.as_ref()))),
                 );
@@ -535,10 +589,22 @@ impl Lowerer {
                 }
             }
         }
+        // Deprecated `{index}[…]{b}` (main entry) and `{i}` (italic) suffixes
+        // (Appendix "Deprecation schedule", C20): consumed with the role.
+        let mut index_suffix = None;
+        if role.name == "index" {
+            if let Some(Node::TmarkBrace(suffix)) = nodes.get(*index) {
+                if !suffix.moustache && matches!(suffix.value.as_str(), "b" | "i") {
+                    index_suffix = Some((suffix.value.clone(), suffix.position.as_ref()));
+                    *index += 1;
+                }
+            }
+        }
         // The span of the whole role: head to last group, argument or suffix.
         let end = suffix_side
             .as_ref()
             .and_then(|(_, p)| *p)
+            .or_else(|| index_suffix.as_ref().and_then(|(_, p)| *p))
             .or_else(|| groups.last().and_then(|g| g.position.as_ref()))
             .or_else(|| argument.and_then(|a| a.position.as_ref()))
             .map_or(head_span.end, |p| ctx.map.translate(p.end.offset) as u32);
@@ -553,11 +619,20 @@ impl Lowerer {
             );
         }
         if let Some(suffix) = &head.registry_suffix {
+            // On the whole role, so that the fix reprints the node.
             self.deprecated(
-                head_span,
+                span,
                 &format!("{{{}:{suffix}}}", head.name),
                 &format!("{{{} registry={suffix}}}", head.name),
             );
+        }
+        if let Some((suffix, _)) = &index_suffix {
+            let canonical = if suffix == "b" {
+                "{index main=true}[…]"
+            } else {
+                "{index}[*…*]"
+            };
+            self.deprecated(span, &format!("{{index}}[…]{{{suffix}}}"), canonical);
         }
         let key = |name: &str| -> Option<String> {
             head.kv
@@ -640,11 +715,28 @@ impl Lowerer {
                 })
             }
             "index" => {
-                let path = groups.iter().map(|g| group_content(self, g)).collect();
+                let mut path: Vec<Vec<Inline>> =
+                    groups.iter().map(|g| group_content(self, g)).collect();
+                let mut main = key("main").as_deref() == Some("true");
+                match index_suffix.as_ref().map(|(s, _)| s.as_str()) {
+                    Some("b") => main = true,
+                    Some("i") => {
+                        // The rendering hint becomes content markup.
+                        if let Some(last) = path.last_mut() {
+                            let content = std::mem::take(last);
+                            let emph_meta = self.meta(span);
+                            *last = vec![Inline::Emph(Emph {
+                                meta: emph_meta,
+                                content,
+                            })];
+                        }
+                    }
+                    _ => {}
+                }
                 Inline::IndexEntry(IndexEntry {
                     meta,
                     path,
-                    main: key("main").as_deref() == Some("true"),
+                    main,
                     registry: key("registry").or(head.registry_suffix.clone()),
                 })
             }
@@ -884,12 +976,17 @@ pub(crate) fn trim_trailing_space(inlines: &mut Vec<Inline>) {
     }
 }
 
-/// `@https://doi.org/…` is sugar for `@doi:…` (spec §Cite).
+/// `@https://doi.org/…` is sugar for `@doi:…` (spec §Cite); a bare DOI
+/// (`10.<digits>/…`, only reachable through the deprecated citation forms)
+/// takes the `doi:` prefix too.
 fn doi_key(key: &str) -> String {
     for prefix in ["https://doi.org/", "http://doi.org/", "https://dx.doi.org/"] {
         if let Some(doi) = key.strip_prefix(prefix) {
             return format!("doi:{doi}");
         }
+    }
+    if key.starts_with("10.") && key.contains('/') {
+        return format!("doi:{key}");
     }
     key.to_string()
 }

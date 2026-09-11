@@ -1,0 +1,34 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{table}[H]
+\centering
+\caption{Stock.}
+\label{tbl:stock}
+\vspace{0.5em}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+\textbf{A} & \textbf{B} \\
+\midrule
+1 & 2 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+---requires---
+{
+  "packages": [
+    "booktabs",
+    "float",
+    "tabularx"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

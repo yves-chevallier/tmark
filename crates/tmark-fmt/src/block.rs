@@ -167,11 +167,7 @@ fn block_with(out: &mut Out, b: &Block, alternate: bool) {
                     info.push_str(" code");
                 }
             }
-            for (k, v) in &c.options.kv {
-                info.push(' ');
-                info.push_str(k);
-                info.push_str(&format!("={}", fence_option(v)));
-            }
+            info.push_str(&fence_attrs(&c.options, |_| true));
             fence(out, info.trim(), &c.text);
         }
         Block::BlockQuote(q) => {
@@ -395,15 +391,37 @@ fn fenced_image(out: &mut Out, image: &tmark_ir::Image) {
     let lang = image.attrs.get("generate").unwrap_or_default();
     let code = image.attrs.get("code").unwrap_or_default();
     let mut info = format!("{lang} image");
-    for (k, v) in &image.attrs.kv {
-        if k == "generate" || k == "code" {
-            continue;
-        }
-        info.push(' ');
-        info.push_str(k);
-        info.push_str(&format!("={}", fence_option(v)));
-    }
+    info.push_str(&fence_attrs(&image.attrs, |k| {
+        k != "generate" && k != "code"
+    }));
     fence(out, &info, code);
+}
+
+/// The options of a fence, with a leading space when there are any: bare
+/// `key=value` words (spec §Lexical grammar, family 4), or the braced
+/// attribute list when there are classes or an id, the only spelling that
+/// carries them (design 12 C28). `keep` filters the keys.
+fn fence_attrs(attrs: &Attrs, keep: impl Fn(&str) -> bool) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let braced = attrs.id.is_some() || !attrs.classes.is_empty();
+    if let Some(id) = &attrs.id {
+        parts.push(format!("#{id}"));
+    }
+    for class in &attrs.classes {
+        parts.push(format!(".{class}"));
+    }
+    for (k, v) in &attrs.kv {
+        if keep(k) {
+            parts.push(format!("{k}={}", fence_option(v)));
+        }
+    }
+    if parts.is_empty() {
+        String::new()
+    } else if braced {
+        format!(" {{{}}}", parts.join(" "))
+    } else {
+        format!(" {}", parts.join(" "))
+    }
 }
 
 /// A quoted fence option. CommonMark processes backslash escapes in an
@@ -418,7 +436,11 @@ fn fence_option(v: &str) -> String {
 /// A table prints as a pipe table when the model is plain, else as a
 /// `yaml table` fence (spec §Table).
 fn table(out: &mut Out, t: &Table) {
-    if is_plain(&t.model) {
+    if let Some(source) = &t.source {
+        // A fence the parser reported on: the model is a best effort, the
+        // text as typed is what the author must see back (design 03).
+        fence(out, "yaml table", source);
+    } else if is_plain(&t.model) {
         pipe_table(out, &t.model);
     } else {
         fence(out, "yaml table", &yaml_table(&t.model));
@@ -646,24 +668,15 @@ fn looks_typed(s: &str) -> bool {
 fn yaml_config(config: &ColumnConfig) -> Vec<String> {
     let mut parts = Vec::new();
     if let Some(align) = config.align {
-        parts.push(format!("align: {}", align_name(align)));
+        parts.push(format!("align: {}", align.name()));
     }
     if let Some(width) = &config.width {
         parts.push(format!("width: {}", yaml_scalar(width)));
     }
     if let Some(group) = &config.width_group {
-        parts.push(format!("width_group: {}", yaml_scalar(group)));
+        parts.push(format!("width-group: {}", yaml_scalar(group)));
     }
     parts
-}
-
-fn align_name(align: Align) -> &'static str {
-    match align {
-        Align::Left => "left",
-        Align::Center => "center",
-        Align::Right => "right",
-        Align::Justify => "justify",
-    }
 }
 
 fn yaml_column(column: &Column) -> String {
@@ -684,19 +697,23 @@ fn yaml_column(column: &Column) -> String {
         }
         Column::Group(group) => {
             let mut parts = vec![format!("name: {}", yaml_scalar(&group.name))];
-            parts.extend(yaml_config(&group.config));
             let columns: Vec<String> = group.columns.iter().map(yaml_column).collect();
             parts.push(format!("columns: [{}]", columns.join(", ")));
+            parts.extend(yaml_config(&group.config));
             format!("{{{}}}", parts.join(", "))
         }
     }
 }
 
+/// A cell of the leaf matrix in the Python `Scalar | RichCell` shape; an
+/// empty cell is `~`.
 fn yaml_cell(cell: &Cell) -> String {
-    if cell.absorbed {
-        return "~".to_string();
-    }
-    let value = yaml_scalar(&cell_text(&cell.content, false));
+    let text = cell_text(&cell.content, false);
+    let value = if text.is_empty() {
+        "~".to_string()
+    } else {
+        yaml_scalar(&text)
+    };
     if cell.rows == 1 && cell.cols == 1 && cell.align.is_none() {
         return value;
     }
@@ -708,12 +725,140 @@ fn yaml_cell(cell: &Cell) -> String {
         parts.push(format!("cols: {}", cell.cols));
     }
     if let Some(align) = cell.align {
-        parts.push(format!("align: {}", align_name(align)));
+        parts.push(format!("align: {}", align.name()));
     }
     format!("{{{}}}", parts.join(", "))
 }
 
-fn yaml_rows(rows: &[Row]) -> Vec<String> {
+fn is_rich(cell: &Cell) -> bool {
+    cell.rows != 1 || cell.cols != 1 || cell.align.is_some()
+}
+
+/// The slots a column span of this row covers: absorbed without being
+/// written, unlike the slots a row span from above absorbs (`~`).
+fn covered_by_colspan(cells: &[Cell]) -> Vec<bool> {
+    let mut covered = vec![false; cells.len()];
+    for (i, cell) in cells.iter().enumerate() {
+        if !cell.absorbed {
+            let end = (i + cell.cols as usize).min(cells.len());
+            for slot in &mut covered[(i + 1).min(end)..end] {
+                *slot = true;
+            }
+        }
+    }
+    covered
+}
+
+/// The leaves `[cursor, end)` as the items of a group list: `~` under a
+/// row span, nothing under a column span, a cell otherwise. Returns the
+/// cursor after the last leaf consumed.
+fn yaml_leaves(
+    cells: &[Cell],
+    covered: &[bool],
+    mut cursor: usize,
+    end: usize,
+) -> (Vec<String>, usize) {
+    let mut items = Vec::new();
+    while cursor < end {
+        let cell = &cells[cursor];
+        if cell.absorbed {
+            if !covered[cursor] {
+                items.push("~".to_string());
+            }
+            cursor += 1;
+        } else {
+            items.push(yaml_cell(cell));
+            cursor += (cell.cols as usize).max(1);
+        }
+    }
+    (items, cursor)
+}
+
+/// A positional row: one item per top-level column (Python
+/// `_parse_positional_row` inverted): a leaf column's cell, a group's
+/// leaves as a list, a rich cell as itself, `~` for every slot a row span
+/// absorbs.
+fn yaml_positional(cells: &[Cell], spans: &[(usize, usize)]) -> String {
+    let covered = covered_by_colspan(cells);
+    let mut items = Vec::new();
+    let mut cursor = 0;
+    for &(start, len) in spans {
+        let end = start + len;
+        while cursor < end && cursor < cells.len() {
+            let cell = &cells[cursor];
+            if cell.absorbed {
+                if !covered[cursor] {
+                    items.push("~".to_string());
+                }
+                cursor += 1;
+            } else if end - cursor == 1 || is_rich(cell) {
+                items.push(yaml_cell(cell));
+                cursor += (cell.cols as usize).max(1);
+            } else {
+                let (list, next) = yaml_leaves(cells, &covered, cursor, end);
+                items.push(format!("[{}]", list.join(", ")));
+                cursor = next;
+            }
+        }
+    }
+    // Leaves beyond the declared columns (a model built by hand).
+    while cursor < cells.len() {
+        items.push(yaml_cell(&cells[cursor]));
+        cursor += 1;
+    }
+    format!("[{}]", items.join(", "))
+}
+
+/// A named row (Python `_parse_named_row` inverted): the label, then the
+/// top-level data columns that hold something, by name; an unnamed or
+/// duplicated column name, a rich label or a cell spanning out of its
+/// column have no named spelling and fall back to the positional form.
+fn yaml_named(cells: &[Cell], columns: &[Column], spans: &[(usize, usize)]) -> Option<String> {
+    let names: Vec<&str> = columns.iter().skip(1).filter_map(Column::name).collect();
+    if names
+        .iter()
+        .enumerate()
+        .any(|(i, n)| names[..i].contains(n))
+    {
+        return None;
+    }
+    let covered = covered_by_colspan(cells);
+    let label = cells
+        .first()
+        .filter(|c| !c.absorbed && !is_rich(c))
+        .map(|c| cell_text(&c.content, false))?;
+    let mut entries = Vec::new();
+    for (column, &(start, len)) in columns.iter().zip(spans).skip(1) {
+        let end = (start + len).min(cells.len());
+        let leaves = &cells[start.min(end)..end];
+        if leaves.iter().all(|c| c.absorbed || c.is_empty()) {
+            continue;
+        }
+        let name = column.name()?;
+        if leaves
+            .iter()
+            .enumerate()
+            .any(|(i, c)| !c.absorbed && start + i + c.cols as usize > end)
+        {
+            return None;
+        }
+        let (items, _) = yaml_leaves(cells, &covered, start, end);
+        let value = if len == 1 {
+            items.into_iter().next().unwrap_or_else(|| "~".to_string())
+        } else {
+            format!("[{}]", items.join(", "))
+        };
+        entries.push(format!("{}: {}", yaml_scalar(name), value));
+    }
+    let cells = format!("{{{}}}", entries.join(", "));
+    Some(if label == "separator" {
+        format!("{{label: {}, cells: {cells}}}", yaml_scalar(&label))
+    } else {
+        format!("{}: {cells}", yaml_scalar(&label))
+    })
+}
+
+fn yaml_rows(rows: &[Row], columns: &[Column], spans: &[(usize, usize)]) -> Vec<String> {
     rows.iter()
         .map(|row| match row {
             Row::Separator(s) => {
@@ -722,62 +867,72 @@ fn yaml_rows(rows: &[Row]) -> Vec<String> {
                     parts.push(format!("label: {}", yaml_scalar(label)));
                 }
                 if s.double_rule {
-                    parts.push("double_rule: true".to_string());
+                    parts.push("double-rule: true".to_string());
                 }
                 format!("  - {{{}}}", parts.join(", "))
             }
             Row::Data(d) => {
-                let cells: Vec<String> = d.cells.iter().map(yaml_cell).collect();
-                if d.named {
-                    let (label, rest) = cells
-                        .split_first()
-                        .map_or((String::new(), &[][..]), |(l, r)| (l.clone(), r));
-                    format!("  {}: [{}]", label, rest.join(", "))
+                let named = if d.named {
+                    yaml_named(&d.cells, columns, spans)
                 } else {
-                    format!("  - [{}]", cells.join(", "))
-                }
+                    None
+                };
+                format!(
+                    "  - {}",
+                    named.unwrap_or_else(|| yaml_positional(&d.cells, spans))
+                )
             }
         })
         .collect()
 }
 
+/// The `table:` section, empty when every setting is at its default.
 fn yaml_settings(settings: &TableSettings) -> Vec<String> {
     let mut lines = Vec::new();
     if settings.width != TableSettings::default().width {
-        lines.push(format!("width: {}", yaml_scalar(&settings.width)));
+        lines.push(format!("  width: {}", yaml_scalar(&settings.width)));
     }
     if let Some(placement) = &settings.placement {
-        lines.push(format!("placement: {}", yaml_scalar(placement)));
+        lines.push(format!("  placement: {}", yaml_scalar(placement)));
     }
     if let Some(long) = settings.long {
-        lines.push(format!("long: {long}"));
+        lines.push(format!("  long: {long}"));
+    }
+    if !lines.is_empty() {
+        lines.insert(0, "table:".to_string());
     }
     lines
 }
 
 fn yaml_table(model: &TableModel) -> String {
-    let mut lines = Vec::new();
+    let spans = model.top_level_spans();
+    let mut lines = yaml_settings(&model.settings);
     lines.push("columns:".to_string());
     for column in &model.columns {
         lines.push(format!("  - {}", yaml_column(column)));
     }
     if !model.rows.is_empty() {
         lines.push("rows:".to_string());
-        lines.extend(yaml_rows(&model.rows));
+        lines.extend(yaml_rows(&model.rows, &model.columns, &spans));
     }
     if !model.footer.is_empty() {
         lines.push("footer:".to_string());
-        lines.extend(yaml_rows(&model.footer));
+        lines.extend(yaml_rows(&model.footer, &model.columns, &spans));
     }
-    lines.extend(yaml_settings(&model.settings));
     lines.join("\n")
 }
 
 fn table_config(out: &mut Out, config: &TableConfig) {
-    let mut lines = vec!["columns:".to_string()];
+    if let Some(source) = &config.source {
+        fence(out, "yaml table-config", source);
+        return;
+    }
+    let mut lines = yaml_settings(&config.settings);
+    if !config.columns.is_empty() {
+        lines.push("columns:".to_string());
+    }
     for column in &config.columns {
         lines.push(format!("  - {{{}}}", yaml_config(column).join(", ")));
     }
-    lines.extend(yaml_settings(&config.settings));
     fence(out, "yaml table-config", &lines.join("\n"));
 }

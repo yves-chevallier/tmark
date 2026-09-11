@@ -94,14 +94,48 @@ fn double_option<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Option<String
     Option::<String>::deserialize(d).map(Some)
 }
 
-/// Spec §Front matter: `authors: [{name, affiliation}]`.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// Spec §Front matter: `authors: [{name, affiliation}]`. A bare string
+/// item (`authors: [Ada Lovelace]`) is the name alone (C9: TMark tolerates
+/// what TeXSmith accepts).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, JsonSchema)]
 pub struct Author {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub affiliation: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for Author {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Name(String),
+            Full {
+                name: String,
+                #[serde(default)]
+                affiliation: Option<String>,
+                #[serde(default)]
+                email: Option<String>,
+            },
+        }
+        Ok(match Repr::deserialize(d)? {
+            Repr::Name(name) => Author {
+                name,
+                ..Author::default()
+            },
+            Repr::Full {
+                name,
+                affiliation,
+                email,
+            } => Author {
+                name,
+                affiliation,
+                email,
+            },
+        })
+    }
 }
 
 /// Spec §BlockQuote: `epigraph: {quote, source}` placed before the first
@@ -277,6 +311,22 @@ const DEPRECATED_KEYS: &[(&str, &str)] = &[
     ("acronyms", "declare"),
 ];
 
+/// Deprecated spellings of `press.callouts.style` (Appendix "Deprecation
+/// schedule": `callout_style`; TeXSmith's own `admonition_style`). The key
+/// is TeXSmith's, so the value moves inside `extra`.
+const DEPRECATED_CALLOUT_STYLE: &[&str] = &["callout_style", "admonition_style"];
+
+/// Every deprecated key as a dotted path, with the path it moved to: the
+/// one table the diagnostic message and the fix read (`yaml_edit::move_key`).
+pub fn deprecated_key_target(key: &str) -> Option<String> {
+    if let Some((_, group)) = DEPRECATED_KEYS.iter().find(|(k, _)| *k == key) {
+        return Some(format!("press.{group}.{key}"));
+    }
+    key.strip_prefix("press.")
+        .filter(|k| DEPRECATED_CALLOUT_STYLE.contains(k))
+        .map(|_| "press.callouts.style".to_string())
+}
+
 /// Parses the YAML text between the `---` fences.
 ///
 /// Every owned key is looked up under `press` first, then at the root; a
@@ -322,6 +372,19 @@ pub fn parse(raw: &str) -> Result<FrontMatter, FrontMatterError> {
             return Err(error(format!("`{group}` must be a mapping")));
         };
         group_map.entry(*key).or_insert(v);
+    }
+
+    for key in DEPRECATED_CALLOUT_STYLE {
+        let Some(v) = press.remove(*key) else {
+            continue;
+        };
+        deprecated.push(format!("press.{key}"));
+        let callouts = press
+            .entry("callouts")
+            .or_insert_with(|| Value::Object(Map::new()));
+        if let Value::Object(callouts) = callouts {
+            callouts.entry("style").or_insert(v);
+        }
     }
 
     if let Some(date) = keys.get_mut("date") {
@@ -396,6 +459,31 @@ mod tests {
         // The canonical `sources.crossrefs` wins over the deprecated spelling.
         assert_eq!(fm.keys.press.sources.crossrefs["other"], "x.json");
         assert!(!fm.keys.press.sources.crossrefs.contains_key("fwrev"));
+    }
+
+    #[test]
+    fn string_authors_and_callout_style_spellings() {
+        let fm = parse(
+            "authors: [TeXSmith, {name: Ada, email: a@b.c}]\npress:\n  admonition_style: classic\n",
+        )
+        .unwrap();
+        assert_eq!(fm.keys.authors[0].name, "TeXSmith");
+        assert_eq!(fm.keys.authors[1].email.as_deref(), Some("a@b.c"));
+        assert_eq!(fm.deprecated, vec!["press.admonition_style"]);
+        assert_eq!(fm.extra["press"]["callouts"]["style"], "classic");
+        assert!(fm.extra["press"].get("admonition_style").is_none());
+        assert_eq!(
+            deprecated_key_target("press.callout_style").as_deref(),
+            Some("press.callouts.style")
+        );
+        assert_eq!(
+            deprecated_key_target("counters").as_deref(),
+            Some("press.declare.counters")
+        );
+        assert!(deprecated_key_target("title").is_none());
+        // The explicit `callouts.style` wins over a deprecated spelling.
+        let fm = parse("press:\n  callout_style: a\n  callouts: {style: b}\n").unwrap();
+        assert_eq!(fm.extra["press"]["callouts"]["style"], "b");
     }
 
     #[test]

@@ -1,0 +1,19 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```yaml table
+table:
+  width: 100%
+  placement: htbp
+  long: true
+columns:
+  - Category
+  - {name: Q1, align: right, width-group: quarter}
+  - {name: Q2, align: right, width-group: quarter}
+rows:
+  - [Salaries, 120, 122]
+  - {separator: true, label: Totals, double-rule: true}
+footer:
+  - [Total, 120, 122]
+```

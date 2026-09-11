@@ -1,0 +1,31 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<figure id="fig:traces">
+<img src="boot.png" alt="Boot" id="fig:boot" />
+<img src="crash.png" alt="Crash" id="fig:crash" />
+<figcaption><span class="caption-label">Figure 1</span> Watchdog traces before and after the fix.</figcaption>
+</figure>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "boot.png",
+      "node": 3
+    },
+    {
+      "src": "crash.png",
+      "node": 7
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

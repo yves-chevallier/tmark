@@ -103,3 +103,48 @@ fn compat_spellings() {
     };
     assert_eq!(i.path, "snippets/file.md");
 }
+
+/// Decision X7: the deprecated citation forms, and what stays literal.
+#[test]
+fn deprecated_citations() {
+    let parsed = parse(
+        "See [^1] and [^ein05] and ^[ab,cd] but ^[not keys] and x^2^ here.\n",
+        FileId::default(),
+    );
+    let Block::Para(p) = &parsed.document.blocks[0] else {
+        panic!("{:?}", parsed.document.blocks)
+    };
+    let kinds: Vec<&str> = p
+        .content
+        .iter()
+        .map(|i| match i {
+            Inline::Str(s) => s.text.as_str(),
+            Inline::Ref(r) => {
+                assert!(r.bracketed);
+                "Ref"
+            }
+            Inline::Superscript(_) => "Sup",
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            "See [^1] and ",
+            "Ref",
+            " and ",
+            "Ref",
+            " but ^[not keys] and x",
+            "Sup",
+            " here."
+        ]
+    );
+    assert_eq!(
+        parsed
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == tmark_ir::Code::Deprecated)
+            .count(),
+        2
+    );
+}

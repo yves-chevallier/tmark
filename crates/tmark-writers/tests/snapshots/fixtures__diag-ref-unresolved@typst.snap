@@ -1,0 +1,20 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+== Intro <sec:intro>
+
+See #ref(<sec:intro>, supplement: [Section]), #ref(<sec:intro>, supplement: [Section]) and #link(<sec:intro>)[the intro], but not \[?sec:nope\].
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
