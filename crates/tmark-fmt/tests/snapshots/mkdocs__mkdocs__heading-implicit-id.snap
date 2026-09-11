@@ -2,6 +2,6 @@
 source: crates/tmark-fmt/tests/mkdocs.rs
 expression: mkdocs(&canonical)
 ---
-A \{--deleted--} word, a [[Wiki Page]].
+## Boot sequence
 
-a. first fancy item
+See [](#boot-sequence) and [^boot-sequence].

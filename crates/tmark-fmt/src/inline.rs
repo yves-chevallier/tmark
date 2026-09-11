@@ -229,6 +229,12 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push("]");
         }
         Inline::Span(n) => {
+            if let Some(shortcode) = icon_shortcode(n) {
+                // `Span{.icon media=web}` prints as the shortcode it holds
+                // (spec §Emoji and icon shortcodes).
+                out.push(shortcode);
+                return;
+            }
             out.push("[");
             inlines(
                 out,
@@ -262,15 +268,7 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
 /// spelling is canonical; the label is quoted, quotes inside it are what
 /// the recogniser cannot hold, so they are dropped).
 pub fn progress_bar(out: &mut Out, n: &tmark_ir::ProgressBar) {
-    out.push("[=");
-    out.push(&n.value_text());
-    out.push("%");
-    if let Some(label) = &n.label {
-        out.push(" \"");
-        out.push(&label.replace('"', ""));
-        out.push("\"");
-    }
-    out.push("]");
+    out.push(&n.head_text());
     attrs::write(out, &n.attrs, "");
 }
 
@@ -345,6 +343,24 @@ fn mkdocs_inline(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char
         Inline::RawInline(n) => mkdocs::raw_inline(out, n),
         _ => false,
     }
+}
+
+/// The shortcode of an icon span: exactly `.icon media=web` around one
+/// `Str` of the form `:material-…:` (one of the four Material sets).
+pub fn icon_shortcode(n: &tmark_ir::SpanNode) -> Option<&str> {
+    let [Inline::Str(s)] = n.content.as_slice() else {
+        return None;
+    };
+    let name = s.text.strip_prefix(':')?.strip_suffix(':')?;
+    let well_formed = !name.is_empty()
+        && name.bytes().all(|b| {
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'_' | b'-' | b'+')
+        });
+    let attrs = &n.attrs;
+    let icon_only = attrs.id.is_none()
+        && attrs.classes == ["icon"]
+        && attrs.kv == [("media".to_string(), "web".to_string())];
+    (well_formed && icon_only && tmark_ir::emoji::is_icon(name)).then_some(s.text.as_str())
 }
 
 /// The inlines of a paragraph-like block, for content that must print on one

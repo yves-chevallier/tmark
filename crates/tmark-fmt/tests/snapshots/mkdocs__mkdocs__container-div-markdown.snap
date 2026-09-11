@@ -2,6 +2,6 @@
 source: crates/tmark-fmt/tests/mkdocs.rs
 expression: mkdocs(&canonical)
 ---
-A \{--deleted--} word, a [[Wiki Page]].
-
-a. first fancy item
+<div class="grid cards" markdown>
+Some **bold** inside.
+</div>

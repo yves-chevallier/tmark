@@ -252,7 +252,7 @@ fn block_with(out: &mut Out, b: &Block, alternate: bool) {
             attrs::write(out, &m.attrs, " ");
             out.ensure_newline();
         }
-        Block::RawBlock(r) => fence(out, &format!("{} raw", r.format), &r.text),
+        Block::RawBlock(r) => raw_block(out, r),
         Block::Include(i) => {
             out.push("{include");
             if let Some(base) = &i.base {
@@ -279,8 +279,40 @@ fn mkdocs_block(out: &mut Out, b: &Block) -> bool {
         Block::Caption(c) => mkdocs::caption(out, c),
         Block::RawBlock(r) => mkdocs::raw_block(out, r),
         Block::Include(i) => mkdocs::include(out, i),
+        Block::Div(d) if d.name == "tabs" => mkdocs::tabs(out, d),
+        Block::Div(d) if d.name == "div" => mkdocs::div_markdown(out, d),
         _ => false,
     }
+}
+
+/// A raw block: a foreign directive (`format=markdown`) and an HTML block
+/// CommonMark reads back as one print as typed (spec §Foreign directive,
+/// §Raw passthrough); any other payload is the `raw` fence.
+fn raw_block(out: &mut Out, r: &tmark_ir::RawBlock) {
+    if r.format == "markdown" || (r.format == "html" && is_html_block(&r.text)) {
+        out.push(r.text.trim_end_matches('\n'));
+        out.push("\n");
+        return;
+    }
+    fence(out, &format!("{} raw", r.format), &r.text);
+}
+
+/// Whether `text`, printed alone between blank lines, is one CommonMark
+/// HTML block: it starts like one of the seven kinds (a tag, a comment,
+/// a processing instruction, a declaration, CDATA) and holds no blank line
+/// (which would end the block early).
+pub fn is_html_block(text: &str) -> bool {
+    let text = text.trim_end_matches('\n');
+    let first = text.lines().next().unwrap_or("");
+    let starts = first.starts_with("<!--")
+        || first.starts_with("<?")
+        || first.starts_with("<![CDATA[")
+        || (first.starts_with("<!") && first[2..].starts_with(|c: char| c.is_ascii_alphabetic()))
+        || (first.starts_with('<')
+            && first[1..]
+                .trim_start_matches('/')
+                .starts_with(|c: char| c.is_ascii_alphabetic()));
+    starts && !text.lines().any(|l| l.trim().is_empty())
 }
 
 /// A fenced block: backticks longer than any run inside, minimum three.

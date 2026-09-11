@@ -2,6 +2,4 @@
 source: crates/tmark-fmt/tests/mkdocs.rs
 expression: mkdocs(&canonical)
 ---
-A \{--deleted--} word, a [[Wiki Page]].
-
-a. first fancy item
+Click :material-cog: Settings.
