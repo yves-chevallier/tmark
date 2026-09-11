@@ -120,7 +120,7 @@ enum Command {
         #[arg(long = "bib", value_name = "FILE")]
         bibliography: Vec<PathBuf>,
     },
-    /// Print a JSON schema: `ir` or `frontmatter`.
+    /// Print a JSON schema: `ir`, `frontmatter`, `diagnostic` or `resolved`.
     Schema { name: String },
 }
 
