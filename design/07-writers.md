@@ -30,8 +30,16 @@ pub struct Requires {
 
 TeXSmith turns `Requires` into a preamble. The writer does not know what a
 fragment contains; it only names the contract (`ts-callouts` provides
-`\tscallout`). The list of contracts is the `FRAGMENTS` table in
-`tmark_ir::registry`, shared with TeXSmith's fragment loader.
+`tscallout`). The list of contracts is the `FRAGMENTS` table in
+`tmark_ir::registry`, shared with TeXSmith's fragment loader: one
+`Fragment { name, provides, packages, shell_escape, description }` per
+bundled `ts-*` fragment, `provides` listing macros (`\tskeys`) and
+environments (`tscode`) by their contract name. A writer that emits a
+contract macro adds the row's `name` to `Requires.fragments` and the row's
+`packages` to `Requires.packages`; `shell_escape` is `false` on every
+bundled row (minted is decided from `code.engine`). Keystroke labels come
+from `registry::KEY_LABELS` (`03-ir.md` §Closed registries), so LaTeX,
+Typst and HTML spell `ctrl` the same way.
 
 ## The trait
 

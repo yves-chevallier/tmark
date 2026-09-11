@@ -1,5 +1,6 @@
 //! The closed registries: roles, node words, predeclared counter prefixes,
-//! admonition types, features and deprecated spellings.
+//! admonition types, features, deprecated spellings, fragment contracts and
+//! keystroke labels.
 //!
 //! Design: `design/03-ir.md` §Closed registries. Each table is a `const`
 //! slice of a small struct; grammars, completion lists, lint messages and
@@ -591,6 +592,197 @@ pub fn deprecation(id: &str) -> Option<&'static Deprecation> {
     DEPRECATIONS.iter().find(|d| d.id == id)
 }
 
+// ---------------------------------------------------------------------------
+// Fragment contracts
+// ---------------------------------------------------------------------------
+
+/// One row of the fragment-contract table. Design `07-writers.md`: the
+/// writer names the contract in `Requires.fragments`; TeXSmith's fragment
+/// defines the macros. Names are the `press.fragments` spellings.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Fragment {
+    pub name: &'static str,
+    /// Macros (`\` prefix) and environments (bare) the fragment must define.
+    pub provides: &'static [&'static str],
+    /// LaTeX packages the contract implies; merged into `Requires.packages`
+    /// so `tlmgr` hints and `ts-extra` see them. What the fragment actually
+    /// loads is its own business.
+    pub packages: &'static [&'static str],
+    /// The contract needs `-shell-escape` regardless of options.
+    pub shell_escape: bool,
+    pub description: &'static str,
+}
+
+const fn frag(
+    name: &'static str,
+    provides: &'static [&'static str],
+    packages: &'static [&'static str],
+    description: &'static str,
+) -> Fragment {
+    Fragment {
+        name,
+        provides,
+        packages,
+        shell_escape: false,
+        description,
+    }
+}
+
+/// The bundled contracts (TeXSmith `specs/migration/fragment-contracts.md`
+/// §2). `shell_escape` is `false` on every bundled row: `ts-code` needs it
+/// only for `minted`, which the writer decides from `code.engine`; the
+/// field serves third-party contracts that always shell out.
+pub const FRAGMENTS: &[Fragment] = &[
+    frag(
+        "ts-typesetting",
+        &[
+            "\\tslead",
+            "\\tsmark",
+            "\\tsdivider",
+            "\\tsepigraph",
+            "\\tsaside",
+            "\\tsprogress",
+            "\\tsicon",
+            "tsdiv",
+        ],
+        &[
+            "xcolor",
+            "epigraph",
+            "marginnote",
+            "multicol",
+            "progressbar",
+            "graphicx",
+        ],
+        "lead-ins, highlight, divider, epigraph, asides, progress bars, generic containers",
+    ),
+    frag(
+        "ts-callouts",
+        &["tscallout"],
+        &["tcolorbox", "xcolor"],
+        "admonitions and theorem boxes",
+    ),
+    frag(
+        "ts-code",
+        &["tscode", "\\tscodeinline"],
+        &["tcolorbox", "fvextra"],
+        "code listings; engine (minted/listings/verbatim/pygments) is the fragment's choice",
+    ),
+    frag("ts-keystrokes", &["\\tskeys"], &["tikz"], "keyboard keys"),
+    frag(
+        "ts-todolist",
+        &["tstasklist", "\\tsdone", "\\tstodo", "\\tspartial"],
+        &["enumitem", "amssymb", "pifont"],
+        "task lists",
+    ),
+    frag(
+        "ts-glossary",
+        &["\\tsgls", "\\tsacr"],
+        &["glossaries"],
+        "glossary terms and acronyms",
+    ),
+    frag(
+        "ts-index",
+        &["\\tsindex"],
+        &["imakeidx"],
+        "index entries and registries",
+    ),
+    frag(
+        "ts-bibliography",
+        &["\\parencite", "\\textcite"],
+        &[],
+        "citation fallbacks without biblatex",
+    ),
+    frag(
+        "ts-fonts",
+        &["\\tsscript", "\\tsemoji"],
+        &["fontspec"],
+        "script and emoji font switches",
+    ),
+    frag(
+        "ts-critic",
+        &["\\tsins", "\\tsdel", "\\tssubst", "\\tscomment"],
+        &["ulem", "xcolor"],
+        "critic markup (tmark M5)",
+    ),
+];
+
+/// Looks a fragment contract up by its exact name.
+pub fn fragment(name: &str) -> Option<&'static Fragment> {
+    FRAGMENTS.iter().find(|f| f.name == name)
+}
+
+// ---------------------------------------------------------------------------
+// Keystroke labels
+// ---------------------------------------------------------------------------
+
+/// The label of a keystroke name (spec §Inline text, `{keys}[ctrl+s]`).
+/// Names are PyMdownX `keys` names, lowercase; labels are backend-neutral
+/// text (a writer maps `↑` to `\uparrow` if it must). A name with no row
+/// is labelled by its uppercase spelling, as TeXSmith's partial did.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct KeyLabel {
+    pub name: &'static str,
+    pub label: &'static str,
+}
+
+const fn key(name: &'static str, label: &'static str) -> KeyLabel {
+    KeyLabel { name, label }
+}
+
+/// Ported from TeXSmith's `keystroke.tex` partial, plus the PyMdownX
+/// aliases authors type most (`ctrl`, `cmd`, `del`, `escape`, `return`).
+pub const KEY_LABELS: &[KeyLabel] = &[
+    key("control", "Ctrl"),
+    key("ctrl", "Ctrl"),
+    key("alt", "Alt"),
+    key("delete", "Del"),
+    key("del", "Del"),
+    key("enter", "⏎ Enter"),
+    key("return", "⏎ Enter"),
+    key("shift", "⇧ Shift"),
+    key("slash", "/"),
+    key("comma", ","),
+    key("period", "."),
+    key("arrow-up", "↑"),
+    key("arrow-down", "↓"),
+    key("arrow-left", "←"),
+    key("arrow-right", "→"),
+    key("backslash", "\\"),
+    key("double-quote", "\""),
+    key("backspace", "⌫ Delete"),
+    key("command", "⌘"),
+    key("cmd", "⌘"),
+    key("tab", "Tab"),
+    key("esc", "Esc"),
+    key("escape", "Esc"),
+    key("insert", "Ins"),
+    key("home", "Home"),
+    key("end", "End"),
+    key("page-up", "PgUp"),
+    key("page-down", "PgDn"),
+    key("space", "Space"),
+    key("f1", "F1"),
+    key("f2", "F2"),
+    key("f3", "F3"),
+    key("f4", "F4"),
+    key("f5", "F5"),
+    key("f6", "F6"),
+    key("f7", "F7"),
+    key("f8", "F8"),
+    key("f9", "F9"),
+    key("f10", "F10"),
+    key("f11", "F11"),
+    key("f12", "F12"),
+];
+
+/// Looks a keystroke label up, case-insensitively (`Ctrl` and `ctrl` are
+/// the same key).
+pub fn key_label(name: &str) -> Option<&'static KeyLabel> {
+    KEY_LABELS
+        .iter()
+        .find(|k| k.name.eq_ignore_ascii_case(name))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,5 +841,63 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), DEPRECATIONS.len(), "deprecation ids are unique");
+    }
+
+    #[test]
+    fn fragments() {
+        assert_eq!(
+            fragment("ts-code").unwrap().packages,
+            &["tcolorbox", "fvextra"]
+        );
+        assert!(
+            fragment("ts-extra").is_none(),
+            "ts-extra is config, not a contract"
+        );
+        assert!(FRAGMENTS.iter().all(|f| !f.shell_escape));
+        let mut provides: Vec<&str> = FRAGMENTS.iter().flat_map(|f| f.provides).copied().collect();
+        let count = provides.len();
+        provides.sort_unstable();
+        provides.dedup();
+        assert_eq!(
+            provides.len(),
+            count,
+            "provides entries are unique across rows"
+        );
+        let mut names: Vec<&str> = FRAGMENTS.iter().map(|f| f.name).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), FRAGMENTS.len(), "fragment names are unique");
+        for f in FRAGMENTS {
+            assert!(
+                f.name.starts_with("ts-"),
+                "{}: contract names are ts-*",
+                f.name
+            );
+            for p in f.provides {
+                let bare = p.strip_prefix('\\').unwrap_or(p);
+                assert!(
+                    bare.chars().all(|c| c.is_ascii_lowercase()),
+                    "{p}: contract macros are lowercase letters"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn key_labels() {
+        assert_eq!(key_label("ctrl").unwrap().label, "Ctrl");
+        assert_eq!(key_label("Control").unwrap().label, "Ctrl");
+        assert_eq!(key_label("arrow-up").unwrap().label, "↑");
+        assert!(
+            key_label("s").is_none(),
+            "unknown keys are the writer's uppercase fallback"
+        );
+        let mut names: Vec<&str> = KEY_LABELS.iter().map(|k| k.name).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), KEY_LABELS.len(), "key names are unique");
+        assert!(KEY_LABELS
+            .iter()
+            .all(|k| k.name == k.name.to_ascii_lowercase()));
     }
 }

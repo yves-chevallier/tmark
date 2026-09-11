@@ -130,5 +130,308 @@
     "proposition",
     "definition",
     "proof"
+  ],
+  "fragments": [
+    {
+      "name": "ts-typesetting",
+      "provides": [
+        "\\tslead",
+        "\\tsmark",
+        "\\tsdivider",
+        "\\tsepigraph",
+        "\\tsaside",
+        "\\tsprogress",
+        "\\tsicon",
+        "tsdiv"
+      ],
+      "packages": [
+        "xcolor",
+        "epigraph",
+        "marginnote",
+        "multicol",
+        "progressbar",
+        "graphicx"
+      ],
+      "shell_escape": false,
+      "description": "lead-ins, highlight, divider, epigraph, asides, progress bars, generic containers"
+    },
+    {
+      "name": "ts-callouts",
+      "provides": [
+        "tscallout"
+      ],
+      "packages": [
+        "tcolorbox",
+        "xcolor"
+      ],
+      "shell_escape": false,
+      "description": "admonitions and theorem boxes"
+    },
+    {
+      "name": "ts-code",
+      "provides": [
+        "tscode",
+        "\\tscodeinline"
+      ],
+      "packages": [
+        "tcolorbox",
+        "fvextra"
+      ],
+      "shell_escape": false,
+      "description": "code listings; engine (minted/listings/verbatim/pygments) is the fragment's choice"
+    },
+    {
+      "name": "ts-keystrokes",
+      "provides": [
+        "\\tskeys"
+      ],
+      "packages": [
+        "tikz"
+      ],
+      "shell_escape": false,
+      "description": "keyboard keys"
+    },
+    {
+      "name": "ts-todolist",
+      "provides": [
+        "tstasklist",
+        "\\tsdone",
+        "\\tstodo",
+        "\\tspartial"
+      ],
+      "packages": [
+        "enumitem",
+        "amssymb",
+        "pifont"
+      ],
+      "shell_escape": false,
+      "description": "task lists"
+    },
+    {
+      "name": "ts-glossary",
+      "provides": [
+        "\\tsgls",
+        "\\tsacr"
+      ],
+      "packages": [
+        "glossaries"
+      ],
+      "shell_escape": false,
+      "description": "glossary terms and acronyms"
+    },
+    {
+      "name": "ts-index",
+      "provides": [
+        "\\tsindex"
+      ],
+      "packages": [
+        "imakeidx"
+      ],
+      "shell_escape": false,
+      "description": "index entries and registries"
+    },
+    {
+      "name": "ts-bibliography",
+      "provides": [
+        "\\parencite",
+        "\\textcite"
+      ],
+      "packages": [],
+      "shell_escape": false,
+      "description": "citation fallbacks without biblatex"
+    },
+    {
+      "name": "ts-fonts",
+      "provides": [
+        "\\tsscript",
+        "\\tsemoji"
+      ],
+      "packages": [
+        "fontspec"
+      ],
+      "shell_escape": false,
+      "description": "script and emoji font switches"
+    },
+    {
+      "name": "ts-critic",
+      "provides": [
+        "\\tsins",
+        "\\tsdel",
+        "\\tssubst",
+        "\\tscomment"
+      ],
+      "packages": [
+        "ulem",
+        "xcolor"
+      ],
+      "shell_escape": false,
+      "description": "critic markup (tmark M5)"
+    }
+  ],
+  "key_labels": [
+    {
+      "name": "control",
+      "label": "Ctrl"
+    },
+    {
+      "name": "ctrl",
+      "label": "Ctrl"
+    },
+    {
+      "name": "alt",
+      "label": "Alt"
+    },
+    {
+      "name": "delete",
+      "label": "Del"
+    },
+    {
+      "name": "del",
+      "label": "Del"
+    },
+    {
+      "name": "enter",
+      "label": "⏎ Enter"
+    },
+    {
+      "name": "return",
+      "label": "⏎ Enter"
+    },
+    {
+      "name": "shift",
+      "label": "⇧ Shift"
+    },
+    {
+      "name": "slash",
+      "label": "/"
+    },
+    {
+      "name": "comma",
+      "label": ","
+    },
+    {
+      "name": "period",
+      "label": "."
+    },
+    {
+      "name": "arrow-up",
+      "label": "↑"
+    },
+    {
+      "name": "arrow-down",
+      "label": "↓"
+    },
+    {
+      "name": "arrow-left",
+      "label": "←"
+    },
+    {
+      "name": "arrow-right",
+      "label": "→"
+    },
+    {
+      "name": "backslash",
+      "label": "\\"
+    },
+    {
+      "name": "double-quote",
+      "label": "\""
+    },
+    {
+      "name": "backspace",
+      "label": "⌫ Delete"
+    },
+    {
+      "name": "command",
+      "label": "⌘"
+    },
+    {
+      "name": "cmd",
+      "label": "⌘"
+    },
+    {
+      "name": "tab",
+      "label": "Tab"
+    },
+    {
+      "name": "esc",
+      "label": "Esc"
+    },
+    {
+      "name": "escape",
+      "label": "Esc"
+    },
+    {
+      "name": "insert",
+      "label": "Ins"
+    },
+    {
+      "name": "home",
+      "label": "Home"
+    },
+    {
+      "name": "end",
+      "label": "End"
+    },
+    {
+      "name": "page-up",
+      "label": "PgUp"
+    },
+    {
+      "name": "page-down",
+      "label": "PgDn"
+    },
+    {
+      "name": "space",
+      "label": "Space"
+    },
+    {
+      "name": "f1",
+      "label": "F1"
+    },
+    {
+      "name": "f2",
+      "label": "F2"
+    },
+    {
+      "name": "f3",
+      "label": "F3"
+    },
+    {
+      "name": "f4",
+      "label": "F4"
+    },
+    {
+      "name": "f5",
+      "label": "F5"
+    },
+    {
+      "name": "f6",
+      "label": "F6"
+    },
+    {
+      "name": "f7",
+      "label": "F7"
+    },
+    {
+      "name": "f8",
+      "label": "F8"
+    },
+    {
+      "name": "f9",
+      "label": "F9"
+    },
+    {
+      "name": "f10",
+      "label": "F10"
+    },
+    {
+      "name": "f11",
+      "label": "F11"
+    },
+    {
+      "name": "f12",
+      "label": "F12"
+    }
   ]
 }
