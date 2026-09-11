@@ -43,14 +43,15 @@ tmark.resolve(doc: dict, loader: Loader | None = None, options: dict | None = No
     # schema("resolved"): counters (numbers, next), next_start, labels, refs,
     # bibliography, entries, dois, glossary, index, crossrefs, included, diagnostics
 tmark.edit(text: str, doc: dict, node_id: int, replacement: dict) -> str
+tmark.edit_many(text: str, doc: dict, edits: list[dict]) -> str   # [{"node_id", "replacement"}], disjoint spans or ValueError
 tmark.write(doc: dict, backend: str, options: dict, loader: Loader | None = None, resolved: dict | None = None) -> dict
     # {"text", "map", "requires"}; raises NotImplementedError until milestone 4
 tmark.schema(name: str) -> dict            # "ir", "frontmatter", "diagnostic", "resolved"
 tmark.schema_hash() -> str                 # 16 hex digits, FNV-1a of schema("ir"), platform-independent
 tmark.codes() -> list[dict]                # {"id", "severity", "stage", "doc"} per diagnostic code
-tmark.fragments() -> list[dict]            # [] until tmark_ir::registry::FRAGMENTS lands
+tmark.fragments() -> list[dict]            # FRAGMENTS rows: name, provides, packages, shell_escape, description
 tmark.registries() -> dict                 # roles, node_words, lang_default_node_words, prefixes,
-                                           # admonitions, features, deprecations
+                                           # admonitions, features, deprecations, key_labels
 tmark.version() -> str; tmark.__version__  # the workspace version
 ```
 

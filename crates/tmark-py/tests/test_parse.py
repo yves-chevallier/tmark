@@ -65,6 +65,38 @@ def test_edit_splices_one_node():
         tmark.edit(text, doc, emph["id"], {"type": "Nope"})
 
 
+def test_edit_many_splices_disjoint_nodes():
+    text = "Hello *world*, bye *all*.\n"
+    doc = tmark.parse(text)
+    content = doc["blocks"][0]["content"]
+    emphs = [n for n in content if n["type"] == "Emph"]
+    strong = lambda word: {"type": "Strong", "content": [{"type": "Str", "text": word}]}
+    out = tmark.edit_many(
+        text,
+        doc,
+        [
+            {"node_id": emphs[0]["id"], "replacement": strong("world")},
+            {"node_id": emphs[1]["id"], "replacement": strong("all")},
+        ],
+    )
+    assert out == "Hello **world**, bye **all**.\n"
+    assert tmark.edit_many(text, doc, []) == text
+    para = doc["blocks"][0]["id"]
+    with pytest.raises(ValueError, match="overlap"):
+        tmark.edit_many(
+            text,
+            doc,
+            [
+                {"node_id": para, "replacement": {"type": "Para", "content": []}},
+                {"node_id": emphs[0]["id"], "replacement": strong("x")},
+            ],
+        )
+    with pytest.raises(ValueError, match="not in the document"):
+        tmark.edit_many(text, doc, [{"node_id": 999, "replacement": strong("x")}])
+    with pytest.raises(TypeError, match="node_id"):
+        tmark.edit_many(text, doc, [{"replacement": strong("x")}])
+
+
 def test_fixes_is_what_lint_fix_writes(fixture_inputs, fixture):
     text = fixture_inputs("include")[0]
     fixed = tmark.fixes(text, loader=NoFiles())

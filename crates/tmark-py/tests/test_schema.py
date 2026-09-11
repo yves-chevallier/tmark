@@ -68,10 +68,19 @@ def test_registries_are_the_closed_tables():
     assert {a["name"] for a in reg["admonitions"]} >= {"note", "theorem", "proof"}
     assert {f["name"] for f in reg["features"]} >= {"paragraph.lead", "compat.pymdownx"}
     assert any(d["id"] == "margin-role" for d in reg["deprecations"])
+    labels = {k["name"]: k["label"] for k in reg["key_labels"]}
+    assert labels["ctrl"] == "Ctrl" and labels["shift"].endswith("Shift")
 
 
-def test_fragments_is_empty_until_the_registry_lands():
-    assert tmark.fragments() == []
+def test_fragments_are_the_contract_table():
+    fragments = tmark.fragments()
+    by_name = {f["name"]: f for f in fragments}
+    assert "ts-typesetting" in by_name
+    row = by_name["ts-typesetting"]
+    assert set(row) == {"name", "provides", "packages", "shell_escape", "description"}
+    assert "\\tslead" in row["provides"] and "xcolor" in row["packages"]
+    assert isinstance(row["shell_escape"], bool) and row["description"]
+    assert len({f["name"] for f in fragments}) == len(fragments)
 
 
 def test_write_is_milestone_4():

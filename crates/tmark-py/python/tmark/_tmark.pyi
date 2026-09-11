@@ -26,6 +26,16 @@ def edit(text: str, doc: dict[str, Any], node_id: int, replacement: dict[str, An
     """
     ...
 
+def edit_many(text: str, doc: dict[str, Any], edits: list[dict[str, Any]]) -> str:
+    """
+    Apply several local edits in one pass: each item is
+    `{"node_id": int, "replacement": dict}` with the replacement shape of
+    `edit`. Spans must be disjoint; an unknown node, a span outside the
+    text or two overlapping edits raise `ValueError` and nothing is applied
+    (design 04 §Local edits).
+    """
+    ...
+
 def fixes(text: str, file: str = "<memory>", loader: Loader | None = None, options: dict[str, Any] | None = None) -> str:
     """
     The text with every safe fix applied: what `tmark lint --fix` writes
@@ -45,8 +55,9 @@ def format(text: str, profile: str = "canonical") -> str:
 
 def fragments() -> list[dict[str, Any]]:
     """
-    The fragment registry: what a writer's `requires` can name. Empty until
-    `tmark_ir::registry::FRAGMENTS` lands with the writers (milestone 4).
+    The fragment-contract table (design 07): one row per contract a
+    writer's `requires.fragments` can name, `{"name", "provides",
+    "packages", "shell_escape", "description"}`.
     """
     ...
 
@@ -78,8 +89,9 @@ def registries() -> dict[str, Any]:
     """
     The closed registries of the IR as tables (design 03 §Closed
     registries): `roles`, `node_words`, `lang_default_node_words`,
-    `prefixes`, `admonitions`, `features`, `deprecations`. One definition,
-    in `tmark_ir::registry`; generate from these, never copy them.
+    `prefixes`, `admonitions`, `features`, `deprecations`, `key_labels`
+    (keystroke name -> label). One definition, in `tmark_ir::registry`;
+    generate from these, never copy them.
     """
     ...
 

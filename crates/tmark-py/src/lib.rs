@@ -25,7 +25,8 @@ use pythonize::{depythonize, pythonize};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tmark::ir::registry::{
-    ADMONITIONS, DEPRECATIONS, FEATURES, LANG_DEFAULT_NODE_WORDS, NODE_WORDS, PREFIXES, ROLES,
+    ADMONITIONS, DEPRECATIONS, FEATURES, FRAGMENTS, KEY_LABELS, LANG_DEFAULT_NODE_WORDS,
+    NODE_WORDS, PREFIXES, ROLES,
 };
 use tmark::ir::{Block, Code, Inline, LineIndex, NodeId, NodeRef};
 use tmark::{
@@ -430,8 +431,19 @@ fn edit(
     replacement: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
     let document = document_of(doc)?;
+    let edit = node_edit(&document, node_id, replacement)?;
+    Ok(tmark::edit(text, &document, edit))
+}
+
+/// A `NodeEdit` from a node id and a Block or Inline as JSON; the node's
+/// kind decides which (`Comment` exists in both).
+fn node_edit(
+    document: &Document,
+    node_id: u32,
+    replacement: &Bound<'_, PyAny>,
+) -> PyResult<NodeEdit> {
     let id = NodeId(node_id);
-    let Some(node) = tmark::ir::find(&document, id) else {
+    let Some(node) = tmark::ir::find(document, id) else {
         return Err(PyValueError::new_err(format!(
             "node {node_id} is not in the document"
         )));
@@ -440,7 +452,32 @@ fn edit(
         NodeRef::Block(_) => Replacement::Block(from_py::<Block>(replacement, "replacement")?),
         NodeRef::Inline(_) => Replacement::Inline(from_py::<Inline>(replacement, "replacement")?),
     };
-    Ok(tmark::edit(text, &document, NodeEdit { id, replacement }))
+    Ok(NodeEdit { id, replacement })
+}
+
+/// edit_many(text: str, doc: dict[str, Any], edits: list[dict[str, Any]]) -> str
+///
+/// Apply several local edits in one pass: each item is
+/// `{"node_id": int, "replacement": dict}` with the replacement shape of
+/// `edit`. Spans must be disjoint; an unknown node, a span outside the
+/// text or two overlapping edits raise `ValueError` and nothing is applied
+/// (design 04 §Local edits).
+#[pyfunction]
+fn edit_many(text: &str, doc: &Bound<'_, PyAny>, edits: &Bound<'_, PyAny>) -> PyResult<String> {
+    let document = document_of(doc)?;
+    let mut node_edits = Vec::new();
+    for item in edits.iter()? {
+        let item = item?;
+        let node_id: u32 = item
+            .get_item("node_id")
+            .and_then(|v| v.extract())
+            .map_err(|e| PyTypeError::new_err(format!("edits: node_id: {e}")))?;
+        let replacement = item
+            .get_item("replacement")
+            .map_err(|e| PyTypeError::new_err(format!("edits: replacement: {e}")))?;
+        node_edits.push(node_edit(&document, node_id, &replacement)?);
+    }
+    tmark::edit_many(text, &document, node_edits).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// write(doc: dict[str, Any], backend: str, options: dict[str, Any], loader: Loader | None = None, resolved: dict[str, Any] | None = None) -> dict[str, Any]
@@ -509,20 +546,33 @@ fn codes(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 
 /// fragments() -> list[dict[str, Any]]
 ///
-/// The fragment registry: what a writer's `requires` can name. Empty until
-/// `tmark_ir::registry::FRAGMENTS` lands with the writers (milestone 4).
+/// The fragment-contract table (design 07): one row per contract a
+/// writer's `requires.fragments` can name, `{"name", "provides",
+/// "packages", "shell_escape", "description"}`.
 #[pyfunction]
 fn fragments(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    // TODO(wt/registry): expose `tmark::ir::registry::FRAGMENTS` once merged.
-    to_py(py, &Value::Array(Vec::new()))
+    let value: Vec<Value> = FRAGMENTS
+        .iter()
+        .map(|f| {
+            json!({
+                "name": f.name,
+                "provides": f.provides,
+                "packages": f.packages,
+                "shell_escape": f.shell_escape,
+                "description": f.description,
+            })
+        })
+        .collect();
+    to_py(py, &Value::Array(value))
 }
 
 /// registries() -> dict[str, Any]
 ///
 /// The closed registries of the IR as tables (design 03 §Closed
 /// registries): `roles`, `node_words`, `lang_default_node_words`,
-/// `prefixes`, `admonitions`, `features`, `deprecations`. One definition,
-/// in `tmark_ir::registry`; generate from these, never copy them.
+/// `prefixes`, `admonitions`, `features`, `deprecations`, `key_labels`
+/// (keystroke name -> label). One definition, in `tmark_ir::registry`;
+/// generate from these, never copy them.
 #[pyfunction]
 fn registries(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     let value = json!({
@@ -536,6 +586,10 @@ fn registries(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         "admonitions": ADMONITIONS,
         "features": FEATURES,
         "deprecations": DEPRECATIONS,
+        "key_labels": KEY_LABELS
+            .iter()
+            .map(|k| json!({"name": k.name, "label": k.label}))
+            .collect::<Vec<_>>(),
     });
     to_py(py, &value)
 }
@@ -557,6 +611,7 @@ fn _tmark(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fixes, m)?)?;
     m.add_function(wrap_pyfunction!(resolve, m)?)?;
     m.add_function(wrap_pyfunction!(edit, m)?)?;
+    m.add_function(wrap_pyfunction!(edit_many, m)?)?;
     m.add_function(wrap_pyfunction!(write, m)?)?;
     m.add_function(wrap_pyfunction!(schema, m)?)?;
     m.add_function(wrap_pyfunction!(schema_hash, m)?)?;
