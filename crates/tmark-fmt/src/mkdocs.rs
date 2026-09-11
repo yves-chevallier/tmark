@@ -149,7 +149,7 @@ fn wrappable(content: &[Inline], same_family: fn(&Inline) -> bool) -> bool {
                 } else {
                     s.text.chars().next()
                 };
-                c.is_none_or(char::is_whitespace)
+                c.map_or(true, char::is_whitespace)
             }
             Inline::Space(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) => true,
             _ => false,
