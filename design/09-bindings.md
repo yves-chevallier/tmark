@@ -9,7 +9,7 @@ of the facade (`01-architecture.md` §The facade).
 ```
 tmark parse  FILE [--compact]           IR as JSON
 tmark fmt    FILE… [--profile P] [--check] [--write]
-tmark lint   FILE… [--fix] [--strict] [--level CODE=LEVEL]
+tmark lint   FILE… [--fix [--stdout | --diff]] [--strict] [--level CODE=LEVEL]
 tmark check  FILE…                       parse + resolve + lint, exit code (alias of lint)
 tmark write  FILE --to latex|typst|html [--media print|web] [--map]   (milestone 4)
 tmark schema frontmatter|ir             print the JSON schema (`inventory`: milestone 4)
@@ -21,6 +21,15 @@ does not carry `lsp-server`; the VS Code extension bundles it. `tmark.toml`
 above a file sets its profile and lint levels (`tmark::Config`); flags
 override. `clap`, `FsLoader`, exit codes 0/1/2 (ok / findings / usage). Output on stdout, diagnostics on stderr in the
 `file:line:col: severity code: message` form. `--json` everywhere for tools.
+
+`lint --fix` applies the safe fixes (the `Fix` a diagnostic carries, design
+05 §Fixes) and, by default, **rewrites each file in place**, reporting
+`file: N fix(es) applied` on stderr; the diagnostics that were fixed are
+not printed. `--stdout` prints the fixed text on stdout instead and writes
+nothing (one file at a time is the useful case); `--diff` prints a unified
+diff (`diff -u` layout, three lines of context) and writes nothing. The
+two are exclusive; both require `--fix`. Standard input (`-`) is never
+written back.
 
 ## Python (`tmark-py`)
 
