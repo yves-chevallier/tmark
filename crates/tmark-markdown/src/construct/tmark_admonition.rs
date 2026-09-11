@@ -1,13 +1,20 @@
-//! TMark admonition in the PyMdownX spelling, in the [flow][] content type.
+//! TMark admonition in the PyMdownX spelling, in the [flow][] content type;
+//! the same head-plus-indented-body shape serves the PyMdownX content tab
+//! (`=== "Title"`, spec §Tabs) and the foreign directive (`::: a.b`, spec
+//! §Foreign directive).
 //!
 //! ## Grammar
 //!
 //! ```bnf
-//! tmark_admonition ::= ('!!!' | '???' | '???+') 1*space info eol body
+//! tmark_admonition ::= marker 1*space info eol body
+//! marker           ::= '!!!' | '???' | '???+' | '===' | '===!' | '===+' | 3*':'
 //! info             ::= 1*(char - eol)
 //! ```
 //!
-//! The body is the indented block that follows (see
+//! The `:::` marker is accepted only when the line is a foreign directive
+//! head (a dotted name alone, `util::tmark::is_foreign_directive`); every
+//! other `:::` line is a container fence. The body is the indented block
+//! that follows (see
 //! [`partial_tmark_body`][crate::construct::partial_tmark_body]). The info
 //! is kept raw (`type class… "Title"`); `tmark-syntax` parses it. The body
 //! is not tokenised here: the lowering re-parses it as a document, with the
@@ -26,8 +33,9 @@ use crate::construct::partial_space_or_tab::space_or_tab;
 use crate::event::Name;
 use crate::state::{Name as StateName, State};
 use crate::tokenizer::Tokenizer;
+use crate::util::tmark::is_foreign_directive;
 
-/// Start, at `!` or `?`.
+/// Start, at `!`, `?`, `=` or `:`.
 ///
 /// ```markdown
 /// > | !!! note "Title"
@@ -37,8 +45,13 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
     if !tokenizer.parse_state.options.constructs.tmark_admonition {
         return State::Nok;
     }
+    if tokenizer.current == Some(b':')
+        && !is_foreign_directive(tokenizer.parse_state.bytes, tokenizer.point.index)
+    {
+        return State::Nok;
+    }
     match tokenizer.current {
-        Some(b'!' | b'?') => {
+        Some(b'!' | b'?' | b'=' | b':') => {
             tokenizer.tokenize_state.marker = tokenizer.current.unwrap();
             tokenizer.tokenize_state.size = 0;
             tokenizer.tokenize_state.seen = false;
@@ -61,13 +74,18 @@ pub fn sequence(tokenizer: &mut Tokenizer) -> State {
         tokenizer.tokenize_state.size += 1;
         tokenizer.consume();
         State::Next(StateName::TmarkAdmonitionSequence)
-    } else if tokenizer.tokenize_state.size != 3 {
+    } else if tokenizer.tokenize_state.size != 3 && tokenizer.tokenize_state.marker != b':' {
         reset(tokenizer);
         State::Nok
-    } else if tokenizer.tokenize_state.marker == b'?'
-        && tokenizer.current == Some(b'+')
-        && !tokenizer.tokenize_state.seen
+    } else if tokenizer.tokenize_state.size < 3 {
+        reset(tokenizer);
+        State::Nok
+    } else if !tokenizer.tokenize_state.seen
+        && ((tokenizer.tokenize_state.marker == b'?' && tokenizer.current == Some(b'+'))
+            || (tokenizer.tokenize_state.marker == b'='
+                && matches!(tokenizer.current, Some(b'+' | b'!'))))
     {
+        // `???+` (open), `===+` (selected tab), `===!` (new tab set).
         tokenizer.tokenize_state.seen = true;
         tokenizer.consume();
         State::Next(StateName::TmarkAdmonitionSequence)
@@ -114,6 +132,11 @@ pub fn info(tokenizer: &mut Tokenizer) -> State {
         }
         _ => {
             if tokenizer.tokenize_state.size_b == 0 {
+                // A content tab's info is its quoted title: `=== "Title"`.
+                if tokenizer.tokenize_state.marker == b'=' && tokenizer.current != Some(b'"') {
+                    reset(tokenizer);
+                    return State::Nok;
+                }
                 tokenizer.enter(Name::TmarkAdmonitionInfo);
                 tokenizer.tokenize_state.size_b = 1;
             }
