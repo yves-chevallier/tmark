@@ -51,12 +51,11 @@ CLI and `Config` (`pathdiff`/`relative_to`); `has_press_key` re-scans the
 front matter in the LSP instead of reading `Document.front_matter`.
 
 From `03-printer-critic.md` (11 under-escaping findings, over-escaping
-measured as rare): U1 fixed (`escape::text` now treats the first run of a
-block as a line start, so `- \# x` and `# \# x` round-trip; heading
-content passes `block_start`). U2–U11 are open; U4 (`"` inside attribute
-values, the only corpus file that fails the fixed point) needs a spec
-decision first (`12-spec-challenges.md` C25 candidate: either `\"` is an
-escape in a quoted value or `"` is unrepresentable).
+measured as rare): U1–U8, U10 and U11 fixed with a fixture each
+(`04-printer.md` §Implementation notes (milestone 3)); C25 decided in the
+spec (`\"` and `\\` escape inside quoted values). U9 (unbalanced
+parentheses in a raw argument) is challenge C26. The 93 TeXSmith pages,
+the spec and the editor sample reach the fixed point and round-trip.
 
 From `01-parser-adversary.md`: P1 is an upstream markdown-rs 1.0.0 panic
 (unclosed fence in a list item followed by a list of another kind), now
@@ -74,39 +73,40 @@ now C24.
 
 ## What M3 still lacks (against `11-roadmap.md` §M3 and `08-lsp.md`)
 
-0. **Printer findings U2–U11** of `reviews/03` before `tmark fmt` runs on
-   TeXSmith's corpus (M4 gate): `|` in code spans and column names, bare
-   link destinations, `"` in values (spec decision), adjacent lists,
-   line breaks and numeric-looking YAML cells, `IndexEntry` before `[`,
-   unbalanced `)` in raw arguments, GFM autolink literals, backslashes in
-   link titles. Each has a minimal input and a proposed fixture name.
+Done since the first pass: the `press` schema merge, diagnostics of
+included files under their own URI, references inside included files
+resolved, outline and folding of asides and generated images, completion
+of classes, front-matter paths and file paths, printer findings U1–U8,
+U10, U11.
+
 1. **A person installing the `.vsix` and trying it.** Everything is tested
    over the in-memory connection and the binary over stdio; nobody has
    opened VS Code. Expect small things: activation on `.md` files without
    `press` (the client sends them all; the server stays quiet — check
    that VS Code does not show "TMark" errors for a README), the output
    channel, the restart command.
-2. **`press` schema merge** into front-matter completion (`Config.press_schema`
-   is parsed, unused). `completion::front_matter` walks `tmark::schema("frontmatter")`;
-   merge the external JSON schema's `properties` under `press` and offer
-   its keys.
-3. **Diagnostics for included files** (`08-lsp.md` says per file). The
-   analysis has the spans with `FileId(n)` and `Resolved.files`; publish a
-   `PublishDiagnostics` per included path (`convert::path_to_uri`).
-4. **Outline and folding** for `Para([Aside])` and generated images
-   (IR review §2–3).
-5. **Completion** of `{.` classes seen in the document, image paths
-   (needs `Loader::list`, or `std::fs::read_dir` at the edge), `{{` paths
-   from the front matter.
-6. **Range formatting** (whole-document diff) and incremental text sync if
-   the 1 MB case matters.
-7. **Fixes beyond `deprecated`**: the audit's D5–D8 rows emit nothing;
+2. **Printer U9** waits for C26 (`12-spec-challenges.md`); the parser-side
+   observations at the end of `reviews/03` (`\[x\]{#id}` leaves two
+   `Str`s, `$5 and $6` is math, `x^2 and y^3` a superscript) and the
+   `reviews/02` ranking for M3 (anchors with undeclared prefixes, C24;
+   `frontmatter-unknown-key` never fires; links and fences are not
+   attribute hosts; deprecated front-matter groups dropped) are the
+   parser's to-do list.
+3. **The upstream tokenizer panic** (`reviews/01` P1) is guarded, not
+   fixed: report it to markdown-rs with the input of
+   `spec/conformance/diag-parse-internal.md`, or fix the exit ordering in
+   `construct/document.rs` and drop the guard's fixture.
+4. **Range formatting** (whole-document diff) and incremental text sync if
+   the 1 MB case matters (`reviews/06`: it does not for chapters).
+5. **Fixes beyond `deprecated`**: the audit's D5–D8 rows emit nothing;
    `caption-id-off-convention` could offer the conventional prefix;
    `deprecated-frontmatter-key` could move the key under `press`.
-8. **Editor polish**: per-platform download of the binary (only the
-   bundled or PATH binary today), `LICENSE` file for `vsce`, a changelog
-   entry when released, the `TMARK_DEV` variable in `launch.json` is
-   unused.
+6. **Editor polish**: per-platform download of the binary (only the
+   bundled or PATH binary today), a changelog entry when released, the
+   `TMARK_DEV` variable in `launch.json` is unused.
+7. **Included files in the editor**: an unsaved buffer of an included
+   file is not seen by the analysis (it reads the disk); hover on a label
+   of an included file shows its heading text, definition jumps there.
 
 ## Plan of attack for M4 (writers and preview)
 
@@ -165,5 +165,6 @@ cargo run -q -p tmark-cli -- lint --fix FILE
 cargo run -q -p tmark --example fixes -- FILE                                  # what --fix would do
 cargo run --release -q -p tmark-syntax --example bench -- spec/tmark.md
 (cd editors/vscode && npm install && npm test && npm run build:grammar && npm run bundle:server && npm run package)
+# corpus fixed point: for f in $(find /home/ycr/texsmith/docs -name '*.md'); do tmark fmt "$f" > /tmp/a.md; tmark fmt /tmp/a.md | cmp -s - /tmp/a.md || echo "$f"; done
 code --install-extension editors/vscode/vscode-tmark-0.1.0.vsix
 ```

@@ -142,3 +142,14 @@ reference), document links for includes.
   needs its own tokenizer rule if it is ever wanted (milestone 5, or never).
 - Glossary terms come from `declare.glossary`, `declare.acronyms` (term to
   string or object with `name`/`description`) and the `*[KEY]: …` lines.
+
+## Implementation notes (milestone 3)
+
+- References inside included files resolve too: the collector keeps the
+  parsed included documents (`Resolved.included`) and `resolve_all` runs
+  on each after the main document, so `ref-unresolved` is reported with
+  the included file's `FileId` and the language server publishes it under
+  that file. `RefResolution.span` is the key token (`RefItem.key_span`);
+  `Label.id_span` is the id token.
+- Heading-class prefixes carry `Prefix::heading` in the registry instead
+  of a list in the collector.

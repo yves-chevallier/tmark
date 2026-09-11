@@ -87,10 +87,11 @@ session by a person). The grammar tables come from `tmark-ir`; the
 external `press` schema of `tmark.toml` is merged into front-matter
 completion; included files get their parse diagnostics published under
 their own URI; completion also covers `{.` classes, `{{` paths and
-image/include paths. Open: references inside included files are not
-resolved (the collector keeps their labels only); `lint --fix` and the
-code actions cover `deprecated` only; range formatting; a real VS Code
-session. See `13-handoff.md`.
+image/include paths. References inside included files resolve and are
+reported under their file; the printer round-trips the TeXSmith
+documentation (`04-printer.md`). Open: `lint --fix` and the code actions
+cover `deprecated` only; range formatting; a real VS Code session. See
+`13-handoff.md`.
 
 ## M4 — Writers and preview
 

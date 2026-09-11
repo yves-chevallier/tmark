@@ -150,3 +150,34 @@ candidate line for the spec's "Canonical" column.
   their backslash escapes, so `format` is idempotent on them.
 - Profiles: `Strict` prints like `Canonical` (the difference is at parse
   time); `Mkdocs` is a stub that prints like `Canonical` until milestone 5.
+
+## Implementation notes (milestone 3, after the printer review)
+
+`reviews/03-printer-critic.md` measured over-escaping as rare on real
+prose and found eleven ways to break the round-trip. Fixed:
+
+- U1: the block-start rules apply to the first run of a block even after
+  a marker (`- \# x`, `# \# x`), through `Context::block_start`.
+- U2: `|` inside a code span of a pipe cell prints `\|`; column names are
+  escaped like cell text.
+- U3: link and image destinations with whitespace, `<`, `>` or unbalanced
+  parentheses print as `<…>` (`inline::destination`).
+- U4: quoted attribute and fence-option values encode `\` and `"`
+  (`attrs::quoted`); the spec gained the `\"`/`\\` escapes (challenge
+  C25, closed). Fence options are encoded once more because CommonMark
+  processes backslash escapes in an info string before TMark reads it.
+- U5: a list right after a list of the same kind takes the other marker
+  (`*`, `)`), so the two do not merge on re-parse.
+- U6: a table with a line break in a cell is not plain: it prints as a
+  `yaml table` fence with `\n` in the scalar.
+- U7: YAML scalars that YAML would type (floats, exponents, `+1`, `0x1F`,
+  the null and boolean words in any case) are quoted; plain integers stay.
+- U8: a `[` right after an `IndexEntry` is escaped (`Context::after_index`).
+- U10: GFM autolink literals are defused (`http\://`, `www\.`,
+  `me\@x.y`); a `www.` link whose text is its address prints bare.
+- U11: link titles encode `\` before `"`.
+
+Open: U9 (a `RawInline` argument with unbalanced parentheses has no
+spelling; challenge C26). The TeXSmith documentation (93 files), the spec
+and the editor sample all reach the fixed point and round-trip
+structurally (`scratchpad` loop, see `13-handoff.md` §Commands).
