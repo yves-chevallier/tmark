@@ -3,13 +3,15 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use tmark_ir::registry::{self, Scope};
 use tmark_ir::{Code, Diagnostic, Document};
 
 use crate::collect::Labels;
 
 /// One series. Spec §Counters, "Fields".
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 pub struct Counter {
     pub prefix: String,
     /// Label word (`Figure`, `Finding`); none for `gls` and `doi`.
@@ -24,10 +26,17 @@ pub struct Counter {
     pub tmark_numbered: bool,
     /// Numbers allocated in document order, by key.
     pub numbers: BTreeMap<String, u32>,
+    /// The next value the series allocates: what the following document of
+    /// a build passes as `ResolveOptions::start`.
     next: u32,
 }
 
 impl Counter {
+    /// The value the next label of a TeXSmith-numbered series takes.
+    pub fn next(&self) -> u32 {
+        self.next
+    }
+
     /// The formatted number of a key, when this series numbers it.
     pub fn label(&self, key: &str) -> Option<String> {
         let n = *self.numbers.get(key)?;
