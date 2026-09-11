@@ -158,7 +158,8 @@ impl Latex<'_> {
     /// `{lead}[…]` run-in is `\tslead{…}` (fragment-contracts.md §1).
     fn para(&mut self, p: &Para, caption: Option<&Caption>) {
         match p.content.as_slice() {
-            [Inline::Image(image)] => {
+            // An icon (`Image{.icon}`, the emoji pass) is never a figure.
+            [Inline::Image(image)] if !image.attrs.has_class("icon") => {
                 self.figure_image(image, caption, None, None);
                 return;
             }

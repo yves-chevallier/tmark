@@ -340,6 +340,12 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   `press.declare.acronyms`). When the parser emits `Abbr`, the helper
   finds nothing and can be deleted. `examples/abbr` and
   `examples/glossary` render `\tsacr` with this.
+- An `Image` with the `icon` class (the emoji pass in artifact mode) is
+  inline in every backend, never a figure: `\tsicon{path}`
+  (ts-typesetting), `#box(image(..), height: 1em)`, `<img class="icon">`.
+  A converted diagram (`Image` with `generate=<lang>` and a `src`) is
+  wrapped in `\adjustbox{max width=\textwidth}` (`media.py:213`,
+  package `adjustbox`); `tests/images.rs` covers both.
 - A `Listing: …` caption line on a fence is passed to `tscode` as
   `caption={…}` (and to `#ts-code` as `caption: […]`); the key is in
   fragment-contracts.md §5. The Typst writer writes the label after the
