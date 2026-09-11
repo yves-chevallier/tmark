@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Figure 3 shows the trace; see the table below and the notes above.

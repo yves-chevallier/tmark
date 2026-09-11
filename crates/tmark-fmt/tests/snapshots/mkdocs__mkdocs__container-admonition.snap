@@ -1,0 +1,6 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+!!! warning "LaTeX toolchain"
+    Install TeX Live before `texsmith --build`.

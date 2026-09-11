@@ -784,21 +784,9 @@ fn is_caption(content: &[Inline]) -> Option<(CaptionKind, usize)> {
     None
 }
 
-/// Blocks a caption can attach to.
+/// Blocks a caption can attach to (`Block::is_float`, spec §Caption).
 fn is_float(block: &Block) -> bool {
-    match block {
-        Block::Table(_) | Block::Figure(_) | Block::CodeBlock(_) | Block::TableConfig(_) => true,
-        // One image, or the subfigures of a `::: figure`.
-        Block::Para(para) => {
-            para.content.iter().any(|i| matches!(i, Inline::Image(_)))
-                && para.content.iter().all(|i| match i {
-                    Inline::Image(_) | Inline::SoftBreak(_) => true,
-                    Inline::Str(s) => s.text.trim().is_empty(),
-                    _ => false,
-                })
-        }
-        _ => false,
-    }
+    block.is_float()
 }
 
 /// An attribute list left as a trailing literal `{…}` by the inline lowering

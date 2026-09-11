@@ -1,0 +1,7 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+## Intro {#sec:intro}
+
+See @sec:intro, @Sec:intro and [the intro](#sec:intro), but not @sec:nope.

@@ -1,0 +1,12 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Term
+:   Definition, indented continuation lines aligned.
+
+    Second paragraph of the definition.
+:   Second definition.
+
+Other
+:   Its definition.

@@ -1,0 +1,13 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Inline $a^2$ and $b^2$.
+
+$$
+a^2 + b^2 = c^2
+$$
+
+$$
+e = mc^2
+$$ {#eq:einstein}

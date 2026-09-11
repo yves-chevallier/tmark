@@ -1,0 +1,14 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+title: Firmware Review
+lang: fr
+press:
+  template: article
+  features:
+    paragraph.lead: false
+---
+
+**Not a lead.** With the feature off.

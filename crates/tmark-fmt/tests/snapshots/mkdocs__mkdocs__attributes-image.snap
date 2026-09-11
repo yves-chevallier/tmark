@@ -1,0 +1,10 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+![Trace of the boot](trace.png){#fig:trace width=60%}
+
+/// caption
+    attrs: {id: fig:plot}
+The watchdog fires **twice**.
+///

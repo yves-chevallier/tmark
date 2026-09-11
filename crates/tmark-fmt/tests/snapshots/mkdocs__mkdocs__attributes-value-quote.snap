@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+# H {#sec:q k="a \"b\" c" j="x}y" l="p\\q"}

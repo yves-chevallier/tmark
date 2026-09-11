@@ -961,6 +961,26 @@ impl Block {
             Block::Comment(n) => &mut n.meta,
         }
     }
+
+    /// A block a caption line attaches to (spec §Caption): a table, a
+    /// figure container, a code block, a table configuration, or a
+    /// paragraph made of images only.
+    pub fn is_float(&self) -> bool {
+        match self {
+            Block::Table(_) | Block::Figure(_) | Block::CodeBlock(_) | Block::TableConfig(_) => {
+                true
+            }
+            Block::Para(para) => {
+                para.content.iter().any(|i| matches!(i, Inline::Image(_)))
+                    && para.content.iter().all(|i| match i {
+                        Inline::Image(_) | Inline::SoftBreak(_) => true,
+                        Inline::Str(s) => s.text.trim().is_empty(),
+                        _ => false,
+                    })
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]

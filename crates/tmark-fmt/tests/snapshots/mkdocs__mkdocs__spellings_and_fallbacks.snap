@@ -1,0 +1,62 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: printed
+---
+---
+press:
+  declare:
+    counters:
+      fw: {name: Finding, format: "FW-{n:02d}"}
+---
+
+# Intro {#intro}
+
+Some ==a b==, ~~x~~, H~2~O, mc^2^, ++ctrl+alt+s++, `#!py print(1)`, __caps__.
+
+See @intro, @sec:x, @fw:one, [^ein05], ^[ein05,ko20], @[see ein05, p. 3], [](gls:term), @doi:10.1/x.
+
+Define #{fw:one} and {counter}(zz:two); {index:phys}[a][b]{b} and {index}[c].
+
+Aside {margin}[note]{l} and {margin}[plain]; raw {latex}[\clearpage] and {raw latex}(a[b]) and {raw foo}(x).
+
+::: note {title="Say \"hi\""}
+Kept canonical: the title has a quote.
+:::
+
+::: tip {#tip:x title=T}
+Kept canonical: an id.
+:::
+
+??? warning wide "A title"
+    Folded, with a class.
+
+    - a list
+
+--8<-- "chapters/a.md"
+
+{include base=chapters}(chapters/b.md)
+
+/// latex
+\clearpage
+///
+
+```typst raw
+#pagebreak()
+```
+
+![Boot](boot.png){#fig:boot}
+
+/// caption
+    attrs: {id: fig:boot}
+The boot.
+///
+
+Table: Stock. {#tbl:stock}
+
+| A   | B   |
+| --- | --- |
+| 1   | 2   |
+
+Text [^ein05][^1] and a footnote.
+
+[^1]: Note.

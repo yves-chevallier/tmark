@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+As shown by @[see ein05, pp. 33-35; -AI2027, ch. 1].

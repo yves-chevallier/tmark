@@ -10,6 +10,7 @@ use tmark_ir::{
 use crate::attrs;
 use crate::escape::Context;
 use crate::inline::{inlines, side_name};
+use crate::mkdocs;
 use crate::out::Out;
 
 /// Writes a whole document.
@@ -55,13 +56,19 @@ fn separate(out: &mut Out) {
 
 /// Writes blocks separated by blank lines.
 pub fn blocks(out: &mut Out, blocks: &[Block]) {
+    // The MkDocs profile moves a table caption before its table.
+    let blocks: Vec<&Block> = if out.mkdocs().is_some() {
+        mkdocs::order(blocks)
+    } else {
+        blocks.iter().collect()
+    };
     // Two lists of the same kind in a row would merge on re-parse: the
     // second alternates its marker (`*` / `)`), the third goes back.
     let mut alternate = false;
     for (i, b) in blocks.iter().enumerate() {
         let same_list = i > 0
             && matches!(
-                (&blocks[i - 1], b),
+                (blocks[i - 1], *b),
                 (Block::BulletList(_), Block::BulletList(_))
                     | (Block::OrderedList(_), Block::OrderedList(_))
             );
@@ -81,6 +88,9 @@ pub fn block(out: &mut Out, b: &Block) {
 /// `alternate`: a list right after a list of the same kind takes the
 /// other marker so that the two do not merge on re-parse.
 fn block_with(out: &mut Out, b: &Block, alternate: bool) {
+    if out.mkdocs().is_some() && mkdocs_block(out, b) {
+        return;
+    }
     match b {
         Block::Para(p) => {
             if let Some(fenced) = generated_image(&p.content) {
@@ -262,6 +272,18 @@ fn block_with(out: &mut Out, b: &Block, alternate: bool) {
             out.push(&c.text);
             out.push("-->\n");
         }
+    }
+}
+
+/// The MkDocs spelling of a block, when the table has one for it
+/// (`mkdocs.rs`); `false` falls through to the canonical spelling.
+fn mkdocs_block(out: &mut Out, b: &Block) -> bool {
+    match b {
+        Block::Admonition(a) => mkdocs::admonition(out, a),
+        Block::Caption(c) => mkdocs::caption(out, c),
+        Block::RawBlock(r) => mkdocs::raw_block(out, r),
+        Block::Include(i) => mkdocs::include(out, i),
+        _ => false,
     }
 }
 

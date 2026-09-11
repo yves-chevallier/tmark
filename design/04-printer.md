@@ -56,16 +56,44 @@ pub enum Profile { Canonical, Strict, Mkdocs }
   parser option, not a printer one. The printer difference between
   `Canonical` and `Strict` is therefore empty today; the variant exists so
   `tmark fmt --profile strict` can be a parse-with-strict-then-print.
-- `Mkdocs`: emits PyMdownX spellings a site understands: `!!! type "Title"`
-  for callouts, `??? type` for collapsed ones, `==x==` / `~~x~~` / `^x^` /
-  `~x~` / `++keys++` / `` `#!py …` `` for the inline sugar, `--8<-- "file"`
-  for includes, footnote-style citations where the site has no citation
-  plugin. Class-X constructs that a site cannot render (`@key`, `#[…]`,
-  `#(…)`, roles) are emitted as their canonical text: the site shows them
-  literally, which is the spec's degradation contract, and TeXSmith's
-  companion Python-Markdown extensions render them when installed.
+- `Mkdocs`: emits the spellings a MkDocs Material site and TeXSmith 0.6
+  render (`mkdocs.rs`, one function per construct; the table below). Every
+  other construct prints as `Canonical`: the site shows it literally, which
+  is the spec's degradation contract. This is the D0 bridge of the TeXSmith
+  migration (`tmark fmt --profile mkdocs` on a canonical file builds with
+  TeXSmith 0.6) and the spelling table `lower_web` reuses
+  (`web-profile.md`).
 
 Profiles are a *table* (construct → spelling function), not subclasses.
+
+| Construct | `Mkdocs` spelling | Falls back to canonical when |
+| --------- | ----------------- | ---------------------------- |
+| `{mark}[x]`, `{del}[x]`, `{sub}[x]`, `{sup}[x]` | `==x==`, `~~x~~`, `~x~`, `^x^` | the content is empty, starts or ends with whitespace, holds a node of the same delimiter family, or follows that delimiter |
+| `{sc}[x]` | `__x__` | as above, or an alphanumeric or `_` touches the run on either side (emphasis flanking) |
+| `{keys}[ctrl+s]` | `++ctrl+s++` | a key holds anything but letters, digits, `-`, spaces, `"` (the run is read as Markdown before the split) |
+| `{code lang=py}[x]` | `` `#!py x` `` | the text is empty, starts with whitespace or spans lines |
+| `{index registry=r main=true}[a][b]` | `{index:r}[a][b]{b}` | the registry is not a bare name; a plain `{index}[…]` is canonical already |
+| `{counter}(p:k)` | `#{p:k}` | the prefix is neither predeclared nor in `declare.counters` (the parser reads `#{…}` only for a declared prefix, C16) |
+| `{aside side=left}[x]` | `{margin}[x]{l}` (`r`, `o`, `i`) | the aside holds blocks (`::: aside` container) |
+| `{raw latex}(x)` (`typst`, `html`) | `{latex}[x]` | the text holds a bracket or a line break, ends with `\`, or the format is not a backend name |
+| `@key` citation | `[^key]`; `@[k1; k2]` → `^[k1,k2]` | an item has a prefix, suffix or `-`; a key is a footnote label of the document; the key is a label (see below) |
+| `@gls:term` | `[](gls:term)` | |
+| `@fig:x`, `@fw:x`, `@alias:key`, `@id` of an anchor | `@…` unchanged (TeXSmith 0.6 reads them) | |
+| `::: type {title="T" .cls collapsed=true}` | `!!! type cls "T"`, `??? type` (collapsed), `???+ type` (open), body indented four spaces | an `#id`, another attribute, a `"` or a line break in the title, an empty body |
+| `Table: … {#id}` after a table | the same line *before* the table (then the table, then its `yaml table-config`) | the block printed before the caption is a float: the parser attaches a caption to the previous host first |
+| `Figure:`, `Listing:` lines | `/// caption` block with `attrs: {id: …}` and the text | the attributes hold more than an id, or a text line is `///` |
+| `latex raw` fence | `/// latex … ///` | another format, or a `///` line inside |
+| `{include}(f)` | `--8<-- "f"` | a `base`, or a `"` in the path |
+| `$…$`, `$$…$$`, `---`, `::: figure`, `::: aside`, `::: name`, `yaml table`, `{underline}`, `[x]{…}`, `{{ var }}`, `@[see key, p. 3]`, `@doi:…` | canonical | |
+
+Citation versus label is the spec's lookup rule (§Registries) applied to
+what the document itself declares, since the printer has no `Resolved`:
+`@a:b` is a label when `a` is a predeclared prefix, a `declare.counters`
+key or a `sources.crossrefs` alias, a glossary reference when `a` is
+`gls`, a bibliography key otherwise; a bare `@key` is a label when an
+attribute list of the document defines `#key`, a citation otherwise. A
+node printed on its own (`print_node_with`) knows the predeclared
+prefixes only.
 
 ## Local edits
 
@@ -116,7 +144,14 @@ marker is a property of the sequence, not of one list).
   depth), assert the fixed-point and idempotence properties.
 - Conformance fixtures: `canonical` block of every fixture must print back
   identically.
-- Snapshot tests for the `Mkdocs` profile on the fixture corpus.
+- Snapshot tests for the `Mkdocs` profile on the fixture corpus
+  (`tests/mkdocs.rs`, `insta`), and the D0 gate: the `Mkdocs` text of
+  every fixture re-parses to the canonical IR and prints again unchanged.
+  Fixtures whose shipping spelling the parser does not read back yet
+  (`[^key]` citations, decision X7; `[](gls:term)`, `{index}[…]{b}`,
+  `/// latex`, `/// caption`, challenge C20) are listed in the test as
+  pending and must fail until the parser side lands; the list shrinks as
+  it does.
 
 ## Implementation notes (milestone 1)
 
@@ -164,7 +199,8 @@ candidate line for the spec's "Canonical" column.
   of a text run that opens a block. Literal fallbacks in the parser decode
   their backslash escapes, so `format` is idempotent on them.
 - Profiles: `Strict` prints like `Canonical` (the difference is at parse
-  time); `Mkdocs` is a stub that prints like `Canonical` until milestone 5.
+  time); `Mkdocs` is the table above (wave 1 of the TeXSmith migration,
+  ahead of milestone 5's writers).
 
 ## Implementation notes (milestone 3, after the printer review)
 

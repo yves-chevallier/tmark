@@ -8,7 +8,7 @@ use tmark_ir::{find, Block, Document, Inline, NodeId, NodeRef, Span};
 
 use crate::escape::Context;
 use crate::out::Out;
-use crate::{block, inline};
+use crate::{block, inline, Profile};
 
 /// What replaces a node.
 #[derive(Clone, Debug)]
@@ -70,7 +70,14 @@ pub fn print(replacement: &Replacement) -> String {
 /// newline): what a fix for a deprecated spelling replaces the node's span
 /// with (design 05 §Fixes).
 pub fn print_node(node: NodeRef<'_>) -> String {
-    let mut out = Out::new();
+    print_node_with(node, Profile::Canonical)
+}
+
+/// `print_node` under a profile (design 04 §Profiles). A node printed on
+/// its own has no document: under `Mkdocs` a bare `@key` without a colon
+/// is a citation, and `#{prefix:key}` needs a predeclared prefix.
+pub fn print_node_with(node: NodeRef<'_>, profile: Profile) -> String {
+    let mut out = Out::with_profile(profile);
     match node {
         NodeRef::Block(b) => block::block(&mut out, b),
         NodeRef::Inline(i) => {

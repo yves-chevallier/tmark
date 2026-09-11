@@ -1,0 +1,10 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+- [ ] open
+- [x] done with @sec:intro
+- plain
+
+3. third
+4. fourth

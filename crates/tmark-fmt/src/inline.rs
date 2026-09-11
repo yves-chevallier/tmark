@@ -5,6 +5,7 @@ use tmark_ir::{Block, Inline, QuoteKind, RefItem, Side, Target};
 
 use crate::attrs;
 use crate::escape::{self, Context};
+use crate::mkdocs;
 use crate::out::Out;
 
 /// Writes `inlines` at the current position.
@@ -25,6 +26,7 @@ pub fn inlines(out: &mut Out, inlines: &[Inline], ctx: Context) {
 fn first_char(inline: &Inline) -> Option<char> {
     match inline {
         Inline::Str(s) => s.text.chars().next(),
+        Inline::Abbr(a) => a.text.chars().next(),
         Inline::Space(_) => Some(' '),
         Inline::SoftBreak(_) | Inline::LineBreak(_) => Some('\n'),
         _ => None,
@@ -49,6 +51,9 @@ fn role(out: &mut Out, head: &str, content: &[Inline], ctx: Context) {
 }
 
 fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
+    if out.mkdocs().is_some() && mkdocs_inline(out, inline, ctx, next) {
+        return;
+    }
     match inline {
         Inline::Str(s) => escape::text(out, &s.text, ctx, next),
         Inline::Space(_) => out.push(" "),
@@ -255,6 +260,33 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push(&n.text);
             out.push(")");
         }
+    }
+}
+
+/// The MkDocs spelling of an inline, when the table has one for it
+/// (`mkdocs.rs`); `false` falls through to the canonical spelling.
+fn mkdocs_inline(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) -> bool {
+    match inline {
+        Inline::Strikeout(n) => mkdocs::delimited(out, "~~", &n.content, ctx, mkdocs::tilde_family),
+        Inline::Highlight(n) => {
+            mkdocs::delimited(out, "==", &n.content, ctx, mkdocs::equals_family)
+        }
+        Inline::Subscript(n) => mkdocs::delimited(out, "~", &n.content, ctx, mkdocs::tilde_family),
+        Inline::Superscript(n) => {
+            mkdocs::delimited(out, "^", &n.content, ctx, mkdocs::caret_family)
+        }
+        Inline::SmallCaps(n) => mkdocs::smallcaps(out, &n.content, ctx, next),
+        Inline::Code(n) => n
+            .lang
+            .as_deref()
+            .is_some_and(|lang| mkdocs::code(out, &n.text, lang, ctx.in_cell)),
+        Inline::Ref(n) => mkdocs::reference(out, &n.items),
+        Inline::IndexEntry(n) => mkdocs::index(out, n, ctx),
+        Inline::CounterItem(n) => mkdocs::counter(out, n),
+        Inline::Keystroke(n) => mkdocs::keys(out, &n.keys),
+        Inline::Aside(n) => mkdocs::aside(out, n, ctx),
+        Inline::RawInline(n) => mkdocs::raw_inline(out, n),
+        _ => false,
     }
 }
 

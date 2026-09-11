@@ -1,0 +1,12 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```python title="bubble_sort.py" linenums="1" hl_lines="2-3"
+def bubble_sort(items): ...
+```
+
+/// caption
+    attrs: {id: lst:bubble}
+Bubble sort, naive version.
+///

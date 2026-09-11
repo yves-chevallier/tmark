@@ -1,0 +1,12 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+press:
+  declare:
+    counters:
+      fw: {name: Finding, format: "FW-{n:02d}"}
+---
+
+#{fw:boot-loop} The firmware reboots when the watchdog fires.

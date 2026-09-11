@@ -9,7 +9,7 @@ mod config;
 
 pub use config::Config;
 pub use tmark_fmt::{
-    edit, edit_many, format, print_node, EditError, NodeEdit, Profile, Replacement,
+    edit, edit_many, format, print_node, print_node_with, EditError, NodeEdit, Profile, Replacement,
 };
 pub use tmark_ir as ir;
 pub use tmark_ir::schema;

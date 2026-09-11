@@ -1,0 +1,15 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+# Top
+
+### Skipped
+
+{lead}[Note.] Promoted.
+
+Table: T. {#fig:t}
+
+| a   |
+| --- |
+| 1   |

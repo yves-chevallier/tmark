@@ -1,0 +1,12 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+press:
+  sources:
+    bibliography:
+      stock: {type: misc, title: Stock}
+---
+
+[This claim]{#stock} is cited as @stock.

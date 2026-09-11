@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Bytes {index}[endianness] and {index}[byte order][endianness] and {index}[chocolate]{b}.

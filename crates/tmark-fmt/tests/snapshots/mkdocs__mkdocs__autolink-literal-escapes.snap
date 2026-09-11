@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+see http\://x.y, www\.x.y/z, me\@x.y and www.example.com or ftp://x.y

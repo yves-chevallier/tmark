@@ -1,0 +1,9 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+??? note "Folded"
+    Hidden by default.
+
+???+ tip
+    Shown by default.

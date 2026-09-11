@@ -8,6 +8,11 @@
 //! line carries the prefixes with trailing whitespace removed, so the output
 //! never has trailing spaces.
 
+use tmark_ir::Document;
+
+use crate::mkdocs::Lookup;
+use crate::Profile;
+
 /// The printer's output buffer.
 #[derive(Debug, Default)]
 pub struct Out {
@@ -15,11 +20,44 @@ pub struct Out {
     prefixes: Vec<String>,
     /// Text has been written on the current line (prefixes included).
     line_started: bool,
+    /// Which spellings to emit (design 04 §Profiles).
+    profile: Profile,
+    /// What the MkDocs spelling table knows about the document; `None`
+    /// under the other profiles.
+    mkdocs: Option<Lookup>,
 }
 
 impl Out {
+    /// A buffer for the canonical profile.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A buffer for `profile`, for a node printed on its own.
+    pub fn with_profile(profile: Profile) -> Self {
+        Self {
+            profile,
+            mkdocs: (profile == Profile::Mkdocs).then(Lookup::default),
+            ..Self::default()
+        }
+    }
+
+    /// A buffer for `profile` printing `doc`.
+    pub fn for_document(profile: Profile, doc: &Document) -> Self {
+        Self {
+            profile,
+            mkdocs: (profile == Profile::Mkdocs).then(|| Lookup::of(doc)),
+            ..Self::default()
+        }
+    }
+
+    pub fn profile(&self) -> Profile {
+        self.profile
+    }
+
+    /// The MkDocs lookup when that spelling table is active.
+    pub fn mkdocs(&self) -> Option<&Lookup> {
+        self.mkdocs.as_ref()
     }
 
     /// Writes `text`. A `\n` ends the line; the next character that is not
