@@ -1,6 +1,6 @@
 //! `tmark` command-line interface. Design: `design/09-bindings.md`.
 //!
-//! `parse`, `fmt`, `check`, `lint`, `write` and `schema`.
+//! `parse`, `fmt`, `check`, `lint`, `write`, `lower` and `schema`.
 
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
@@ -9,8 +9,8 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use tmark::ir::{Code, LineIndex, Severity};
 use tmark::{
-    check, format, parse, Backend, Config, FileId, FsLoader, LintConfig, Media, Profile,
-    ResolveOptions, WriterOptions,
+    check, format, parse, Backend, Citations, Config, FileId, FsLoader, LintConfig, Media, Profile,
+    ResolveNumbering, ResolveOptions, SectionRefs, WebOptions, WriterOptions,
 };
 
 #[derive(Parser)]
@@ -100,6 +100,26 @@ enum Command {
         #[arg(long)]
         map: bool,
     },
+    /// Lower a file for a MkDocs page: every TMark construct spliced into
+    /// what Material renders, every other byte as written (design
+    /// 07-writers.md §Web lowering). For debugging the site plugin.
+    Lower {
+        /// The file to lower; `-` for standard input.
+        file: PathBuf,
+        /// `web`, the only target.
+        #[arg(long, value_name = "TARGET")]
+        to: String,
+        /// What `@sec:x` shows: `title` (default) or `number`.
+        #[arg(long)]
+        sections: Option<String>,
+        /// `inline` (default: built-in author-year plus a References list)
+        /// or `passthrough` (Pandoc `[@key]` for mkdocs-bibtex).
+        #[arg(long)]
+        citations: Option<String>,
+        /// `.bib` files feeding the bibliography; repeatable.
+        #[arg(long = "bib", value_name = "FILE")]
+        bibliography: Vec<PathBuf>,
+    },
     /// Print a JSON schema: `ir` or `frontmatter`.
     Schema { name: String },
 }
@@ -143,6 +163,19 @@ fn main() -> ExitCode {
             media,
             map,
         } => cmd_write(&file, &to, media.as_deref(), map),
+        Command::Lower {
+            file,
+            to,
+            sections,
+            citations,
+            bibliography,
+        } => cmd_lower(
+            &file,
+            &to,
+            sections.as_deref(),
+            citations.as_deref(),
+            &bibliography,
+        ),
         Command::Schema { name } => cmd_schema(&name),
     }
 }
@@ -569,6 +602,86 @@ fn cmd_write(file: &PathBuf, to: &str, media: Option<&str>, map: bool) -> ExitCo
     } else {
         let _ = out.write_all(body.text.as_bytes());
     }
+    ExitCode::SUCCESS
+}
+
+/// `tmark lower FILE --to web`: the page as the MkDocs plugin would hand
+/// it to Material, resolved alone with every series numbered.
+fn cmd_lower(
+    file: &PathBuf,
+    to: &str,
+    sections: Option<&str>,
+    citations: Option<&str>,
+    bibliography: &[PathBuf],
+) -> ExitCode {
+    if to != "web" {
+        eprintln!("tmark: unknown lowering target `{to}` (web)");
+        return ExitCode::from(2);
+    }
+    let sections = match sections {
+        None | Some("title") => SectionRefs::Title,
+        Some("number") => SectionRefs::Number,
+        Some(other) => {
+            eprintln!("tmark: unknown --sections `{other}` (title, number)");
+            return ExitCode::from(2);
+        }
+    };
+    let citations = match citations {
+        None | Some("inline") => Citations::Inline,
+        Some("passthrough") => Citations::Passthrough,
+        Some(other) => {
+            eprintln!("tmark: unknown --citations `{other}` (inline, passthrough)");
+            return ExitCode::from(2);
+        }
+    };
+    let text = match read(file) {
+        Ok(text) => text,
+        Err(error) => {
+            eprintln!("tmark: {}: {error}", file.display());
+            return ExitCode::from(2);
+        }
+    };
+    let workspace = match config_for(file) {
+        Ok(config) => config,
+        Err(code) => return code,
+    };
+    let parsed = tmark::parse_with(&text, FileId::default(), workspace.profile);
+    let mut options = workspace.resolve_options(file);
+    options.numbering = ResolveNumbering::All;
+    let base = file.parent().unwrap_or(std::path::Path::new(""));
+    options
+        .bibliography
+        .extend(bibliography.iter().map(|b| pathdiff(b, base)));
+    let resolved = tmark::resolve(&parsed.document, &FsLoader, &options);
+    let web = WebOptions {
+        sections,
+        citations,
+        ..WebOptions::default()
+    };
+    let lowered = tmark::lower_web(&text, &parsed.document, &resolved, &FsLoader, &web);
+    let index = LineIndex::new(&text);
+    let name = file.display().to_string();
+    for d in parsed
+        .diagnostics
+        .iter()
+        .chain(&resolved.diagnostics)
+        .chain(&lowered.diagnostics)
+    {
+        if d.span.file != FileId::default() {
+            continue;
+        }
+        let at = index.line_col(d.span.start);
+        eprintln!(
+            "{name}:{}:{}: {} {}: {}",
+            at.line + 1,
+            at.col + 1,
+            d.severity.as_str(),
+            d.code.id(),
+            d.message
+        );
+    }
+    let mut out = io::stdout().lock();
+    let _ = out.write_all(lowered.text.as_bytes());
     ExitCode::SUCCESS
 }
 
