@@ -122,6 +122,7 @@ candidate line for the spec's "Canonical" column.
   `{name: …, columns: […]}` groups, `- [a, b]` rows, `{value: …, rows: n,
   cols: n}` spanning cells, `~` absorbed slots, `{separator: true, label:
   …}` separators; scalars are plain when safe, double-quoted otherwise.
+  The row shapes are the Python ones (wave 1 notes below).
 - A listing whose language defaults to another node word keeps the word:
   `mermaid code`.
 - A `yaml table-config` fence prints right after its table, before the
@@ -181,3 +182,34 @@ Open: U9 (a `RawInline` argument with unbalanced parentheses has no
 spelling; challenge C26). The TeXSmith documentation (93 files), the spec
 and the editor sample all reach the fixed point and round-trip
 structurally (`scratchpad` loop, see `13-handoff.md` §Commands).
+
+## Implementation notes (wave 1, tables — decision X9)
+
+The `yaml table` fence prints the leaf matrix back in the shapes
+TeXSmith's `parse_table` reads (design 03 §Tables), so that every fence of
+the corpus round-trips modulo YAML normalisation:
+
+- `table:` first (`width` when not `auto`, `placement`, `long` when not
+  `auto`), then `columns`, `rows`, `footer`. Keys use the YAML spellings
+  `width-group` and `double-rule`; `align` prints its long form.
+- A column is its bare name when it has no layout, else
+  `{name, columns, align, width, width-group}` in that order; groups
+  nest in flow style.
+- A positional row walks the top-level columns: a leaf's cell prints as
+  itself; a rich cell (span or alignment) prints as itself wherever it
+  starts and the slots its column span absorbs are skipped; a plain cell
+  with leaves left in its column opens a list of the remaining leaves;
+  every slot a row span absorbs prints `~`. An empty cell is `~`.
+- A named row prints `Label: {Column: value}` for the data columns that
+  hold something (a list for a group); the explicit `{label, cells}` form
+  is used only when the label is the word `separator`. A row whose named
+  spelling does not exist (unnamed or duplicated column names, a rich
+  label, a span crossing its column) prints positionally.
+- A `Table` or `TableConfig` with a kept `source` prints that text
+  verbatim under its node word; a payload that was not YAML is a
+  `CodeBlock` whose `lang` is the info string (`yaml table`), like
+  `grid table`.
+- `tests/tables.rs`: a generated valid model prints and parses back
+  equal with no diagnostic (proptest), and TeXSmith's table corpus
+  (`tests/data/yaml-tables.md`, copies) round-trips and is a fixed point.
+
