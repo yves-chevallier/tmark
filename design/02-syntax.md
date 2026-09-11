@@ -49,7 +49,7 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Role `{name …}[content]` / `(argument)` | family 2 | inline | New construct `role`: head, then one or more bracket groups tokenised as inline content, or one parenthesised verbatim argument with balanced parens. Name not in the registry: literal text (spec). |
 | Anonymous span `[text]{attrs}` | family 1 | inline | No new tokenisation: a `[…]` that is not a link and is immediately followed by an attribute list lowers to `Span`. |
 | Container `::: name {attrs}` … `:::` | family 3 | block | New container construct; nesting by fence length; content is flow. Unknown name: `Div` with `attrs.name`, diagnostic `container-unknown` (spec §Div: class D error). |
-| Data directive ```` ```lang node opts ```` | family 4 | lowering | Fenced code exists; lowering parses the info string with the family-4 regex and produces `CodeBlock`, `Table`, `TableConfig`, `Image` or `RawBlock`. Bare `mermaid` → `Image` (spec exception). |
+| Data directive ```` ```lang node opts ```` | family 4 | lowering | Fenced code exists; lowering parses the info string with the family-4 regex and produces `CodeBlock`, `Table`, `TableConfig`, `Image` or `RawBlock`. Bare `mermaid` → `Image` (spec exception). A trailing `{…}` attribute list (C28) adds classes and an id to the options; the printer keeps the braces only then. |
 | Bare reference `@key` | sigil | inline | New construct `reference` with the X4 look-behind guard. Key grammar from the spec; `doi:` keys additionally accept `/` (spec challenge C3). |
 | Bracketed reference `@[…]` | sigil | inline | Same construct; item grammar (prefix, `-`, key, suffix, `;`) parsed in lowering, not in the tokenizer. |
 | Index entry `#[a][b]` | sigil | inline | New construct `define`, bracket groups are inline content. |
@@ -61,12 +61,13 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Definition list | §DefinitionList | block | New construct (PHP-Markdown-Extra rules). |
 | Abbreviation `*[HTML]: …` | §Glossary | block | New construct, definition-only line; lowering records it in the document's abbreviation table and substitutes `Abbr` inlines. |
 | `!!! type "Title"`, `??? type` | §Admonition | block | New construct; body is the following indented block. Lowers to `Admonition` (same node as `::: type`). |
-| `/// name … ///` | deprecated | block | New construct, lowers like a container, diagnostic `deprecated`. |
-| Footnote `[^1]`, `[^1]:` | §Note | block+inline | GFM footnotes construct (vendored). Deprecated citation use (`[^key]` with no definition but a bibliography key) is decided in resolution, not parsing. |
+| `/// name … ///` | deprecated | block | Same construct as `:::`; lowers like a container with a `deprecated` fix, except the pymdownx.blocks names that are not containers: `/// latex` / `typst` / `html` → `RawBlock` (fix: a `latex raw` fence); `/// caption`, `/// figure-caption`, `/// table-caption` → `Caption` after the float, the id read from the indented `attrs: {id: …}` option line, the kind from the name or (generic `caption`) from the float (fix: the `Kind: … {#id}` line). |
+| Footnote `[^1]`, `[^1]:` | §Note | block+inline | GFM footnotes construct (vendored). |
+| Citation sugar `[^key]`, `^[k1,k2]` | deprecated (X7) | inline | `tmark_reference`: `[^key]` whose key is a citation key with no `[^key]:` definition, and `^[…]` holding comma-separated keys, tokenise as references; lowering gives a bracketed `Ref` and a `deprecated` fix (`@key`, `@[k1; k2]`; a bare DOI gets `doi:`). `^[` never opens a caret superscript. A numeric label (`[^1]`) or a defined one stays a footnote. |
 | Math `$…$`, `$$…$$`, `\(…\)`, `\[…\]` | §Math | inline/block | Vendored math construct plus the two LaTeX-habit delimiters. |
 | Moustache `{{ key }}` | §Front matter | lowering | Text scan in lowering; produces `Var` inline. Not inside code. |
 | Comment `<!-- -->` | §Comment | block/inline | HTML construct; lowering produces `Comment` for the comment form only, `RawInline`/`RawBlock` with `format = "html"` for other HTML. |
-| Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal. |
+| Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal text plus `compat-unsupported` (`lower/compat.rs`), like tabs, progress bars, wiki links, shortcodes, fancy list markers and `[TOC]` (design 05). |
 | Escapes `\@`, `\#` | §Lexical grammar | inline | Added to the escape construct's character set. |
 
 ### Rule of thumb
@@ -166,7 +167,12 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
   `Strong` first.
 - Not implemented yet, deliberately: grid tables (listing with lang
   `grid table`), critic markup, progress bars, wiki links, inline footnotes
-  `^[…]`, fancy list styles (milestone 5), and `Space` nodes (see 03).
+  `^[…]` (the spelling is still the deprecated citation group; a `^[…]`
+  that is not a key list is literal text), fancy list styles (milestone
+  5), and `Space` nodes (see 03).
+- The printer puts a space before a `Ref` that would otherwise follow a
+  word character or one of `@/:.-` (the X4 guard), so `tutor.^[key]`
+  prints as `tutor. @key`.
 - Strict profile: `__x__` is bold and `~x~` is literal; the rest of the
   Appendix-PyMdownX sugar is still accepted (milestone 5 completes the
   profile).

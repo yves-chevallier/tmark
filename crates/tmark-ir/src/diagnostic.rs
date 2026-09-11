@@ -79,6 +79,12 @@ pub enum Code {
     /// the document is one paragraph of the text. AGENTS.md: "parsing
     /// never fails".
     ParseInternal,
+    /// Appendix "PyMdownX compatibility profile": a spelling of the profile
+    /// the parser recognises but does not implement yet (milestone 5), so
+    /// it is literal text: content tabs, critic markup, progress bars, wiki
+    /// links, fancy list markers, `^^x^^` without `inline.insert`, emoji
+    /// and icon shortcodes, `[TOC]`. Loud rather than silent (P4).
+    CompatUnsupported,
     // --- Resolve (tmark-registry) ---
     /// Spec §Ref: a key found in no registry.
     RefUnresolved,
@@ -144,6 +150,7 @@ impl Code {
         Code::FrontmatterUnknownKey,
         Code::Deprecated,
         Code::ParseInternal,
+        Code::CompatUnsupported,
         Code::RefUnresolved,
         Code::RefAmbiguous,
         Code::PrefixUnknown,
@@ -183,6 +190,7 @@ impl Code {
             Code::FrontmatterUnknownKey => "frontmatter-unknown-key",
             Code::Deprecated => "deprecated",
             Code::ParseInternal => "parse-internal",
+            Code::CompatUnsupported => "compat-unsupported",
             Code::RefUnresolved => "ref-unresolved",
             Code::RefAmbiguous => "ref-ambiguous",
             Code::PrefixUnknown => "prefix-unknown",
@@ -217,6 +225,7 @@ impl Code {
             | Code::ContainerUnknown
             | Code::FenceUnknownNodeWord
             | Code::Deprecated
+            | Code::CompatUnsupported
             | Code::RefUnresolved
             | Code::RefAmbiguous
             | Code::PrefixUnknown

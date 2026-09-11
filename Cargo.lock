@@ -857,6 +857,7 @@ name = "tmark-cli"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "diff",
  "serde_json",
  "tmark",
 ]

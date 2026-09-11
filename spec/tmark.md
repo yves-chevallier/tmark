@@ -1632,7 +1632,7 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | top-level `bibliography`, `crossrefs` | `sources.*` | draft 3 | fmt |
 | top-level `counters`, `admonitions`, `glossary`, `acronyms` | `declare.*` | draft 3 | fmt |
 | `admonitions.<type>` `.icon` / `.color` | `press.callouts.<type>` | draft 3 | fmt |
-| `press.callout_style` | `press.callouts.style` | draft 3 | fmt |
+| `press.callout_style`, `press.admonition_style` | `press.callouts.style` | draft 3 | fmt |
 | `--no-promote-title` CLI flag | `title: null` | (none) | indefinite |
 
 ```yaml table-config

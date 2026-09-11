@@ -74,6 +74,7 @@ impl Lowerer {
                 let meta = self.meta(span);
                 let lowered = self.lower_inlines(&p.children, ctx);
                 let mut content = lowered.inlines;
+                self.compat_scan_paragraph(&content, ctx.slice(p.position.as_ref()), span);
                 let lead = self.take_lead(&mut content);
                 if let Some((attrs, attrs_span)) = lowered.tail_attrs {
                     // A paragraph cannot host attributes, except through the
@@ -378,20 +379,15 @@ impl Lowerer {
                 attrs: Attrs::new(),
             }));
         }
-        if let Some(rest) = source.strip_prefix("--8<--") {
-            let rest = rest.trim();
-            let path = rest.trim_matches('"');
-            let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
-            if !path.is_empty() && (quoted || !rest.contains(char::is_whitespace)) {
-                let span = self.span(ctx, p.position.as_ref());
-                self.deprecated(span, "--8<-- \"file\"", "{include}(file)");
-                let meta = self.meta(span);
-                return Some(Block::Include(Include {
-                    meta,
-                    path: path.to_string(),
-                    base: None,
-                }));
-            }
+        if let Some(path) = snippet_path(source) {
+            let span = self.span(ctx, p.position.as_ref());
+            self.deprecated(span, "--8<-- \"file\"", "{include}(file)");
+            let meta = self.meta(span);
+            return Some(Block::Include(Include {
+                meta,
+                path,
+                base: None,
+            }));
         }
         None
     }
@@ -436,8 +432,8 @@ impl Lowerer {
                 options: Attrs::new(),
             });
         };
-        let mut options = Attrs::new();
-        options.kv = info.options.clone();
+        let mut options = info.attrs.clone();
+        options.id_span = None;
         let node = info
             .node
             .clone()
@@ -451,6 +447,22 @@ impl Lowerer {
                 options: options.clone(),
             })
         };
+        // A listing whose body is one PyMdownX snippet line (`--8<-- "file"`)
+        // is the `include="file"` option (spec §Listing; Appendix
+        // "Deprecation schedule").
+        if node == "code" && options.get("include").is_none() {
+            if let Some(path) = snippet_path(code.value.trim()) {
+                self.deprecated(span, "--8<-- \"file\" in a fence", "include=\"file\"");
+                let mut options = options;
+                options.kv.push(("include".to_string(), path));
+                return Block::CodeBlock(CodeBlock {
+                    meta,
+                    text: String::new(),
+                    lang: Some(info.lang.clone()),
+                    options,
+                });
+            }
+        }
         match node.as_str() {
             "code" => listing(self, Some(info.lang.clone())),
             "table" => match info.lang.as_str() {
@@ -557,6 +569,9 @@ impl Lowerer {
             );
         }
         if c.marker == b'/' {
+            if let Some(block) = self.lower_slash_block(c, &name, span, ctx, document) {
+                return block;
+            }
             self.deprecated(span, "/// name … ///", "::: name … :::");
         }
         if !c.closed {
@@ -632,6 +647,111 @@ impl Lowerer {
         }
     }
 
+    /// The deprecated `///` blocks that are not containers (Appendix
+    /// "Deprecation schedule", examples-migration item 3): a backend name
+    /// (`/// latex`) is a raw fence, `/// caption`, `/// figure-caption` and
+    /// `/// table-caption` (pymdownx.blocks.caption, with its indented
+    /// `attrs: {id: …}` option line) are a caption line after the float.
+    /// `None` for every other name (a container, as before).
+    fn lower_slash_block(
+        &mut self,
+        c: &tmark_markdown::mdast::TmarkContainer,
+        name: &str,
+        span: Span,
+        ctx: &Ctx,
+        document: &mut Document,
+    ) -> Option<Block> {
+        let kind = match name {
+            "latex" | "typst" | "html" => {
+                self.deprecated(
+                    span,
+                    &format!("/// {name} … ///"),
+                    &format!("a ```{name} raw fence"),
+                );
+                return Some(Block::RawBlock(RawBlock {
+                    meta: self.meta(span),
+                    format: name.to_string(),
+                    text: c.value.trim_end_matches('\n').to_string(),
+                }));
+            }
+            "caption" => None,
+            "figure-caption" => Some(CaptionKind::Figure),
+            "table-caption" => Some(CaptionKind::Table),
+            _ => return None,
+        };
+        // pymdownx.blocks options: indented `key: value` lines right after
+        // the opening fence, YAML.
+        let mut options_len = 0;
+        let mut yaml = String::new();
+        for line in c.value.split_inclusive('\n') {
+            let is_option = (line.starts_with("    ") || line.starts_with('\t'))
+                && line.trim_start().split_once(':').is_some_and(|(k, _)| {
+                    !k.is_empty()
+                        && k.bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                });
+            if !is_option {
+                break;
+            }
+            yaml.push_str(line.trim_start());
+            options_len += line.len();
+        }
+        let mut attrs = Attrs::new();
+        if let Ok(serde_yaml_ng::Value::Mapping(options)) =
+            serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&yaml)
+        {
+            if let Some(serde_yaml_ng::Value::Mapping(list)) = options.get("attrs") {
+                for (k, v) in list {
+                    let (Some(k), Some(v)) = (k.as_str(), v.as_str()) else {
+                        continue;
+                    };
+                    match k {
+                        "id" => attrs.id = Some(v.to_string()),
+                        "class" => attrs
+                            .classes
+                            .extend(v.split_whitespace().map(str::to_string)),
+                        _ => attrs.kv.push((k.to_string(), v.to_string())),
+                    }
+                }
+            }
+        }
+        let stops = shift_stops(&c.stops, options_len);
+        let body = self.lower_content(&c.value[options_len..], &stops, ctx, document);
+        let mut content = Vec::new();
+        for block in body {
+            let inlines = match block {
+                Block::Para(p) => p.content,
+                Block::Plain(p) => p.content,
+                _ => continue,
+            };
+            if !content.is_empty() {
+                content.push(Inline::SoftBreak(tmark_ir::SoftBreak {
+                    meta: self.meta(span),
+                }));
+            }
+            content.extend(inlines);
+        }
+        self.deprecated(
+            span,
+            &format!("/// {name} … ///"),
+            &format!(
+                "a `{}: … {{#id}}` line after the float",
+                kind.map_or("Figure", CaptionKind::word)
+            ),
+        );
+        let meta = self.meta(span);
+        if kind.is_none() {
+            self.generic_captions.push(meta.id);
+        }
+        Some(Block::Caption(Caption {
+            meta,
+            kind: kind.unwrap_or(CaptionKind::Figure),
+            content,
+            attrs,
+            position: CaptionPosition::After,
+        }))
+    }
+
     /// Pair `:   definition` items with the paragraph before them; a run of
     /// terms and definitions is one list.
     fn pair_definitions(&mut self, items: Vec<Item>) -> Vec<Block> {
@@ -702,6 +822,21 @@ impl Lowerer {
                 },
                 _ => unreachable!(),
             };
+            // A generic `/// caption` takes the kind of its float.
+            if self.generic_captions.contains(&caption.meta.id) {
+                let host = if previous_is_host {
+                    out.last()
+                } else if next_is_host {
+                    iter.peek()
+                } else {
+                    None
+                };
+                caption.kind = match host {
+                    Some(Block::Table(_) | Block::TableConfig(_)) => CaptionKind::Table,
+                    Some(Block::CodeBlock(_)) => CaptionKind::Listing,
+                    _ => CaptionKind::Figure,
+                };
+            }
             if previous_is_host {
                 caption.position = CaptionPosition::After;
                 // A `yaml table-config` fence belongs right after its table,
@@ -844,6 +979,29 @@ fn take_partial_task(content: &mut [Block]) -> Option<Task> {
     let rest = s.text.strip_prefix("[.] ")?;
     s.text = rest.to_string();
     Some(Task::Partial)
+}
+
+/// The path of a PyMdownX snippet line `--8<-- "file"` (quoted, or bare
+/// without whitespace), when `line` is exactly one.
+fn snippet_path(line: &str) -> Option<String> {
+    let rest = line.trim().strip_prefix("--8<--")?.trim();
+    let path = rest.trim_matches('"');
+    let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
+    (!path.is_empty() && !path.contains('\n') && (quoted || !rest.contains(char::is_whitespace)))
+        .then(|| path.to_string())
+}
+
+/// The `stops` of a collected body whose first `skip` bytes are dropped.
+fn shift_stops(stops: &[(usize, usize)], skip: usize) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (i, (local, source)) in stops.iter().enumerate() {
+        if *local >= skip {
+            out.push((local - skip, *source));
+        } else if !stops.get(i + 1).is_some_and(|next| next.0 <= skip) {
+            out.push((0, source + (skip - local)));
+        }
+    }
+    out
 }
 
 /// The canonical text of an attribute list, for literal fallbacks.

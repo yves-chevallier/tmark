@@ -6,6 +6,7 @@
 //! total: unrecognised input lowers to literal text and a diagnostic.
 
 mod block;
+mod compat;
 mod inline;
 mod table;
 
@@ -88,6 +89,9 @@ pub(crate) struct Lowerer {
     pub definitions: HashMap<String, (String, Option<String>)>,
     /// Lowering the body of a `::: figure`: a free caption is the figure's.
     pub in_figure: bool,
+    /// Captions from a generic `/// caption` block, whose kind the
+    /// neighbouring float decides (`attach_captions`).
+    pub generic_captions: Vec<NodeId>,
 }
 
 pub fn parse(text: &str, file: FileId) -> Parsed {
@@ -115,6 +119,7 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
             .collect(),
         definitions: HashMap::new(),
         in_figure: false,
+        generic_captions: Vec::new(),
     };
     let ctx = Ctx {
         text,
@@ -283,14 +288,21 @@ impl Lowerer {
                 Ok(mut fm) => {
                     fm.meta = meta;
                     fm.raw = raw;
+                    // One fix moves every deprecated key at once; each
+                    // diagnostic carries it (the CLI applies the first and
+                    // skips the overlapping rest).
+                    let fix = deprecated_keys_fix(&fm.raw, &fm.deprecated)
+                        .map(|replacement| tmark_ir::Fix { span, replacement });
                     for key in &fm.deprecated {
-                        self.diag(
-                            Code::DeprecatedFrontmatterKey,
-                            span,
-                            format!(
-                                "top-level `{key}` is deprecated, move it under its `press` group"
-                            ),
-                        );
+                        let target = frontmatter::deprecated_key_target(key).unwrap_or_default();
+                        self.diagnostics.push(Diagnostic {
+                            fix: fix.clone(),
+                            ..Diagnostic::new(
+                                Code::DeprecatedFrontmatterKey,
+                                span,
+                                format!("`{key}` is deprecated, write `{target}`"),
+                            )
+                        });
                     }
                     front_matter = fm;
                 }
@@ -376,6 +388,22 @@ impl Lowerer {
 }
 
 pub(crate) use tmark_ir::plain_text;
+
+/// The front matter (`raw`, fences included) with every deprecated key
+/// moved to its canonical place (`tmark_ir::yaml_edit::move_key`), or
+/// `None` when one of the moves is not a safe line edit.
+fn deprecated_keys_fix(raw: &str, deprecated: &[String]) -> Option<String> {
+    let mut lines = raw.split_inclusive('\n');
+    let open = lines.next()?;
+    let close = raw.rsplit('\n').next()?;
+    let inner_end = raw.len() - close.len();
+    let mut inner = raw.get(open.len()..inner_end)?.to_string();
+    for key in deprecated {
+        let target = frontmatter::deprecated_key_target(key)?;
+        inner = tmark_ir::yaml_edit::move_key(&inner, key, &target)?;
+    }
+    Some(format!("{open}{inner}{close}"))
+}
 
 /// Source text with its backslash escapes decoded (`\+` → `+`), for text
 /// that the tokenizer took raw and the lowering gives back as literal: what

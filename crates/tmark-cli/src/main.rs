@@ -55,9 +55,16 @@ enum Command {
         /// Lint levels, `code=off|hint|info|warning|error`, repeatable.
         #[arg(long = "level", value_name = "CODE=LEVEL")]
         levels: Vec<String>,
-        /// Apply the safe fixes (deprecated spellings) in place.
+        /// Apply the safe fixes (deprecated spellings): the files are
+        /// rewritten in place unless `--stdout` or `--diff` is given.
         #[arg(long)]
         fix: bool,
+        /// With `--fix`: print the fixed text on stdout, write nothing.
+        #[arg(long, requires = "fix", conflicts_with = "diff")]
+        stdout: bool,
+        /// With `--fix`: print a unified diff of the fixes, write nothing.
+        #[arg(long, requires = "fix")]
+        diff: bool,
     },
     /// Alias of `check`.
     Lint {
@@ -66,8 +73,16 @@ enum Command {
         strict: bool,
         #[arg(long = "level", value_name = "CODE=LEVEL")]
         levels: Vec<String>,
+        /// Apply the safe fixes (deprecated spellings): the files are
+        /// rewritten in place unless `--stdout` or `--diff` is given.
         #[arg(long)]
         fix: bool,
+        /// With `--fix`: print the fixed text on stdout, write nothing.
+        #[arg(long, requires = "fix", conflicts_with = "diff")]
+        stdout: bool,
+        /// With `--fix`: print a unified diff of the fixes, write nothing.
+        #[arg(long, requires = "fix")]
+        diff: bool,
     },
     /// Print a JSON schema: `ir` or `frontmatter`.
     Schema { name: String },
@@ -87,13 +102,25 @@ fn main() -> ExitCode {
             strict,
             levels,
             fix,
+            stdout,
+            diff,
         }
         | Command::Lint {
             files,
             strict,
             levels,
             fix,
-        } => cmd_check(&files, strict, &levels, fix),
+            stdout,
+            diff,
+        } => {
+            let mode = match (fix, stdout, diff) {
+                (false, _, _) => FixMode::Off,
+                (true, true, _) => FixMode::Stdout,
+                (true, _, true) => FixMode::Diff,
+                (true, false, false) => FixMode::Write,
+            };
+            cmd_check(&files, strict, &levels, mode)
+        }
         Command::Schema { name } => cmd_schema(&name),
     }
 }
@@ -156,7 +183,100 @@ fn apply_fixes(text: &str, diagnostics: &[tmark::Diagnostic]) -> (String, usize)
     (out, applied)
 }
 
-fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String], fix: bool) -> ExitCode {
+/// What `--fix` does with the fixed text (design 09 §CLI).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FixMode {
+    /// No `--fix`: report every diagnostic.
+    Off,
+    /// Rewrite the file in place (the default of `--fix`).
+    Write,
+    /// `--stdout`: print the fixed text, write nothing.
+    Stdout,
+    /// `--diff`: print a unified diff, write nothing.
+    Diff,
+}
+
+/// A unified diff of `before` → `after` with three lines of context, in the
+/// `diff -u` layout (`--- name`, `+++ name`, `@@ -a,b +c,d @@` hunks).
+fn unified_diff(name: &str, before: &str, after: &str) -> String {
+    let before: Vec<&str> = before.lines().collect();
+    let after: Vec<&str> = after.lines().collect();
+    let changes = diff::slice(&before, &after);
+    // Line-level diff over `changes`, with each line's position on both sides.
+    let mut old_line = 0usize;
+    let mut new_line = 0usize;
+    let mut lines: Vec<(char, usize, usize, &str)> = Vec::with_capacity(changes.len());
+    for change in &changes {
+        match change {
+            diff::Result::Left(l) => {
+                old_line += 1;
+                lines.push(('-', old_line, new_line, l));
+            }
+            diff::Result::Right(r) => {
+                new_line += 1;
+                lines.push(('+', old_line, new_line, r));
+            }
+            diff::Result::Both(l, _) => {
+                old_line += 1;
+                new_line += 1;
+                lines.push((' ', old_line, new_line, l));
+            }
+        }
+    }
+    const CONTEXT: usize = 3;
+    let mut out = format!(
+        "--- {name}
++++ {name}
+"
+    );
+    let mut i = 0;
+    while i < lines.len() {
+        if lines[i].0 == ' ' {
+            i += 1;
+            continue;
+        }
+        // A hunk: from `CONTEXT` lines before this change to `CONTEXT`
+        // lines after the last change that is within `2 * CONTEXT` of it.
+        let start = i.saturating_sub(CONTEXT);
+        let mut last_change = i;
+        let mut probe = i;
+        while probe < lines.len() {
+            if lines[probe].0 != ' ' {
+                last_change = probe;
+            } else if probe - last_change > 2 * CONTEXT {
+                break;
+            }
+            probe += 1;
+        }
+        let end = (last_change + CONTEXT + 1).min(lines.len());
+        let hunk = &lines[start..end];
+        let old_count = hunk.iter().filter(|l| l.0 != '+').count();
+        let new_count = hunk.iter().filter(|l| l.0 != '-').count();
+        let old_start = hunk
+            .iter()
+            .find(|l| l.0 != '+')
+            .map_or(hunk[0].1, |l| l.1)
+            .max(usize::from(old_count > 0));
+        let new_start = hunk
+            .iter()
+            .find(|l| l.0 != '-')
+            .map_or(hunk[0].2, |l| l.2)
+            .max(usize::from(new_count > 0));
+        out.push_str(&format!(
+            "@@ -{old_start},{old_count} +{new_start},{new_count} @@\n"
+        ));
+        for (sign, _, _, text) in hunk {
+            out.push(*sign);
+            out.push_str(text);
+            out.push('\n');
+        }
+        i = end;
+    }
+    out
+}
+
+fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String], fix: FixMode) -> ExitCode {
+    let fix_on = fix != FixMode::Off;
     let bibliography: Vec<PathBuf> = files
         .iter()
         .filter(|f| f.extension().is_some_and(|e| e == "bib"))
@@ -201,21 +321,36 @@ fn cmd_check(files: &[PathBuf], strict: bool, levels: &[String], fix: bool) -> E
         );
         let index = LineIndex::new(&text);
         let name = file.display().to_string();
-        if fix && file.as_os_str() != "-" {
-            let (fixed, applied) = apply_fixes(&text, &diagnostics);
-            if applied > 0 {
-                if let Err(error) = std::fs::write(file, &fixed) {
-                    eprintln!("tmark: {}: {error}", file.display());
-                    failed = true;
+        match fix {
+            FixMode::Off => {}
+            FixMode::Write => {
+                let (fixed, applied) = apply_fixes(&text, &diagnostics);
+                if applied > 0 && file.as_os_str() != "-" {
+                    if let Err(error) = std::fs::write(file, &fixed) {
+                        eprintln!("tmark: {}: {error}", file.display());
+                        failed = true;
+                    }
+                    eprintln!("{name}: {applied} fix(es) applied");
                 }
-                eprintln!("{name}: {applied} fix(es) applied");
+            }
+            FixMode::Stdout => {
+                let (fixed, _) = apply_fixes(&text, &diagnostics);
+                let mut out = io::stdout().lock();
+                let _ = out.write_all(fixed.as_bytes());
+            }
+            FixMode::Diff => {
+                let (fixed, applied) = apply_fixes(&text, &diagnostics);
+                if applied > 0 {
+                    let mut out = io::stdout().lock();
+                    let _ = out.write_all(unified_diff(&name, &text, &fixed).as_bytes());
+                }
             }
         }
         for d in &diagnostics {
             if d.span.file != FileId::default() {
                 continue;
             }
-            if fix && d.fix.is_some() {
+            if fix_on && d.fix.is_some() {
                 continue;
             }
             let at = index.line_col(d.span.start);
@@ -385,5 +520,27 @@ fn cmd_schema(name: &str) -> ExitCode {
             eprintln!("tmark: unknown schema `{name}` (ir, frontmatter)");
             ExitCode::from(2)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unified_diff;
+
+    #[test]
+    fn unified_diff_has_hunks_with_context() {
+        let before = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n";
+        let after = "a\nb\nc\nD\ne\nf\ng\nh\ni\nJ\n";
+        let diff = unified_diff("x.md", before, after);
+        assert_eq!(
+            diff,
+            "--- x.md\n+++ x.md\n@@ -1,10 +1,10 @@\n a\n b\n c\n-d\n+D\n e\n f\n g\n h\n i\n-j\n+J\n"
+        );
+        let far = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\n";
+        let far_after = "A\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nM\n";
+        let diff = unified_diff("x.md", far, far_after);
+        assert!(diff.contains("@@ -1,4 +1,4 @@\n-a\n+A\n b\n c\n d\n"));
+        assert!(diff.contains("@@ -10,4 +10,4 @@\n j\n k\n l\n-m\n+M\n"));
+        assert_eq!(unified_diff("x.md", "a\n", "a\n"), "--- x.md\n+++ x.md\n");
     }
 }

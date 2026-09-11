@@ -410,12 +410,38 @@ pub fn destination(u: &str) -> String {
 }
 
 /// `@key` when one plain item; `@[…]` otherwise (spec §Ref).
+/// A key the bare `@key` grammar accepts (spec §Lexical grammar): a letter,
+/// then `[\w:.-]`, ending on an alphanumeric; `doi:` keys and URLs may hold
+/// `/`. Anything else (a digit-initial Zotero key, C27) prints bracketed,
+/// where the item grammar's fallback keeps the whole item as the key.
+fn is_bare_key(key: &str) -> bool {
+    let bytes = key.as_bytes();
+    let url = key.starts_with("doi:") || key.starts_with("http://") || key.starts_with("https://");
+    bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[bytes.len() - 1].is_ascii_alphanumeric()
+        && bytes.iter().all(|b| {
+            b.is_ascii_alphanumeric()
+                || matches!(b, b'_' | b':' | b'.' | b'-')
+                || (url && !b.is_ascii_whitespace() && !matches!(b, b'[' | b']' | b'(' | b')'))
+        })
+}
+
 fn reference(out: &mut Out, items: &[RefItem]) {
+    // The X4 guard: `@` fires only after a non-word character that is not
+    // one of `@/:.-` (spec §Lexical grammar). A reference printed right
+    // after such a character (`text.` then `[^key]`) gets a space.
+    if out
+        .last_char()
+        .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '@' | '/' | ':' | '.' | '-'))
+    {
+        out.push(" ");
+    }
     if let [item] = items {
         if item.prefix.is_none()
             && item.suffix.is_none()
             && !item.suppress_author
-            && !item.key.contains(char::is_whitespace)
+            && is_bare_key(&item.key)
         {
             out.push("@");
             out.push(&item.key);

@@ -174,7 +174,7 @@
       }
     },
     "Author": {
-      "description": "Spec §Front matter: `authors: [{name, affiliation}]`.",
+      "description": "Spec §Front matter: `authors: [{name, affiliation}]`. A bare string item (`authors: [Ada Lovelace]`) is the name alone (C9: TMark tolerates what TeXSmith accepts).",
       "type": "object",
       "required": [
         "name"

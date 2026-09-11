@@ -110,8 +110,16 @@ pub fn before(tokenizer: &mut Tokenizer) -> State {
             );
             State::Retry(StateName::CharacterReferenceStart)
         }
+        // `^[k1,k2]` citation (tmark), then attention (superscript, insert).
+        Some(b'^') => {
+            tokenizer.attempt(
+                State::Next(StateName::TextBefore),
+                State::Next(StateName::TextBeforeAttention),
+            );
+            State::Retry(StateName::TmarkReferenceCaretStart)
+        }
         // attention (emphasis, gfm strikethrough, strong, tmark sugar)
-        Some(b'*' | b'+' | b'=' | b'^' | b'_' | b'~') => {
+        Some(b'*' | b'+' | b'=' | b'_' | b'~') => {
             tokenizer.attempt(
                 State::Next(StateName::TextBefore),
                 State::Next(StateName::TextBeforeData),
@@ -143,7 +151,7 @@ pub fn before(tokenizer: &mut Tokenizer) -> State {
         Some(b'[') => {
             tokenizer.attempt(
                 State::Next(StateName::TextBefore),
-                State::Next(StateName::TextBeforeFootnoteLabel),
+                State::Next(StateName::TextBeforeCitationLabel),
             );
             State::Retry(StateName::TmarkReferencePandocStart)
         }
@@ -256,9 +264,31 @@ pub fn before_hard_break_escape(tokenizer: &mut Tokenizer) -> State {
     State::Retry(StateName::HardBreakEscapeStart)
 }
 
-/// Before GFM label start (footnote).
+/// Before a deprecated `[^key]` citation (tmark).
 ///
 /// At `[`, which wasn’t a Pandoc-style citation.
+pub fn before_citation_label(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::TextBefore),
+        State::Next(StateName::TextBeforeFootnoteLabel),
+    );
+    State::Retry(StateName::TmarkReferenceFootnoteStart)
+}
+
+/// Before attention.
+///
+/// At `^`, which wasn’t a `^[k1,k2]` citation.
+pub fn before_attention(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::TextBefore),
+        State::Next(StateName::TextBeforeData),
+    );
+    State::Retry(StateName::AttentionStart)
+}
+
+/// Before GFM label start (footnote).
+///
+/// At `[`, which wasn’t a `[^key]` citation.
 pub fn before_footnote_label(tokenizer: &mut Tokenizer) -> State {
     tokenizer.attempt(
         State::Next(StateName::TextBefore),
