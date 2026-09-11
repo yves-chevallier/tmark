@@ -126,7 +126,6 @@ API as built); the Python `Loader` protocol is wrapped at the boundary;
 `maturin develop` and `maturin build` work, the pytest suite under
 `crates/tmark-py/tests` is green, `.github/workflows/wheels.yml` builds the
 abi3 wheels. `write` raises `NotImplementedError` until the writers land
-(M4) and `fragments()` is empty until `FRAGMENTS` merges. Not started: the
 wheel on PyPI, `tmark-wasm`, the PyMdownX profile, dialect import.
 
 ## Out of scope for all milestones
