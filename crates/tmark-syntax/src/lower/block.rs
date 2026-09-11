@@ -436,8 +436,8 @@ impl Lowerer {
                 options: Attrs::new(),
             });
         };
-        let mut options = Attrs::new();
-        options.kv = info.options.clone();
+        let mut options = info.attrs.clone();
+        options.id_span = None;
         let node = info
             .node
             .clone()

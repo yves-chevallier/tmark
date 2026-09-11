@@ -157,11 +157,7 @@ fn block_with(out: &mut Out, b: &Block, alternate: bool) {
                     info.push_str(" code");
                 }
             }
-            for (k, v) in &c.options.kv {
-                info.push(' ');
-                info.push_str(k);
-                info.push_str(&format!("={}", fence_option(v)));
-            }
+            info.push_str(&fence_attrs(&c.options, |_| true));
             fence(out, info.trim(), &c.text);
         }
         Block::BlockQuote(q) => {
@@ -373,15 +369,37 @@ fn fenced_image(out: &mut Out, image: &tmark_ir::Image) {
     let lang = image.attrs.get("generate").unwrap_or_default();
     let code = image.attrs.get("code").unwrap_or_default();
     let mut info = format!("{lang} image");
-    for (k, v) in &image.attrs.kv {
-        if k == "generate" || k == "code" {
-            continue;
-        }
-        info.push(' ');
-        info.push_str(k);
-        info.push_str(&format!("={}", fence_option(v)));
-    }
+    info.push_str(&fence_attrs(&image.attrs, |k| {
+        k != "generate" && k != "code"
+    }));
     fence(out, &info, code);
+}
+
+/// The options of a fence, with a leading space when there are any: bare
+/// `key=value` words (spec §Lexical grammar, family 4), or the braced
+/// attribute list when there are classes or an id, the only spelling that
+/// carries them (design 12 C28). `keep` filters the keys.
+fn fence_attrs(attrs: &Attrs, keep: impl Fn(&str) -> bool) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let braced = attrs.id.is_some() || !attrs.classes.is_empty();
+    if let Some(id) = &attrs.id {
+        parts.push(format!("#{id}"));
+    }
+    for class in &attrs.classes {
+        parts.push(format!(".{class}"));
+    }
+    for (k, v) in &attrs.kv {
+        if keep(k) {
+            parts.push(format!("{k}={}", fence_option(v)));
+        }
+    }
+    if parts.is_empty() {
+        String::new()
+    } else if braced {
+        format!(" {{{}}}", parts.join(" "))
+    } else {
+        format!(" {}", parts.join(" "))
+    }
 }
 
 /// A quoted fence option. CommonMark processes backslash escapes in an

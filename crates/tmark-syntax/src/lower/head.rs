@@ -239,13 +239,18 @@ pub fn parse_ref_items(inner: &str) -> Vec<RefItem> {
 pub struct FenceInfo {
     pub lang: String,
     pub node: Option<String>,
-    pub options: Vec<(String, String)>,
+    /// `key=value` options, plus the classes and id of a trailing attribute
+    /// list (`{.snippet caption="…"}`, design 12 C28). `id_span` is unset.
+    pub attrs: Attrs,
     /// Text of the info string that did not parse as options, kept for the
     /// listing.
     pub rest: Option<String>,
 }
 
-/// Parses `lang [node] [key=value…]`.
+/// Parses `lang [node] [key=value…] [{attrs}]`: bare `key=value` options
+/// (spec §Lexical grammar, family 4) and, at the end, an attribute list in
+/// braces with the C1 value grammar, which is the only spelling that can
+/// carry classes (`{.snippet caption="Title" width="60%"}`).
 pub fn parse_fence_info(lang: Option<&str>, meta: Option<&str>) -> Option<FenceInfo> {
     let lang = lang?.trim();
     if lang.is_empty() {
@@ -254,13 +259,18 @@ pub fn parse_fence_info(lang: Option<&str>, meta: Option<&str>) -> Option<FenceI
     let mut info = FenceInfo {
         lang: lang.to_string(),
         node: None,
-        options: Vec::new(),
+        attrs: Attrs::new(),
         rest: None,
     };
     let Some(meta) = meta else {
         return Some(info);
     };
-    let list = tokens(meta);
+    let meta = meta.trim();
+    let (plain, braced) = match meta.find('{') {
+        Some(at) if meta.ends_with('}') => (&meta[..at], Some(&meta[at + 1..meta.len() - 1])),
+        _ => (meta, None),
+    };
+    let list = tokens(plain);
     let mut index = 0;
     if let Some(first) = list.first() {
         if tmark_ir::registry::node_word(first).is_some() {
@@ -271,9 +281,19 @@ pub fn parse_fence_info(lang: Option<&str>, meta: Option<&str>) -> Option<FenceI
     let mut rest = Vec::new();
     for token in &list[index..] {
         match key_value(token) {
-            Some(pair) => info.options.push(pair),
+            Some(pair) => info.attrs.kv.push(pair),
             None => rest.push(*token),
         }
+    }
+    match braced.map(parse_attrs) {
+        Some(Some(attrs)) => {
+            info.attrs.id = attrs.id;
+            info.attrs.classes = attrs.classes;
+            info.attrs.kv.extend(attrs.kv);
+        }
+        // Not an attribute list: literal text of the info string.
+        Some(None) => rest.push(&meta[meta.find('{').unwrap_or(0)..]),
+        None => {}
     }
     if !rest.is_empty() {
         info.rest = Some(rest.join(" "));
@@ -398,15 +418,33 @@ mod tests {
         let info = parse_fence_info(Some("python"), Some("image include=\"plot.py\"")).unwrap();
         assert_eq!(info.node.as_deref(), Some("image"));
         assert_eq!(
-            info.options,
+            info.attrs.kv,
             vec![("include".to_string(), "plot.py".to_string())]
         );
         let info = parse_fence_info(Some("yaml"), Some("table")).unwrap();
         assert_eq!(info.node.as_deref(), Some("table"));
         let info = parse_fence_info(Some("js"), Some("title=\"a.js\" linenums=\"1\"")).unwrap();
         assert!(info.node.is_none());
-        assert_eq!(info.options.len(), 2);
+        assert_eq!(info.attrs.kv.len(), 2);
         assert!(parse_fence_info(None, None).is_none());
+        // A trailing attribute list (C28): classes and quoted values.
+        let info = parse_fence_info(
+            Some("md"),
+            Some("{.snippet caption=\"A title\" width=\"60%\"}"),
+        )
+        .unwrap();
+        assert_eq!(info.attrs.classes, vec!["snippet"]);
+        assert_eq!(info.attrs.get("caption"), Some("A title"));
+        assert_eq!(info.attrs.get("width"), Some("60%"));
+        assert!(info.rest.is_none());
+        let info = parse_fence_info(Some("mermaid"), Some("{width=80%}")).unwrap();
+        assert_eq!(info.attrs.get("width"), Some("80%"));
+        let info = parse_fence_info(Some("python"), Some("image {#fig:x .wide} ")).unwrap();
+        assert_eq!(info.node.as_deref(), Some("image"));
+        assert_eq!(info.attrs.id.as_deref(), Some("fig:x"));
+        let info = parse_fence_info(Some("c"), Some("{not attrs}")).unwrap();
+        assert!(info.attrs.is_empty());
+        assert_eq!(info.rest.as_deref(), Some("{not attrs}"));
     }
 
     #[test]
