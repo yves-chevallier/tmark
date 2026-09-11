@@ -172,14 +172,17 @@ pub fn pandoc_start(tokenizer: &mut Tokenizer) -> State {
 }
 
 /// A citation key of the deprecated forms: a bare-reference key
-/// (`[A-Za-z][\w:.-]*[A-Za-z0-9]`, `/` allowed after `doi:`) or a bare
-/// DOI (`10.<digits>/…`), which the lowering prefixes with `doi:`.
+/// (`[A-Za-z][\w:.-]*[A-Za-z0-9]`, `/` allowed after `doi:`), a bare
+/// DOI (`10.<digits>/…`, which the lowering prefixes with `doi:`), or a
+/// digit-initial bibliography key (`1RgTv`, Zotero's shape; printed
+/// bracketed, `design/12-spec-challenges.md` C27). An all-digit label is
+/// a footnote, never a key.
 fn is_citation_key(key: &[u8]) -> bool {
-    if key.len() < 2 {
+    if key.len() < 2 || key.iter().all(u8::is_ascii_digit) {
         return false;
     }
     let doi = key.starts_with(b"doi:") || (key.starts_with(b"10.") && key.contains(&b'/'));
-    let first_ok = key[0].is_ascii_alphabetic() || doi;
+    let first_ok = key[0].is_ascii_alphanumeric();
     let last = key[key.len() - 1];
     first_ok
         && !matches!(last, b'.' | b',' | b';' | b':' | b'!' | b'?' | b'-' | b'/')

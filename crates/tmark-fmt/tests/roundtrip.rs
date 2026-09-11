@@ -135,12 +135,14 @@ fn spec_round_trips() {
 /// references.
 #[test]
 fn hugging_citations_get_a_space() {
-    let text = "Slow to talk,^[ein05,AI2027] he said.[^ein05] Then^[10.1007/x] more.\n";
+    let text =
+        "Slow to talk,^[ein05,AI2027] he said.[^ein05] Then^[10.1007/x] more.^[1RgTv] Not [^1].\n";
     let doc = parse(text, FileId::default()).document;
     let printed = format(&doc, Profile::Canonical);
+    // A digit-initial key (C27) has no bare spelling: it prints bracketed.
     assert_eq!(
         printed,
-        "Slow to talk,@[ein05; AI2027] he said. @ein05 Then @doi:10.1007/x more.\n"
+        "Slow to talk,@[ein05; AI2027] he said. @ein05 Then @doi:10.1007/x more. @[1RgTv] Not \\[\\^1].\n"
     );
     // The inserted space changes the `Str` text, so the sugar is not a
     // strict round trip; the printed text is a fixed point that parses back
