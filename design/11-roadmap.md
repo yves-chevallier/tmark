@@ -98,7 +98,9 @@ cover `deprecated` only; range formatting; a real VS Code session. See
 Crates: `tmark-writers` (LaTeX, Typst, HTML, CommonMark profiles), the
 `typst` crate in `tmark-lsp`.
 
-- Bodies, `Requires`, source maps per `07-writers.md`; `Mkdocs` profile.
+- Bodies, `Requires`, source maps per `07-writers.md` — the three
+  writers, `tmark write` and the fixture snapshots exist (`07-writers.md`
+  §Implementation notes (milestone 4)); `Mkdocs` profile.
 - TeXSmith switches its reader to the IR (its side of the work; the
   contract is this repository's schema and `Requires`).
 - Typst preview in the editor with click-to-source.
