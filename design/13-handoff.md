@@ -1,4 +1,4 @@
-# 13 — Handoff notes (milestone 3, first pass)
+# 13 — Handoff notes (end of the milestone 3 round, 2026-09-11)
 
 Written by the agent that implemented most of M3 on top of M1–M2, for the
 agent that takes over. Read `AGENTS.md`, then this file, then
@@ -9,7 +9,7 @@ the inside of the work: verify it, do not trust it.
 
 - `main`, workspace green: `cargo test --workspace`, `cargo clippy
   --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`,
-  `npm test` in `editors/vscode`. Not pushed; the owner pushes.
+  `npm test` in `editors/vscode`. Pushed to `origin/main`.
 - New since M2: `tmark-lsp` (server library plus binary, `crates/tmark-lsp`),
   the VS Code client (`editors/vscode/src/extension.js`, esbuild bundle,
   `bin/tmark-lsp` bundled by `npm run bundle:server`, `.vsix` verified
@@ -41,10 +41,10 @@ exposed by `tmark-fmt`. Not done: node ids are not pre-order/dense
 
 From `05-architecture.md`: A1 (feature gate), A2 (documented in `01`), A5
 (dependency comments), A6 (severity words), C3 (`analyse`, `parse_with`),
-A4 (grammar tables from `tmark-ir`) done. Not done: A3 (the caption-kind ↔
-prefix mapping is now `CaptionKind::prefix()` in `tmark-ir` but
-`tmark-lint::caption_id`, `collect.rs` and the heading-class list still
-spell their own copies — small, do it); B4 (inventory schema, `tmark
+A4 (grammar tables from `tmark-ir`) done. A3 mostly done (`CaptionKind::prefix()`/`word()` used by the lint rule
+and the outline, `Prefix::heading` replaces the collector's list; the
+`Host` ↔ prefix mapping in `collect.rs` and the label words of
+`hardcoded_number` remain). Not done: B4 (inventory schema, `tmark
 schema inventory`, M4); C4 (drop `tmark-writers → tmark-fmt`, decide at
 M4); the `ResolveOptions.bibliography` relativisation duplicated in the
 CLI and `Config` (`pathdiff`/`relative_to`); `has_press_key` re-scans the
@@ -86,8 +86,8 @@ U10, U11.
    that VS Code does not show "TMark" errors for a README), the output
    channel, the restart command.
 2. **Printer U9** waits for C26 (`12-spec-challenges.md`); the parser-side
-   observations at the end of `reviews/03` (`\[x\]{#id}` leaves two
-   `Str`s, `$5 and $6` is math, `x^2 and y^3` a superscript) and the
+   observations at the end of `reviews/03` (`$5 and $6` is math,
+   `x^2 and y^3` a superscript; the two-`Str` case is fixed) and the
    `reviews/02` ranking for M3 (anchors with undeclared prefixes, C24;
    `frontmatter-unknown-key` never fires; links and fences are not
    attribute hosts; deprecated front-matter groups dropped) are the
@@ -116,10 +116,9 @@ holds `Writer`, `Body`, `Requires`, `SourceMap`, `html`, `latex`, `typst`).
 Suggested order: HTML writer first (the CommonMark suite compares HTML,
 `10-testing.md` §2, and the LSP preview can show it), then LaTeX against
 TeXSmith's output on its docs, then Typst with the in-process preview
-(ADR 0005). Before starting: run the three missing reviews; the printer
-critic's over-escaping count decides whether `tmark fmt` is ready to
-touch TeXSmith's corpus, and the parser adversary decides whether the
-totality property test is enough.
+(ADR 0005). The printer is ready for TeXSmith's corpus (93 pages at the
+fixed point, `04-printer.md`); the HTML writer can reuse the CommonMark
+suite's expectations. Keep the corpus loop of §Commands as the M4 gate.
 
 ## Pitfalls learned this pass
 
