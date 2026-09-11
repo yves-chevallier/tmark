@@ -378,20 +378,15 @@ impl Lowerer {
                 attrs: Attrs::new(),
             }));
         }
-        if let Some(rest) = source.strip_prefix("--8<--") {
-            let rest = rest.trim();
-            let path = rest.trim_matches('"');
-            let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
-            if !path.is_empty() && (quoted || !rest.contains(char::is_whitespace)) {
-                let span = self.span(ctx, p.position.as_ref());
-                self.deprecated(span, "--8<-- \"file\"", "{include}(file)");
-                let meta = self.meta(span);
-                return Some(Block::Include(Include {
-                    meta,
-                    path: path.to_string(),
-                    base: None,
-                }));
-            }
+        if let Some(path) = snippet_path(source) {
+            let span = self.span(ctx, p.position.as_ref());
+            self.deprecated(span, "--8<-- \"file\"", "{include}(file)");
+            let meta = self.meta(span);
+            return Some(Block::Include(Include {
+                meta,
+                path,
+                base: None,
+            }));
         }
         None
     }
@@ -451,6 +446,22 @@ impl Lowerer {
                 options: options.clone(),
             })
         };
+        // A listing whose body is one PyMdownX snippet line (`--8<-- "file"`)
+        // is the `include="file"` option (spec §Listing; Appendix
+        // "Deprecation schedule").
+        if node == "code" && options.get("include").is_none() {
+            if let Some(path) = snippet_path(code.value.trim()) {
+                self.deprecated(span, "--8<-- \"file\" in a fence", "include=\"file\"");
+                let mut options = options;
+                options.kv.push(("include".to_string(), path));
+                return Block::CodeBlock(CodeBlock {
+                    meta,
+                    text: String::new(),
+                    lang: Some(info.lang.clone()),
+                    options,
+                });
+            }
+        }
         match node.as_str() {
             "code" => listing(self, Some(info.lang.clone())),
             "table" => match info.lang.as_str() {
@@ -979,6 +990,16 @@ fn take_partial_task(content: &mut [Block]) -> Option<Task> {
     let rest = s.text.strip_prefix("[.] ")?;
     s.text = rest.to_string();
     Some(Task::Partial)
+}
+
+/// The path of a PyMdownX snippet line `--8<-- "file"` (quoted, or bare
+/// without whitespace), when `line` is exactly one.
+fn snippet_path(line: &str) -> Option<String> {
+    let rest = line.trim().strip_prefix("--8<--")?.trim();
+    let path = rest.trim_matches('"');
+    let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
+    (!path.is_empty() && !path.contains('\n') && (quoted || !rest.contains(char::is_whitespace)))
+        .then(|| path.to_string())
 }
 
 /// The `stops` of a collected body whose first `skip` bytes are dropped.
