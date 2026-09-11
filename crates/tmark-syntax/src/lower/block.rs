@@ -15,6 +15,9 @@ use super::inline::trim_trailing_space;
 use super::{plain_text, Ctx, Lowerer};
 
 /// A block with the mdast node it came from, for the neighbour passes.
+/// Every item is moved once into the block list: boxing the block would
+/// cost an allocation per block for nothing.
+#[allow(clippy::large_enum_variant)]
 enum Item {
     Block(Block),
     /// A definition item body; paired with the paragraph before it.
@@ -233,6 +236,7 @@ impl Lowerer {
                     meta,
                     model,
                     attrs: Attrs::new(),
+                    source: None,
                 })));
             }
             Node::FootnoteDefinition(def) => {
@@ -467,18 +471,19 @@ impl Lowerer {
             "code" => listing(self, Some(info.lang.clone())),
             "table" => match info.lang.as_str() {
                 "yaml" | "yml" => match self.lower_yaml_table(&code.value, span) {
-                    Ok(model) => Block::Table(Table {
+                    Ok((model, rejected)) => Block::Table(Table {
                         meta,
                         model,
                         attrs: options,
+                        source: rejected.then(|| code.value.clone()),
                     }),
                     Err(error) => {
                         self.diag(
-                            Code::FenceUnknownNodeWord,
+                            Code::TableYaml,
                             span,
-                            format!("invalid `yaml table`: {error}"),
+                            format!("the `yaml table` payload {error}"),
                         );
-                        listing(self, Some(info.lang.clone()))
+                        listing(self, Some("yaml table".to_string()))
                     }
                 },
                 // Grid tables are parsed at milestone 4 (design/11-roadmap.md).
@@ -492,19 +497,28 @@ impl Lowerer {
                     listing(self, Some(info.lang.clone()))
                 }
             },
-            "table-config" => match self.lower_yaml_table_config(&code.value) {
-                Ok((columns, settings)) if matches!(info.lang.as_str(), "yaml" | "yml") => {
-                    Block::TableConfig(TableConfig {
+            "table-config" => match info.lang.as_str() {
+                "yaml" | "yml" => match self.lower_yaml_table_config(&code.value, span) {
+                    Ok((columns, settings, rejected)) => Block::TableConfig(TableConfig {
                         meta,
                         columns,
                         settings,
-                    })
-                }
-                Ok(_) | Err(_) => {
+                        source: rejected.then(|| code.value.clone()),
+                    }),
+                    Err(error) => {
+                        self.diag(
+                            Code::TableYaml,
+                            span,
+                            format!("the `yaml table-config` payload {error}"),
+                        );
+                        listing(self, Some("yaml table-config".to_string()))
+                    }
+                },
+                other => {
                     self.diag(
                         Code::FenceUnknownNodeWord,
                         span,
-                        "`table-config` takes YAML",
+                        format!("`{other} table-config` is not a data directive; `table-config` takes YAML"),
                     );
                     listing(self, Some(info.lang.clone()))
                 }

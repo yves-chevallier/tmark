@@ -5,6 +5,9 @@ mod hardcoded_number;
 mod heading_skip;
 mod lead_promotion;
 mod position_word;
+mod table_placement;
+mod table_width;
+mod table_width_sum;
 
 use crate::Rule;
 
@@ -14,6 +17,9 @@ pub const RULES: &[&dyn Rule] = &[
     &caption_id::CaptionIdOffConvention,
     &heading_skip::HeadingSkip,
     &lead_promotion::LeadPromotion,
+    &table_placement::TablePlacement,
+    &table_width::TableWidth,
+    &table_width_sum::TableWidthSum,
 ];
 
 /// Walk every `Str` of the document with its span.
@@ -32,4 +38,30 @@ pub(crate) fn sub_span(span: tmark_ir::Span, start: usize, end: usize) -> tmark_
         span.start + start as u32,
         span.start + end as u32,
     )
+}
+
+/// The `table:` settings of a table or table-config node the parser holds
+/// faithfully (a node with a kept `source` is a best effort: skipped).
+pub(crate) fn table_settings(
+    node: tmark_ir::NodeRef<'_>,
+) -> Option<(&tmark_ir::TableSettings, tmark_ir::Span)> {
+    match node {
+        tmark_ir::NodeRef::Block(tmark_ir::Block::Table(t)) if t.source.is_none() => {
+            Some((&t.model.settings, t.meta.span))
+        }
+        tmark_ir::NodeRef::Block(tmark_ir::Block::TableConfig(c)) if c.source.is_none() => {
+            Some((&c.settings, c.meta.span))
+        }
+        _ => None,
+    }
+}
+
+/// The number of a `NN%` or `NN.N%` width (TeXSmith `PERCENT_RE`).
+pub(crate) fn percent(width: &str) -> Option<f64> {
+    let number = width.strip_suffix('%')?;
+    let valid = !number.is_empty()
+        && number.chars().all(|c| c.is_ascii_digit() || c == '.')
+        && number.matches('.').count() <= 1
+        && number.starts_with(|c: char| c.is_ascii_digit());
+    valid.then(|| number.parse().ok()).flatten()
 }

@@ -9,6 +9,7 @@ mod block;
 mod compat;
 mod inline;
 mod table;
+mod table_yaml;
 
 pub(crate) mod head;
 

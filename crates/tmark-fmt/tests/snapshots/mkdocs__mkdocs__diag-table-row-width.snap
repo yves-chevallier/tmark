@@ -1,0 +1,10 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```yaml table
+columns: [A, B, C, D]
+rows:
+  - [x, 1, 2]
+  - [y, 1, 2, 3, 4]
+```

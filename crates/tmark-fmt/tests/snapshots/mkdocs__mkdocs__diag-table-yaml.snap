@@ -1,0 +1,8 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+```yaml table
+- not
+- a mapping
+```

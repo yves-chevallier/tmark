@@ -1,0 +1,18 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Table: Config. {#tbl:cfg}
+
+| A   | B   | C   |
+| --- | --- | --- |
+| 1   | 2   | 3   |
+
+```yaml table-config
+table:
+  width: 100%
+columns:
+  - {}
+  - {align: right, width: X}
+  - {align: center, width-group: g}
+```

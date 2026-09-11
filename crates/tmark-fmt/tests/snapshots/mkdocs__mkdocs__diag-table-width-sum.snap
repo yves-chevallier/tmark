@@ -4,11 +4,8 @@ expression: mkdocs(&canonical)
 ---
 ```yaml table
 columns:
-  - A
-  - B
-  - C
+  - {name: A, width: 60%}
+  - {name: B, width: 50%}
 rows:
-  - ["1.10", "+1", "0x1F"]
-  - [3, "NULL", "Yes"]
-  - [{value: "1e3", cols: 2}, "on"]
+  - [1, 2]
 ```
