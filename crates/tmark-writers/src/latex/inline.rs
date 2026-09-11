@@ -10,7 +10,7 @@ use tmark_registry::Resolution;
 
 use super::escape;
 use super::Latex;
-use crate::common::{abbr, fragments, media, refs, text, zero};
+use crate::common::{abbr, fragments, logos, media, refs, text, zero};
 use crate::{CodeEngine, Media};
 
 /// Zero-width inlines (spec §Attributes): comments, index entries, asides,
@@ -51,7 +51,7 @@ impl Latex<'_> {
                 let keys = std::mem::take(&mut self.abbr_keys);
                 for segment in abbr::split(&s.text, &keys) {
                     match segment {
-                        abbr::Segment::Text(t) => self.out.push(&escape::prose(t)),
+                        abbr::Segment::Text(t) => self.prose(t),
                         abbr::Segment::Abbr(key) => self.abbr(&Abbr {
                             meta: s.meta,
                             text: key.to_string(),
@@ -132,6 +132,31 @@ impl Latex<'_> {
                 }
             }
             Inline::ProgressBar(n) => self.progress_bar(n),
+        }
+    }
+
+    /// Prose with the TeX logo words set as logos under
+    /// `typography.tex-logos` (spec §TeX logos): `\TeX{}`, `\LaTeX{}` and
+    /// `\LaTeXe{}` are the kernel's, the others `\tslogo{Name}` of
+    /// `ts-typesetting`.
+    fn prose(&mut self, text: &str) {
+        if !self.tex_logos {
+            self.out.push(&escape::prose(text));
+            return;
+        }
+        for segment in logos::split(text) {
+            match segment {
+                logos::Segment::Text(t) => self.out.push(&escape::prose(t)),
+                logos::Segment::Logo(name) => match name {
+                    "TeX" => self.out.push("\\TeX{}"),
+                    "LaTeX" => self.out.push("\\LaTeX{}"),
+                    "LaTeX2e" => self.out.push("\\LaTeXe{}"),
+                    other => {
+                        self.req.fragment(fragments::TYPESETTING);
+                        self.out.push(&format!("\\tslogo{{{other}}}"));
+                    }
+                },
+            }
         }
     }
 

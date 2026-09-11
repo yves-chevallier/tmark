@@ -25,7 +25,7 @@ use tmark_ir::{
 };
 use tmark_registry::Resolved;
 
-use crate::common::{abbr, fragments, media, text, Out};
+use crate::common::{abbr, fragments, logos, media, refs, Out};
 use crate::{Backend, Body, CodeEngine, Media, Requires, Writer, WriterOptions};
 
 /// The LaTeX writer.
@@ -48,6 +48,7 @@ impl Writer for LatexWriter {
             in_cell: false,
             acronyms: BTreeMap::new(),
             abbr_keys: abbr::keys(doc),
+            tex_logos: logos::enabled(doc),
         };
         w.blocks(&doc.blocks);
         let (text, map) = w.out.finish();
@@ -77,6 +78,8 @@ pub(crate) struct Latex<'a> {
     acronyms: BTreeMap<String, String>,
     /// Acronym keys substituted in running text (`common::abbr`).
     abbr_keys: Vec<String>,
+    /// Feature `typography.tex-logos` (spec §TeX logos).
+    pub(crate) tex_logos: bool,
 }
 
 impl Latex<'_> {
@@ -187,8 +190,11 @@ impl Latex<'_> {
 
     /// `heading.tex`: level −1 `part`, 0 `chapter`, 1–3 `section` …
     /// `subsubsection`, 4–5 `paragraph`/`subparagraph` plus `\mbox{}\\`,
-    /// beyond `\textbf{}`; `*` when not numbered; `\label{id}` with the id
-    /// or the slug of the title.
+    /// beyond `\textbf{}`; `*` when not numbered, per document
+    /// (`headings.numbered`) or per heading (`.unnumbered`, `.unlisted`:
+    /// spec §Header; an unnumbered heading keeps its `\addcontentsline`,
+    /// an unlisted one loses it); `\label{id}` with the explicit id, or
+    /// the implicit id when a reference targets it.
     fn header(&mut self, h: &Header) {
         let level = i32::from(h.level) + i32::from(self.opts.headings.base_level) - 1;
         let command = match level {
@@ -207,21 +213,28 @@ impl Latex<'_> {
             .collect::<Vec<_>>()
             .join(" ");
         let label = match h.attrs.id() {
-            Some(id) => id.to_string(),
-            None => text::slugify(&plain_text(&h.content)),
+            Some(id) => Some(id.to_string()),
+            None => refs::referenced_implicit_id(self.res, h.meta.id).map(str::to_string),
         };
+        let unlisted = h.attrs.has_class("unlisted");
+        let unnumbered = unlisted || h.attrs.has_class("unnumbered");
         match command {
             Some(command) => {
                 self.out.push("\\");
                 self.out.push(command);
-                if !self.opts.headings.numbered {
+                if !self.opts.headings.numbered || unnumbered {
                     self.out.push("*");
                 }
                 self.out.push(&format!("{{{title}}}"));
+                if unnumbered && !unlisted && self.opts.headings.numbered {
+                    let toc = if level < 0 { "part" } else { command };
+                    self.out
+                        .push(&format!("\\addcontentsline{{toc}}{{{toc}}}{{{title}}}"));
+                }
             }
             None => self.out.push(&format!("\\textbf{{{title}}}")),
         }
-        if !label.is_empty() {
+        if let Some(label) = label {
             self.out
                 .push(&format!("\\label{{{}}}", escape::escape(&label)));
         }
@@ -524,6 +537,9 @@ impl Latex<'_> {
                 }
             }
             "typst" | "html" => {}
+            // Print has no interaction: the tabs of a set follow each other,
+            // each a titled `tsdiv{tab}` block (spec §Tabs).
+            "tabs" => self.blocks(&d.content),
             "code" => {
                 let keys = self.code_keys(None, &d.attrs, caption, None, Some("pygments"));
                 self.begin_code(&keys);

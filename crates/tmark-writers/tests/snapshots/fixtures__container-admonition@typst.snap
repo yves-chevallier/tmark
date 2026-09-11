@@ -2,15 +2,16 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-#ts-callout(kind: "warning", title: [LaTeX toolchain])[
-Install TeX Live before `texsmith --build`.
+#ts-callout(kind: "warning", title: [#ts-logo("LaTeX") toolchain])[
+Install #ts-logo("TeX") Live before `texsmith --build`.
 ]
 
 ---requires---
 {
   "packages": [],
   "fragments": [
-    "ts-callouts"
+    "ts-callouts",
+    "ts-typesetting"
   ],
   "shell_escape": false,
   "assets": [],

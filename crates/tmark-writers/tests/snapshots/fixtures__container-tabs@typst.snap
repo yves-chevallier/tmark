@@ -2,16 +2,19 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-\begin{tscallout}[kind=warning, title={\LaTeX{} toolchain}]
-Install \TeX{} Live before \tscodeinline{texsmith -\allowbreak{}-\allowbreak{}build}.
-\end{tscallout}
+#ts-div("tab", title: "Windows")[
+Windows is a Microsoft operating system.
+]
+
+#ts-div("tab", title: "Linux")[
+Linux is an open-source operating system.
+]
 
 ---requires---
 {
   "packages": [],
   "fragments": [
-    "ts-callouts",
-    "ts-code"
+    "ts-typesetting"
   ],
   "shell_escape": false,
   "assets": [],

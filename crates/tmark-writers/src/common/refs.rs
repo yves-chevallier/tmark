@@ -72,6 +72,22 @@ pub fn tmark_numbered(res: &Resolved, prefix: &str) -> bool {
     res.counters.get(prefix).is_some_and(|c| c.tmark_numbered)
 }
 
+/// The implicit id of a heading (spec §Header) when a reference of the
+/// document targets it, else `None`: the paged writers write a `\label`
+/// for an implicit id only when something points at it. An explicit id is
+/// the node's own attribute and is not looked up here.
+pub fn referenced_implicit_id(res: &Resolved, node: NodeId) -> Option<&str> {
+    let label = res
+        .labels
+        .in_order
+        .iter()
+        .find(|l| l.node == node && l.implicit)?;
+    res.refs
+        .iter()
+        .any(|r| matches!(&r.resolution, tmark_registry::Resolution::Label { target, .. } if *target == node))
+        .then_some(label.id.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

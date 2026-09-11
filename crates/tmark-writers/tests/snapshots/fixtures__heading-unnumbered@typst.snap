@@ -2,10 +2,9 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<div class="admonition warning">
-<p class="admonition-title"><span class="tex-logo">L<sup>a</sup>T<sub>e</sub>X</span> toolchain</p>
-<p>Install <span class="tex-logo">T<sub>e</sub>X</span> Live before <code>texsmith --build</code>.</p>
-</div>
+#heading(level: 1, numbering: none)[Preface]
+
+#heading(level: 2, numbering: none, outlined: false)[Colophon]
 
 ---requires---
 {

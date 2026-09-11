@@ -9,7 +9,7 @@ use tmark_registry::Resolution;
 use super::escape;
 use super::math;
 use super::Typst;
-use crate::common::{abbr, fragments, media, refs, text, zero};
+use crate::common::{abbr, fragments, logos, media, refs, text, zero};
 use crate::Media;
 
 /// Zero-width inlines (spec §Attributes).
@@ -46,7 +46,7 @@ impl Typst<'_> {
                 let keys = std::mem::take(&mut self.abbr_keys);
                 for segment in abbr::split(&s.text, &keys) {
                     match segment {
-                        abbr::Segment::Text(t) => self.out.push(&escape::markup(t)),
+                        abbr::Segment::Text(t) => self.prose(t),
                         abbr::Segment::Abbr(key) => self.abbr(&Abbr {
                             meta: s.meta,
                             text: key.to_string(),
@@ -138,6 +138,24 @@ impl Typst<'_> {
                 }
             }
             Inline::ProgressBar(n) => self.progress_bar(n),
+        }
+    }
+
+    /// Prose with the TeX logo words as `#ts-logo("Name")` under
+    /// `typography.tex-logos` (spec §TeX logos).
+    fn prose(&mut self, text: &str) {
+        if !self.tex_logos {
+            self.out.push(&escape::markup(text));
+            return;
+        }
+        for segment in logos::split(text) {
+            match segment {
+                logos::Segment::Text(t) => self.out.push(&escape::markup(t)),
+                logos::Segment::Logo(name) => {
+                    self.req.fragment(fragments::TYPESETTING);
+                    self.out.push(&format!("#ts-logo(\"{name}\")"));
+                }
+            }
         }
     }
 

@@ -5,6 +5,7 @@
 
 pub mod abbr;
 pub mod fragments;
+pub mod logos;
 pub mod media;
 pub mod out;
 pub mod refs;
