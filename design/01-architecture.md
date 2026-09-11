@@ -78,14 +78,19 @@ pub fn fixes(doc: &Document, diagnostics: &mut [Diagnostic]);          // deprec
 pub fn format(doc: &Document, profile: Profile) -> String;
 pub fn edit(text: &str, doc: &Document, edit: NodeEdit) -> String;      // local splice
 pub fn print_node(node: NodeRef) -> String;                             // one node, canonical
-pub fn schema(name: &str) -> Option<serde_json::Value>;                 // "ir", "frontmatter"
+pub fn apply_fixes(text, file, diagnostics) -> (String, usize);         // what `lint --fix` writes
+pub fn schema(name: &str) -> Option<serde_json::Value>;                 // "ir", "frontmatter", "diagnostic", "resolved"
+pub fn schema_hash() -> String;                                         // stable hash of schema("ir")
+pub fn to_json(doc) -> Value; pub fn from_json(Value) -> Result<Document, String>; // "tmark": VERSION at the root
 pub struct Config;  // tmark.toml: Config::parse(text, dir); Config::discover(path) behind `fs`
 ```
 
 `write` arrives with milestone 4. Anything else a binding needs is a
 composition of these. Bindings do not reach into lower crates: `tmark::ir`
 re-exports `tmark-ir`, and `Resolved`, `Label`, `RefResolution`,
-`Resolution`, `Host` are re-exported for navigation.
+`Resolution`, `Host` are re-exported for navigation; `ResolvedView`
+(`Resolved::view()`) is the flat, serialisable shape the bindings return
+and `schema("resolved")` describes.
 
 **Feature `fs`.** `FsLoader` and `Config::discover` are the only functions
 in the core that touch the file system; both are absent without the

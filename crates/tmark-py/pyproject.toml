@@ -27,6 +27,7 @@ module-name = "tmark._tmark"
 features = ["pyo3/extension-module"]
 # The wheel carries the stub and the marker so that pyright sees the API.
 include = ["python/tmark/py.typed", "python/tmark/_tmark.pyi"]
+exclude = ["python/**/__pycache__/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,128 @@
+# Wheels of the `tmark` Python package (crates/tmark-py), built by maturin
+# with PyO3/maturin-action: abi3 from Python 3.10, one wheel per platform
+# (design/09-bindings.md §Python, "Building wheels"). Runs on a tag and on
+# demand; publishes to PyPI on a `v*` tag through trusted publishing.
+name: wheels
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MANIFEST: crates/tmark-py/Cargo.toml
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: 2_28
+          args: --release --out dist -m ${{ env.MANIFEST }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: dist
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: universal2-apple-darwin
+          args: --release --out dist -m ${{ env.MANIFEST }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-universal2
+          path: dist
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: x64
+          args: --release --out dist -m ${{ env.MANIFEST }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-x64
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m ${{ env.MANIFEST }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+  test:
+    # The abi3 wheel of the host platform against the pytest suite, on the
+    # oldest and the newest supported interpreters.
+    needs: [linux]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels-linux-x86_64
+          path: dist
+      - run: |
+          pip install pytest dist/tmark-*.whl
+          pytest crates/tmark-py/tests
+          python crates/tmark-py/scripts/gen_stubs.py --check
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, macos, windows, sdist, test]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "wheels-*"
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: upload
+          args: --non-interactive --skip-existing dist/*

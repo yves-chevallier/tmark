@@ -17,9 +17,21 @@ pub struct Diagnostic {
 }
 ```
 
-`Code` is an enum in `tmark-ir::diagnostic` with a `&'static str` id and a
-doc comment giving the spec section. The CLI prints `file:line:col: severity
-code: message`; the LSP maps the fields one to one.
+`Code` is an enum in `tmark-ir::diagnostic` with a `&'static str` id, a
+doc comment giving the spec section (also `Code::doc()`, for tools that
+list the catalogue) and a `Code::stage()` (parse, resolve, lint). The CLI
+prints `file:line:col: severity code: message`; the LSP maps the fields one
+to one.
+
+**Positions.** A span is bytes; nothing stores a line or a column. When a
+tool prints one, `line` and `col` are **1-based, and `col` counts bytes**
+from the start of the line (`LineIndex::line_col` plus one on each): the
+convention of `tmark-cli`, of the Python binding's `line`/`col` fields and
+of TeXSmith's renderer, so that both print identical lines for identical
+findings (migration decision X10). The LSP is the exception: it speaks
+UTF-16 code units (`LineColUtf16`, design 08 §Positions). Revisit
+characters versus bytes when an editor complains; change both sides or
+neither.
 
 ## Who emits what
 
