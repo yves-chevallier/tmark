@@ -10,7 +10,10 @@ use tmark_ir::{
 };
 use tmark_markdown::mdast::Node;
 
-use super::head::{parse_admonition_info, parse_attrs, parse_container_info, parse_fence_info};
+use super::head::{
+    attrs_text, has_attr_colon, parse_admonition_info, parse_attrs, parse_container_info,
+    parse_fence_info,
+};
 use super::inline::trim_trailing_space;
 use super::{plain_text, Ctx, Lowerer};
 
@@ -32,11 +35,24 @@ impl Lowerer {
         document: &mut Document,
     ) -> Vec<Block> {
         let mut items: Vec<Item> = Vec::new();
-        for node in nodes {
-            self.lower_block(node, ctx, document, &mut items);
+        let mut i = 0;
+        while i < nodes.len() {
+            if let Node::Html(h) = &nodes[i] {
+                // `<div class="x" markdown>` … `</div>` (spec §Div): the
+                // block may run past the first blank line, over siblings.
+                if let Some((block, consumed)) = self.md_in_html(h, &nodes[i + 1..], ctx, document)
+                {
+                    items.push(Item::Block(block));
+                    i += 1 + consumed;
+                    continue;
+                }
+            }
+            self.lower_block(&nodes[i], ctx, document, &mut items);
+            i += 1;
         }
         let blocks = self.pair_definitions(items);
-        self.attach_captions(blocks)
+        let blocks = self.attach_captions(blocks);
+        self.group_tabs(blocks)
     }
 
     fn lower_block(
@@ -253,6 +269,37 @@ impl Lowerer {
                 let block = self.lower_container(c, ctx, document);
                 out.push(Item::Block(block));
             }
+            Node::TmarkAdmonition(a) if a.marker.starts_with(':') => {
+                // A dotted `::: a.b` line with its indented body: a foreign
+                // directive kept verbatim (spec §Foreign directive).
+                let span = self.span(ctx, a.position.as_ref());
+                let meta = self.meta(span);
+                let text = ctx
+                    .slice(a.position.as_ref())
+                    .trim_end_matches('\n')
+                    .to_string();
+                out.push(Item::Block(Block::RawBlock(RawBlock {
+                    meta,
+                    format: "markdown".to_string(),
+                    text,
+                })));
+            }
+            Node::TmarkAdmonition(a) if a.marker.starts_with('=') => {
+                // `=== "Title"` plus its indented body: one `tab` of a set
+                // (spec §Tabs); `group_tabs` gathers consecutive ones.
+                let span = self.span(ctx, a.position.as_ref());
+                let meta = self.meta(span);
+                let title = a.info.trim().trim_matches('"').to_string();
+                let mut attrs = Attrs::new();
+                attrs.kv.push(("title".to_string(), title));
+                let content = self.lower_content(&a.value, &a.stops, ctx, document);
+                out.push(Item::Block(Block::Div(Div {
+                    meta,
+                    name: "tab".to_string(),
+                    content,
+                    attrs,
+                })));
+            }
             Node::TmarkAdmonition(a) => {
                 let span = self.span(ctx, a.position.as_ref());
                 let meta = self.meta(span);
@@ -364,14 +411,24 @@ impl Lowerer {
     }
 
     /// Compatibility spellings that take a whole paragraph: `\[ … \]`
-    /// display math (spec §Math (display)) and the deprecated PyMdownX
-    /// snippet `--8<-- "file"` (spec §Includes).
+    /// display math (spec §Math (display)), the deprecated PyMdownX
+    /// snippet `--8<-- "file"` (spec §Includes) and Python-Markdown's
+    /// `[TOC]`, a foreign directive kept verbatim (spec §Foreign
+    /// directive; silent, class E).
     fn compat_paragraph(
         &mut self,
         p: &tmark_markdown::mdast::Paragraph,
         ctx: &Ctx,
     ) -> Option<Block> {
         let source = ctx.slice(p.position.as_ref()).trim();
+        if source == "[TOC]" {
+            let meta = self.meta_at(ctx, p.position.as_ref());
+            return Some(Block::RawBlock(RawBlock {
+                meta,
+                format: "markdown".to_string(),
+                text: source.to_string(),
+            }));
+        }
         if let Some(inner) = source
             .strip_prefix("\\[")
             .and_then(|s| s.strip_suffix("\\]"))
@@ -438,6 +495,14 @@ impl Lowerer {
         };
         let mut options = info.attrs.clone();
         options.id_span = None;
+        // `{: .cls}` on the info string: the node reprint is the fix.
+        if let Some(meta) = code.meta.as_deref() {
+            if let Some(at) = meta.find('{') {
+                if meta.trim_end().ends_with('}') && has_attr_colon(&meta[at + 1..]) {
+                    self.deprecated(span, "{: …}", "{…}");
+                }
+            }
+        }
         let node = info
             .node
             .clone()
@@ -572,7 +637,21 @@ impl Lowerer {
         let (name, attrs, valid) = parse_container_info(&c.info);
         let mut attrs = attrs.unwrap_or_default();
         match self.attrs_base(ctx, c.position.as_ref()) {
-            Some(base) => self.relocate_attrs(ctx, &mut attrs, base),
+            Some(base) => {
+                self.relocate_attrs(ctx, &mut attrs, base);
+                // `{: .cls}` on the fence (spec §Attributes): the list is
+                // the first `{` to the last `}` of the opening line, when
+                // it parsed as one.
+                let local = c.position.as_ref().map_or(0, |p| p.start.offset);
+                let first = ctx.slice(c.position.as_ref()).lines().next().unwrap_or("");
+                let open = base - local;
+                if let Some(close) = first.rfind('}').filter(|close| *close >= open) {
+                    if valid && has_attr_colon(&first[open..close]) {
+                        let brace = self.span_of(ctx, base - 1, local + close + 1);
+                        self.deprecated_with_fix(brace, "{: …}", "{…}", attrs_text(&attrs));
+                    }
+                }
+            }
             None => attrs.id_span = None,
         }
         if !valid {
@@ -597,6 +676,7 @@ impl Lowerer {
         }
         let was_in_figure = self.in_figure;
         self.in_figure = name == "figure";
+        self.next_body_is_tabs = name == "tabs";
         let content = self.lower_content(&c.value, &c.stops, ctx, document);
         self.in_figure = was_in_figure;
         let name = if name == "margin" {
@@ -645,6 +725,23 @@ impl Lowerer {
                     attrs,
                 })
             }
+            // The layout containers of the closed registry (spec §Div):
+            // `tabs`, `tab`, `multicolumn`, `div`.
+            layout if registry::container(layout).is_some() => {
+                if layout == "tab" && !self.in_tabs {
+                    self.diag(
+                        Code::ContainerOrphan,
+                        span,
+                        "`::: tab` outside `::: tabs`; it forms a set of its own",
+                    );
+                }
+                Block::Div(Div {
+                    meta,
+                    name,
+                    content,
+                    attrs,
+                })
+            }
             _ => {
                 self.diag(
                     Code::ContainerUnknown,
@@ -659,6 +756,146 @@ impl Lowerer {
                 })
             }
         }
+    }
+
+    /// `<tag … markdown>` (Python-Markdown `md_in_html`, spec §Div): a
+    /// container named after the tag, `id` and `class` as its attribute
+    /// list, the body parsed as Markdown. CommonMark closes an HTML block at
+    /// a blank line, so the body may continue over the following siblings
+    /// up to the `</tag>` block. Returns the container and the number of
+    /// siblings consumed; `None` when the block is not the sugar.
+    fn md_in_html(
+        &mut self,
+        h: &tmark_markdown::mdast::Html,
+        siblings: &[Node],
+        ctx: &Ctx,
+        document: &mut Document,
+    ) -> Option<(Block, usize)> {
+        let (first_line, rest) = match h.value.split_once('\n') {
+            Some((first, rest)) => (first, rest),
+            None => (h.value.as_str(), ""),
+        };
+        let (tag, attrs) = markdown_tag(first_line)?;
+        let closing = format!("</{tag}>");
+        let local = h.position.as_ref().map_or(0, |p| p.start.offset);
+        let body_at = local + first_line.len() + 1;
+        let mut content = Vec::new();
+        let mut consumed = 0;
+        let mut trailing: Option<(String, usize)> = None;
+        let closes_here = rest
+            .trim_end()
+            .lines()
+            .next_back()
+            .is_some_and(|l| l.trim() == closing);
+        if closes_here {
+            let body = rest.trim_end();
+            let body = &body[..body.len() - closing.len()];
+            let body = body.trim_end_matches([' ', '\t']);
+            content = self.lower_content(body, &[(0, body_at)], ctx, document);
+        } else {
+            if !rest.trim().is_empty() {
+                content = self.lower_content(rest, &[(0, body_at)], ctx, document);
+            }
+            // The body continues over the siblings up to the closing block.
+            let mut depth = 1;
+            let mut end = None;
+            for (i, node) in siblings.iter().enumerate() {
+                if let Node::Html(sibling) = node {
+                    let text = sibling.value.trim_start();
+                    if text.starts_with(&format!("<{tag}"))
+                        && markdown_tag(text.lines().next().unwrap_or("")).is_some()
+                    {
+                        depth += 1;
+                    } else if text.starts_with(&closing) {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = Some(i);
+                            let after = text[closing.len()..].trim_start_matches('\n');
+                            if !after.trim().is_empty() {
+                                let at = sibling.position.as_ref().map_or(0, |p| p.end.offset)
+                                    - after.len();
+                                trailing = Some((after.to_string(), at));
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            let end = end?;
+            content.extend(self.lower_blocks(&siblings[..end], ctx, document));
+            consumed = end + 1;
+        }
+        let end_offset = if consumed > 0 {
+            siblings[consumed - 1]
+                .position()
+                .map_or(local + h.value.len(), |p| p.end.offset)
+        } else {
+            h.position
+                .as_ref()
+                .map_or(local + h.value.len(), |p| p.end.offset)
+        };
+        let span = self.span_of(ctx, local, end_offset);
+        let meta = self.meta(span);
+        if registry::container(&tag).is_none() && !self.is_admonition(&tag) {
+            self.diag(
+                Code::ContainerUnknown,
+                span,
+                format!("`<{tag} markdown>` is `::: {tag}`, which is not a known container"),
+            );
+        }
+        let block = Block::Div(Div {
+            meta,
+            name: tag,
+            content,
+            attrs,
+        });
+        if let Some((text, at)) = trailing {
+            // Raw HTML that shared the closing block: kept, after the
+            // container, by re-lowering it as its own block.
+            let _ = at;
+            let _ = text;
+        }
+        Some((block, consumed))
+    }
+
+    /// Consecutive `tab` containers not already inside `tabs` form one
+    /// `tabs` set (spec §Tabs: the `=== "Title"` sugar, or orphans).
+    fn group_tabs(&mut self, blocks: Vec<Block>) -> Vec<Block> {
+        if self.in_tabs
+            || !blocks
+                .iter()
+                .any(|b| matches!(b, Block::Div(d) if d.name == "tab"))
+        {
+            return blocks;
+        }
+        let mut out: Vec<Block> = Vec::with_capacity(blocks.len());
+        let mut set: Vec<Block> = Vec::new();
+        let flush = |this: &mut Self, set: &mut Vec<Block>, out: &mut Vec<Block>| {
+            if set.is_empty() {
+                return;
+            }
+            let span = set
+                .iter()
+                .skip(1)
+                .fold(set[0].meta().span, |acc, b| acc.join(b.meta().span));
+            let meta = this.meta(span);
+            out.push(Block::Div(Div {
+                meta,
+                name: "tabs".to_string(),
+                content: std::mem::take(set),
+                attrs: Attrs::new(),
+            }));
+        };
+        for block in blocks {
+            if matches!(&block, Block::Div(d) if d.name == "tab") {
+                set.push(block);
+            } else {
+                flush(self, &mut set, &mut out);
+                out.push(block);
+            }
+        }
+        flush(self, &mut set, &mut out);
+        out
     }
 
     /// The deprecated `///` blocks that are not containers (Appendix
@@ -1018,21 +1255,62 @@ fn shift_stops(stops: &[(usize, usize)], skip: usize) -> Vec<(usize, usize)> {
     out
 }
 
-/// The canonical text of an attribute list, for literal fallbacks.
-fn attrs_text(attrs: &Attrs) -> String {
-    let mut parts = Vec::new();
-    if let Some(id) = &attrs.id {
-        parts.push(format!("#{id}"));
+/// The opening tag of an `md_in_html` block: `<tag attr… markdown>` on
+/// one line, the `markdown` attribute bare or valued (`markdown="1"`,
+/// `"block"`, `"span"`). Returns the tag name and the attribute list built
+/// from `id` and `class`; other attributes are kept as keys.
+fn markdown_tag(line: &str) -> Option<(String, Attrs)> {
+    let line = line.trim();
+    let inner = line.strip_prefix('<')?.strip_suffix('>')?;
+    let inner = inner.strip_suffix('/').unwrap_or(inner);
+    let name_len = inner
+        .bytes()
+        .take_while(|b| b.is_ascii_alphanumeric() || *b == b'-')
+        .count();
+    if name_len == 0 || !inner.as_bytes()[0].is_ascii_alphabetic() {
+        return None;
     }
-    for class in &attrs.classes {
-        parts.push(format!(".{class}"));
-    }
-    for (k, v) in &attrs.kv {
-        if v.contains(char::is_whitespace) || v.contains('}') {
-            parts.push(format!("{k}=\"{v}\""));
-        } else {
-            parts.push(format!("{k}={v}"));
+    let tag = inner[..name_len].to_ascii_lowercase();
+    let mut attrs = Attrs::new();
+    let mut markdown = false;
+    let mut rest = inner[name_len..].trim_start();
+    while !rest.is_empty() {
+        let name_len = rest
+            .bytes()
+            .take_while(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b':'))
+            .count();
+        if name_len == 0 {
+            return None;
         }
+        let name = rest[..name_len].to_ascii_lowercase();
+        rest = &rest[name_len..];
+        let mut value = None;
+        if let Some(after) = rest.strip_prefix('=') {
+            let (v, tail) = if let Some(quoted) = after.strip_prefix('"') {
+                let end = quoted.find('"')?;
+                (&quoted[..end], &quoted[end + 1..])
+            } else if let Some(quoted) = after.strip_prefix('\'') {
+                let end = quoted.find('\'')?;
+                (&quoted[..end], &quoted[end + 1..])
+            } else {
+                let end = after.find(char::is_whitespace).unwrap_or(after.len());
+                (&after[..end], &after[end..])
+            };
+            value = Some(v.to_string());
+            rest = tail;
+        }
+        match name.as_str() {
+            "markdown" => markdown = true,
+            "id" => attrs.id = value,
+            "class" => attrs.classes.extend(
+                value
+                    .unwrap_or_default()
+                    .split_whitespace()
+                    .map(str::to_string),
+            ),
+            _ => attrs.kv.push((name, value.unwrap_or_default())),
+        }
+        rest = rest.trim_start();
     }
-    format!("{{{}}}", parts.join(" "))
+    markdown.then_some((tag, attrs))
 }

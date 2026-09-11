@@ -8,6 +8,7 @@
 mod block;
 mod compat;
 mod inline;
+mod sugar;
 mod table;
 mod table_yaml;
 
@@ -93,6 +94,12 @@ pub(crate) struct Lowerer {
     /// Captions from a generic `/// caption` block, whose kind the
     /// neighbouring float decides (`attach_captions`).
     pub generic_captions: Vec<NodeId>,
+    /// Lowering the direct body of a `::: tabs`: its `tab` containers are
+    /// not regrouped (`group_tabs`).
+    pub in_tabs: bool,
+    /// Set by `lower_container` before the body of a `tabs`; consumed by
+    /// `lower_content`.
+    pub next_body_is_tabs: bool,
 }
 
 pub fn parse(text: &str, file: FileId) -> Parsed {
@@ -121,6 +128,8 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
         definitions: HashMap::new(),
         in_figure: false,
         generic_captions: Vec::new(),
+        in_tabs: false,
+        next_body_is_tabs: false,
     };
     let ctx = Ctx {
         text,
@@ -248,6 +257,26 @@ impl Lowerer {
             span,
             format!("`{spelling}` is deprecated, write `{canonical}`"),
         );
+    }
+
+    /// A `deprecated` diagnostic that carries its own text fix, for a
+    /// spelling whose span is not a node's (an attribute list on a host,
+    /// the head of a progress bar before its attributes).
+    pub fn deprecated_with_fix(
+        &mut self,
+        span: Span,
+        spelling: &str,
+        canonical: &str,
+        replacement: String,
+    ) {
+        self.diagnostics.push(Diagnostic {
+            fix: Some(tmark_ir::Fix { span, replacement }),
+            ..Diagnostic::new(
+                Code::Deprecated,
+                span,
+                format!("`{spelling}` is deprecated, write `{canonical}`"),
+            )
+        });
     }
 
     pub fn is_prefix(&self, name: &str) -> bool {
@@ -380,10 +409,13 @@ impl Lowerer {
         let map = OffsetMap::nested(stops.to_vec(), ctx.map.clone());
         let inner = Ctx { text: value, map };
         let saved = std::mem::take(&mut self.definitions);
+        let in_tabs = std::mem::take(&mut self.next_body_is_tabs);
+        let saved_tabs = std::mem::replace(&mut self.in_tabs, in_tabs);
         let children: &[Node] = tree.children().map_or(&[], Vec::as_slice);
         self.collect_definitions(children);
         let blocks = self.lower_blocks(children, &inner, document);
         self.definitions = saved;
+        self.in_tabs = saved_tabs;
         blocks
     }
 }
