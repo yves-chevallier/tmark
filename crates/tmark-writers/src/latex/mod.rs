@@ -13,6 +13,9 @@ mod figure;
 mod inline;
 mod table;
 
+/// An image source without the MkDocs theme variant (`#only-light`).
+pub(crate) use figure::strip_theme_variant as figure_src;
+
 use std::collections::BTreeMap;
 
 use tmark_ir::{

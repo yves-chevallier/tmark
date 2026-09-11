@@ -1,0 +1,26 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#ts-callout(kind: "note", title: [Folded], collapsed: true)[
+Hidden by default.
+]
+
+#ts-callout(kind: "tip", collapsed: false)[
+Shown by default.
+]
+
+---requires---
+{
+  "packages": [],
+  "fragments": [
+    "ts-callouts"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

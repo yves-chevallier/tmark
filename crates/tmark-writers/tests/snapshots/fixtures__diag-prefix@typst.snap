@@ -1,0 +1,30 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\[?rq:one\]<rq:one> A requirement with an undeclared series.
+
+#figure(
+  image("trace.png"),
+  caption: [Trace],
+) <tbl:trace>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "trace.png",
+      "node": 5
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": [
+    "rq"
+  ]
+}

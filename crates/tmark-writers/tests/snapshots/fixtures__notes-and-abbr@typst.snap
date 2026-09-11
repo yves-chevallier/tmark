@@ -1,0 +1,23 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+The #ts-acr("HTML") spec#footnote[The living standard.] is maintained by the #ts-acr("W3C").
+
+---requires---
+{
+  "packages": [],
+  "fragments": [
+    "ts-glossary"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [
+    "HTML",
+    "W3C"
+  ],
+  "index": [],
+  "counters": []
+}

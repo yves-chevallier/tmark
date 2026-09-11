@@ -1,0 +1,25 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#include "chapters/boot.typ"
+
+See \[?fwrev:fw:x\].
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "chapters/boot.md",
+      "node": 2
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
