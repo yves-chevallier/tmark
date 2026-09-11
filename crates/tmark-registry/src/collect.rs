@@ -69,6 +69,12 @@ pub struct Label {
     /// a sibling document shows for the label (`BookLabel::title`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// A heading's implicit id (spec §Header): GitHub's slug of the title,
+    /// derived here and never stored in the IR; a reference to it is the
+    /// hint `ref-implicit-id`. An explicit `{#id}` of the same spelling
+    /// replaces it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub implicit: bool,
 }
 
 /// All labels, by lower-cased id and in document order.
@@ -158,7 +164,11 @@ impl<'a> Collector<'a> {
         match block {
             Block::Header(h) => {
                 let title = Some(plain_text(&h.content));
-                self.define(&h.attrs, Host::Header, h.meta.id, h.meta.span, title);
+                if h.attrs.id().is_some() {
+                    self.define(&h.attrs, Host::Header, h.meta.id, h.meta.span, title);
+                } else {
+                    self.define_implicit(h, title);
+                }
             }
             Block::Caption(c) => {
                 let host = match c.kind {
@@ -213,6 +223,7 @@ impl<'a> Collector<'a> {
                     id_span: (!c.key_span.0.is_empty()).then_some(c.key_span.0),
                     number: None,
                     title: None,
+                    implicit: false,
                 });
             }
             Inline::IndexEntry(e) => {
@@ -277,12 +288,52 @@ impl<'a> Collector<'a> {
             id_span,
             number: None,
             title,
+            implicit: false,
+        });
+    }
+
+    /// A heading without `{#id}` gets GitHub's slug of its title as an
+    /// implicit id (spec §Header), suffixed `-1`, `-2`, … when the id is
+    /// taken, in document order. It counts in the heading series like a
+    /// bare explicit id (`@boot-sequence` renders "section 2").
+    fn define_implicit(&mut self, h: &tmark_ir::Header, title: Option<String>) {
+        let slug = github_slug(title.as_deref().unwrap_or_default());
+        if slug.is_empty() {
+            return;
+        }
+        let mut id = slug.clone();
+        let mut n = 0;
+        while self.labels.by_id.contains_key(&id.to_ascii_lowercase()) {
+            n += 1;
+            id = format!("{slug}-{n}");
+        }
+        self.insert(Label {
+            key: id.clone(),
+            id,
+            prefix: Host::Header.prefix().map(str::to_string),
+            host: Host::Header,
+            node: h.meta.id,
+            span: h.meta.span,
+            id_span: None,
+            number: None,
+            title,
+            implicit: true,
         });
     }
 
     fn insert(&mut self, label: Label) {
         let key = label.id.to_ascii_lowercase();
         if let Some(existing) = self.labels.by_id.get(&key) {
+            // An explicit id takes an implicit one's place silently: the
+            // heading keeps its title, the author chose the id.
+            if existing.implicit && !label.implicit {
+                let node = existing.node;
+                if let Some(at) = self.labels.in_order.iter().position(|l| l.node == node) {
+                    self.labels.in_order[at] = label.clone();
+                }
+                self.labels.by_id.insert(key, label);
+                return;
+            }
             let mut d = Diagnostic::new(
                 Code::LabelDuplicate,
                 label.span,
@@ -296,6 +347,38 @@ impl<'a> Collector<'a> {
         self.labels.by_id.insert(key, label.clone());
         self.labels.in_order.push(label);
     }
+}
+
+/// GitHub's heading slug (spec §Header): the plain title lower-cased,
+/// every character that is not a letter, a digit, a combining mark, a
+/// space, `-` or `_` removed, runs of spaces turned into one `-`. Accents
+/// and non-Latin scripts survive. Editors compute go-to-target with the
+/// same function. (The text is taken as it is; NFC normalisation is left
+/// to the editor that saved the file.)
+pub fn github_slug(title: &str) -> String {
+    let mut out = String::with_capacity(title.len());
+    let mut pending_space = false;
+    for c in title.trim().chars().flat_map(char::to_lowercase) {
+        if c == ' ' {
+            pending_space = true;
+        } else if c.is_alphanumeric() || c == '-' || c == '_' || is_combining_mark(c) {
+            if pending_space {
+                out.push('-');
+                pending_space = false;
+            }
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The combining-mark blocks (Unicode general category Mn/Mc, by range:
+/// the standard library has no category test).
+fn is_combining_mark(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x0300..=0x036F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F
+    )
 }
 
 /// Glossary and acronym terms: `declare.glossary`, `declare.acronyms`
@@ -325,4 +408,20 @@ pub fn glossary(doc: &Document) -> BTreeMap<String, String> {
             .or_insert_with(|| abbr.expansion.clone());
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::github_slug;
+
+    #[test]
+    fn slugs() {
+        assert_eq!(github_slug("Boot sequence"), "boot-sequence");
+        assert_eq!(github_slug("  Hello,  World!  "), "hello-world");
+        assert_eq!(github_slug("Élan vital"), "élan-vital");
+        assert_eq!(github_slug("日本語 見出し"), "日本語-見出し");
+        assert_eq!(github_slug("a_b-c.d"), "a_b-cd");
+        assert_eq!(github_slug("e\u{301}t\u{e9}"), "e\u{301}t\u{e9}");
+        assert_eq!(github_slug("!!!"), "");
+    }
 }
