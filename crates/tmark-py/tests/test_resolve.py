@@ -154,3 +154,30 @@ def test_resolve_refuses_another_major(fixture):
         tmark.resolve(doc)
     del doc["tmark"]
     assert tmark.resolve(doc)["next_start"] == {"fw": 2}
+
+
+def test_resolve_numbers_a_site_and_links_siblings(fixture):
+    """Design 06 §Site-wide resolution: the MkDocs plugin's two passes."""
+    b_text = fixture("counter-item") + "\n![x](a.png)\n\nFigure: Crash. {#fig:crash}\n"
+    b = tmark.resolve(tmark.parse(b_text), None, {"path": "b.md", "numbering": "all", "start": {"fig": 3}})
+    assert b["numbering"] == "all" and b["next_start"]["fig"] == 4
+    assert b["counters"]["fig"]["tmark_numbered"] is True
+    boot, crash = b["book"]
+    assert crash == {
+        "key": "fig:crash",
+        "prefix": "fig",
+        "number": "3",
+        "kind": "figure",
+        "title": "Crash.",
+        "location": "b.md#fig:crash",
+    }
+    assert boot["number"] == "FW-01" and boot["location"] == "b.md#fw:boot-loop"
+    a = tmark.resolve(tmark.parse("See @fig:crash and @fw:boot-loop.\n"), None, {"book": b["book"], "lang": "de"})
+    assert [r["resolution"] for r in a["refs"]] == [
+        {"kind": "sibling", "label": "3", "location": "b.md#fig:crash"},
+        {"kind": "sibling", "label": "FW-01", "location": "b.md#fw:boot-loop"},
+    ]
+    assert a["lang"] == "de" and a["counters"]["fig"]["name"] == "Abbildung"
+    assert a["diagnostics"] == []
+    with pytest.raises(TypeError, match="options"):
+        tmark.resolve(tmark.parse("x"), None, {"numbering": "chapter"})

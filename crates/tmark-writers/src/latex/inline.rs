@@ -318,6 +318,9 @@ impl Latex<'_> {
                         escape::prose(&doi)
                     ));
                 }
+                // A sibling document is outside this build: its label as
+                // text, no `\ref` to a label LaTeX never sees.
+                Resolution::Sibling { label, .. } => self.out.push(&escape::prose(&label)),
                 Resolution::External { label, page, .. } => {
                     self.out.push(&escape::prose(&label));
                     if let Some(page) = page {

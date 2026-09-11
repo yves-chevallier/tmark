@@ -7,8 +7,8 @@ use tmark_ir::{walk, Code, Diagnostic, Inline, NodeId, NodeRef, Span, Target};
 
 use crate::Resolved;
 
-/// What a key refers to. Serialises with a `kind` tag (`label`, `citation`,
-/// `glossary`, `doi`, `external`, `ambiguous`, `unresolved`).
+/// What a key refers to. Serialises with a `kind` tag (`label`, `sibling`,
+/// `citation`, `glossary`, `doi`, `external`, `ambiguous`, `unresolved`).
 #[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Resolution {
@@ -16,8 +16,17 @@ pub enum Resolution {
     Label {
         target: NodeId,
         prefix: Option<String>,
-        /// Formatted number, for TeXSmith-numbered series.
+        /// Formatted number, for tmark-numbered series.
         number: Option<String>,
+    },
+    /// A label of another document of the book (`ResolveOptions::book`);
+    /// a local definition always wins over it.
+    Sibling {
+        /// What to show: the formatted number, else the title, else the
+        /// key as written in the sibling.
+        label: String,
+        /// The sibling's `BookLabel::location` (`findings.md#fw:boot`).
+        location: String,
     },
     Citation {
         key: String,
@@ -74,7 +83,7 @@ pub fn resolve_all(doc: &tmark_ir::Document, resolved: &mut Resolved) {
         }
     });
     for (node, span, key) in found {
-        let resolution = resolve_one(&key, resolved);
+        let resolution = resolve_one(&key, span, resolved);
         if resolution == Resolution::Unresolved {
             resolved.diagnostics.push(Diagnostic::new(
                 Code::RefUnresolved,
@@ -93,7 +102,10 @@ pub fn resolve_all(doc: &tmark_ir::Document, resolved: &mut Resolved) {
 
 /// Resolution order (spec §Registries): declared prefix (`doi` and `gls`
 /// included), then bibliography; a key in two registries is ambiguous.
-fn resolve_one(key: &str, resolved: &mut Resolved) -> Resolution {
+/// A sibling document's label (design 06 §Site-wide resolution) stands in
+/// for a missing local one: it never shadows a local label and is as
+/// ambiguous with a bibliography key as a local label would be.
+fn resolve_one(key: &str, span: Span, resolved: &mut Resolved) -> Resolution {
     let lower = key.to_ascii_lowercase();
     // Cross-document: `alias:prefix:key` with a declared alias.
     if let Some((alias, rest)) = lower.split_once(':') {
@@ -139,21 +151,32 @@ fn resolve_one(key: &str, resolved: &mut Resolved) -> Resolution {
             ));
             Resolution::Ambiguous
         }
-        (Some(label), false) => {
-            let number = label
-                .prefix
-                .as_deref()
-                .and_then(|p| resolved.counters.get(p))
-                .and_then(|c| c.label(&label.key));
-            Resolution::Label {
-                target: label.node,
-                prefix: label.prefix.clone(),
-                number,
-            }
-        }
-        (None, true) => Resolution::Citation {
-            key: key.to_string(),
+        (Some(label), false) => Resolution::Label {
+            target: label.node,
+            prefix: label.prefix.clone(),
+            number: resolved.formatted(label),
         },
-        (None, false) => Resolution::Unresolved,
+        (None, citation) => match (resolved.sibling(&lower), citation) {
+            (Some(sibling), false) => Resolution::Sibling {
+                label: sibling
+                    .number
+                    .clone()
+                    .or_else(|| sibling.title.clone())
+                    .unwrap_or_else(|| sibling.key.clone()),
+                location: sibling.location.clone(),
+            },
+            (Some(_), true) => {
+                resolved.diagnostics.push(Diagnostic::new(
+                    Code::RefAmbiguous,
+                    span,
+                    format!("`{key}` is both a label of another document and a bibliography key"),
+                ));
+                Resolution::Ambiguous
+            }
+            (None, true) => Resolution::Citation {
+                key: key.to_string(),
+            },
+            (None, false) => Resolution::Unresolved,
+        },
     }
 }

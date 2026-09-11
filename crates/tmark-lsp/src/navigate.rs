@@ -313,6 +313,7 @@ pub fn hover(view: &View, offset: u32) -> Option<Hover> {
                 Some(p) => format!("`{alias}` → {label}, page {p}"),
                 None => format!("`{alias}` → {label}"),
             },
+            Resolution::Sibling { label, location } => format!("{label} → `{location}`"),
             Resolution::Ambiguous => format!("`{}` is in two registries", r.key),
             Resolution::Unresolved => format!("`{}` does not resolve", r.key),
         };

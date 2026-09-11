@@ -893,6 +893,15 @@ impl Html<'_> {
                         escape::text(&doi)
                     ));
                 }
+                Resolution::Sibling { label, location } => {
+                    // Another document of the book: link to it as given
+                    // (design 06 §Site-wide resolution).
+                    self.out.push(&format!(
+                        "<a href=\"{}\" class=\"reference\">{}</a>",
+                        escape::attr(&location),
+                        escape::text(&label)
+                    ));
+                }
                 Resolution::External { label, page, .. } => {
                     self.out.push(&escape::text(&label));
                     if let Some(page) = page {

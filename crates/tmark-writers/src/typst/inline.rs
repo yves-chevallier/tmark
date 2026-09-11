@@ -257,6 +257,8 @@ impl Typst<'_> {
                         escape::markup(&doi)
                     ));
                 }
+                // A sibling document is outside this build: its label as text.
+                Resolution::Sibling { label, .. } => self.out.push(&escape::markup(&label)),
                 Resolution::External { label, page, .. } => {
                     self.out.push(&escape::markup(&label));
                     if let Some(page) = page {

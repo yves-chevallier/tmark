@@ -8,7 +8,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use tmark_ir::{Diagnostic, FileId, NodeId};
 
-use crate::{BibEntry, Counter, Inventory, Label, RefResolution, Resolution, Resolved};
+use crate::{
+    BibEntry, BookLabel, Counter, Inventory, Label, Numbering, RefResolution, Resolution, Resolved,
+};
 
 /// A label with its formatted number, when its series numbers it.
 #[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
@@ -42,13 +44,21 @@ pub struct FileView {
 /// The registries and the resolution of a document, flat and serialisable.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, JsonSchema)]
 pub struct ResolvedView {
+    /// Which series tmark numbered (`ResolveOptions::numbering`).
+    pub numbering: Numbering,
+    /// The language of the label words; `None` is English.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lang: Option<String>,
     /// Every series by prefix, predeclared ones included.
     pub counters: BTreeMap<String, Counter>,
-    /// The first free value of every TeXSmith-numbered series
+    /// The first free value of every tmark-numbered series
     /// ([`Resolved::next_start`]).
     pub next_start: BTreeMap<String, u32>,
     /// Every definition, in document order (includes after their host).
     pub labels: Vec<LabelView>,
+    /// This document's labels for its siblings ([`Resolved::book_labels`]
+    /// at the document's path): what the next resolution takes as `book`.
+    pub book: Vec<BookLabel>,
     /// One entry per `Ref` node and anchor link, in document order.
     pub refs: Vec<RefResolution>,
     /// The bibliography keys, sorted.
@@ -75,11 +85,7 @@ impl ResolvedView {
             .in_order
             .iter()
             .map(|label| LabelView {
-                formatted: label
-                    .prefix
-                    .as_deref()
-                    .and_then(|p| resolved.counters.get(p))
-                    .and_then(|c| c.label(&label.key)),
+                formatted: resolved.formatted(label),
                 label: label.clone(),
             })
             .collect();
@@ -110,9 +116,12 @@ impl ResolvedView {
             })
             .collect();
         ResolvedView {
+            numbering: resolved.numbering,
+            lang: resolved.lang.clone(),
             counters: resolved.counters.by_prefix.clone(),
             next_start: resolved.next_start(),
             labels,
+            book: resolved.book_labels(&resolved.path.to_string_lossy()),
             refs: resolved.refs.clone(),
             bibliography: resolved.bibliography.entries.keys().cloned().collect(),
             entries: resolved.bibliography.entries.clone(),

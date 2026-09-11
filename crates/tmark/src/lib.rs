@@ -17,9 +17,13 @@ pub use tmark_ir::{Diagnostic, Document, FileId};
 pub use tmark_lint::{lint, Config as LintConfig};
 #[cfg(feature = "fs")]
 pub use tmark_registry::FsLoader;
+// `tmark_registry::Numbering` (which series `resolve` numbers) and
+// `tmark_writers::Numbering` (who numbers a series a writer renders) share
+// a name in their crates; the facade keeps the writer's and aliases the
+// resolver's.
 pub use tmark_registry::{
-    resolve, Host, Label, Loader, MemoryLoader, RefResolution, Resolution, ResolveOptions,
-    Resolved, ResolvedView,
+    resolve, BookLabel, Host, Label, Loader, MemoryLoader, Numbering as ResolveNumbering,
+    RefResolution, Resolution, ResolveOptions, Resolved, ResolvedView,
 };
 pub use tmark_syntax::{parse, parse_strict, Parsed};
 pub use tmark_writers::{
