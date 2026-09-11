@@ -791,6 +791,7 @@ pub const FRAGMENTS: &[Fragment] = &[
             "\\tsaside",
             "\\tsprogress",
             "\\tsicon",
+            "\\tslogo",
             "tsdiv",
         ],
         &[
@@ -801,7 +802,7 @@ pub const FRAGMENTS: &[Fragment] = &[
             "progressbar",
             "graphicx",
         ],
-        "lead-ins, highlight, divider, epigraph, asides, progress bars, generic containers",
+        "lead-ins, highlight, divider, epigraph, asides, progress bars, TeX logos, generic containers",
     ),
     frag(
         "ts-callouts",

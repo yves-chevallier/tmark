@@ -586,9 +586,21 @@ pub struct ProgressBar {
 }
 
 impl ProgressBar {
+    /// The canonical spelling without the attribute list, `[=45% "label"]`
+    /// (spec §ProgressBar: PyMdownX's percentage form). Shared by the
+    /// printer and the parser's fix for the fraction form; a `"` inside
+    /// the label, which the recogniser cannot hold, is dropped.
+    pub fn head_text(&self) -> String {
+        let mut out = format!("[={}%", self.value_text());
+        if let Some(label) = &self.label {
+            out.push_str(&format!(" \"{}\"", label.replace('"', "")));
+        }
+        out.push(']');
+        out
+    }
+
     /// The value as the canonical spelling writes it: an integer when it
-    /// is one, else at most two decimals (`45`, `33.33`). Shared by the
-    /// printer and the parser's fix for the fraction form.
+    /// is one, else at most two decimals (`45`, `33.33`).
     pub fn value_text(&self) -> String {
         let value = self.value.clamp(0.0, 100.0);
         let rounded = (value * 100.0).round() / 100.0;
