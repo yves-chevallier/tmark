@@ -24,6 +24,7 @@ tmark-writers = { path = "../tmark-writers" }
 # edges hand over the text (`Config::discover` is behind `fs`, like FsLoader).
 toml = { workspace = true }
 serde = { workspace = true }
-
-[dev-dependencies]
-serde_json.workspace = true
+# The versioned document JSON and the schemas the bindings serve
+# (`to_json`, `schema("resolved")`, `schema_hash`; design/09-bindings.md).
+serde_json = { workspace = true }
+schemars = { workspace = true }
