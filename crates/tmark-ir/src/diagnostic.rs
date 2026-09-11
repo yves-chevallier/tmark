@@ -259,7 +259,8 @@ impl Code {
             | Code::FrontmatterYaml
             | Code::FrontmatterUnknownKey
             | Code::Deprecated
-            | Code::ParseInternal => Stage::Parse,
+            | Code::ParseInternal
+            | Code::CompatUnsupported => Stage::Parse,
             Code::RefUnresolved
             | Code::RefAmbiguous
             | Code::PrefixUnknown
@@ -335,6 +336,9 @@ impl Code {
                 "Appendix \"Deprecation schedule\": a deprecated front-matter key"
             }
             Code::LeadPromotion => "Spec §Para: a leading strong span promoted to a lead-in",
+            Code::CompatUnsupported => {
+                "Appendix \"PyMdownX compatibility profile\": a spelling milestone 5 implements, literal today"
+            }
             Code::HeadingSkip => "Spec §Header: a heading level skipped",
         }
     }

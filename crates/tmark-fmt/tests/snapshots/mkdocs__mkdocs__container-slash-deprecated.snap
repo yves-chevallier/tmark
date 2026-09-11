@@ -1,0 +1,21 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+![Melting](mozzarella.svg){width=80%}
+
+/// caption
+    attrs: {id: fig:melting}
+Melting behavior of high-moisture cheese
+upon heating
+///
+
+Table: Hard cheese samples {#tbl:samples}
+
+| Cheese | Age |
+| ------ | --- |
+| Comté  | 18  |
+
+/// latex
+\vspace{1em}
+///

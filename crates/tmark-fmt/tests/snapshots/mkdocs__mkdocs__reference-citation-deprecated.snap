@@ -1,0 +1,7 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Slow to talk [^ein05], said the tutor. ^[ein05,AI2027] He failed the test, @doi:10.1007/s00016-014-0153-5 see [^AI2027] and [^note].
+
+[^note]: A real footnote.
