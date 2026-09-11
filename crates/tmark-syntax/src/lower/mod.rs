@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 use tmark_ir::{
     frontmatter, registry, Attrs, Code, Diagnostic, Document, FileId, FrontMatter, Inline, Meta,
-    NodeId, Span, Str, SubSpan,
+    NodeId, Severity, Span, Str, SubSpan,
 };
 use tmark_markdown::{mdast::Node, to_mdast, unist::Position, ParseOptions};
 
@@ -240,6 +240,22 @@ impl Lowerer {
 
     pub fn diag(&mut self, code: Code, span: Span, message: impl Into<String>) {
         self.diagnostics.push(Diagnostic::new(code, span, message));
+    }
+
+    /// A diagnostic downgraded to `info` when `informational` (a foreign
+    /// container, which the spec leaves to the site).
+    pub fn diag_at(
+        &mut self,
+        code: Code,
+        span: Span,
+        message: impl Into<String>,
+        informational: bool,
+    ) {
+        let mut d = Diagnostic::new(code, span, message);
+        if informational {
+            d.severity = Severity::Info;
+        }
+        self.diagnostics.push(d);
     }
 
     pub fn deprecated(&mut self, span: Span, spelling: &str, canonical: &str) {

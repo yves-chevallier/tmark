@@ -1,0 +1,26 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p><span id="fw:boot" class="counter">FW-01</span> A finding.</p>
+<div class="texsmith.core.counters">
+<pre><code>options:
+  show_source: false
+</code></pre>
+<p>Prose after the directive still refers to <a href="#fw:boot" class="reference">FW-01</a>.</p>
+</div>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": [
+    "fw"
+  ]
+}

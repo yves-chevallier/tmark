@@ -971,6 +971,12 @@ pub(crate) fn trim_trailing_space(inlines: &mut Vec<Inline>) {
         if trimmed == 0 {
             inlines.pop();
         } else {
+            // Whitespace is never escaped: the span shrinks by as much as
+            // the text (design 03 §Identity and spans).
+            let removed = (s.text.len() - trimmed) as u32;
+            if s.meta.span.len() >= removed {
+                s.meta.span.end -= removed;
+            }
             s.text.truncate(trimmed);
         }
     }
