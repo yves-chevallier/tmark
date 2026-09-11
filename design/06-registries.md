@@ -68,7 +68,9 @@ is `ref-ambiguous`.
    diagnostics, and the `mkdocs` companion that numbers on the web.
    Multi-document numbering (a series continuing across files of a book) is
    an input: `ResolveOptions { start: HashMap<Prefix, u32> }`, set by
-   TeXSmith from the previous document's inventory.
+   TeXSmith from the previous document's `next_start`. A medium with no
+   backend to number the rest asks for it with `numbering: All`
+   (§Site-wide resolution below).
 4. **Load sources.** `.bib` files named in `sources.bibliography` (parsed
    with the `biblatex` crate; entries kept as fields, no CSL here), inline
    pybtex-shaped entries, DOI shorthands recorded as *pending* (TeXSmith
@@ -97,6 +99,82 @@ here for cross-document references:
 `tmark-registry` owns the *reader* and the type; TeXSmith owns the writer,
 generated from the same `schemars` schema. A stale `hash` raises
 `crossref-inventory-stale`.
+
+## Site-wide resolution
+
+The web profile (TeXSmith `specs/migration/web-profile.md`) renders a book
+page by page with no backend to number `fig`, `tbl`, `lst`, `eq`, `sec` or
+the theorem kinds, and needs a reference on one page to reach a label on
+another. Both are resolution inputs, so that the registry stays the one
+numbering authority for print and web (decision D4 of the migration).
+
+### Numbering every series
+
+`ResolveOptions::numbering` is `Backend` (default: the TeXSmith-numbered
+series only, as step 3 above) or `All`. Under `All` every predeclared
+series with a scope (`part`, `chap`, `sec`, `app`, `fig`, `tbl`, `lst`,
+`eq`, `thm`, `note`; `gls` and `doi` number nothing) becomes
+tmark-numbered for this resolution: `Counter::tmark_numbered` is true,
+its labels get `number`s in document order, `Counter::label` and
+`Resolution::Label.number` format them and `Resolved::next_start` lists
+the series, so a site chains `start` from page to page exactly as it does
+for user counters. The `format`, `start` and `ref` fields of a
+predeclared entry apply (`fig: {format: "F{n}"}` in the front matter).
+
+Scope under `All` is always `document`, continuous across the chain:
+`Scope::Chapter` and `Scope::Section` never reset here. The web has no
+chapters (web-profile open question 1); a `chapter` mode keyed on the nav
+would couple numbers to the nav shape and waits for a real site. Print
+keeps the backend's scoped numbering: `All` is never passed on the LaTeX
+path, so `Figure 3.2` in the PDF and `Figure 12` on the site are the same
+label with two spellings, which is the accepted cost.
+
+What is counted: labels, that is items with an id. A captioned figure
+without `{#fig:x}` is not a label and takes no number, whereas LaTeX would
+number it. The web lowering either gives such floats a synthetic id or
+leaves them unnumbered; it is its decision, not the registry's.
+
+`Counter::reference_text(key)` renders the `ref` template
+(`"{name} {number}"` → `Figure 3`); `ResolveOptions::lang` picks the label
+word of the predeclared series from `tmark_ir::registry::PREFIX_NAMES`
+(French and German; English is `Prefix::label`; the primary subtag of a
+BCP 47 tag decides, so `fr-CH` is `fr`; an unknown language is English).
+It defaults to the front matter's `lang`. A `name` declared in the front
+matter always wins, user series are never translated, and the LaTeX
+writer keeps relying on babel. `Resolved::lang` and `ResolvedView::lang`
+record the language used.
+
+### Sibling documents
+
+`ResolveOptions::book` is the list of the other documents' labels, each a
+`BookLabel { key, prefix, number, kind: Host, title, location }`;
+`Resolved::book_labels(location)` produces one document's contribution
+(one entry per label in document order, `location` being the given string
+plus `#key`; the view uses the document's path, and the caller relativises
+the part before `#` for each referring page). `title` is the heading text
+or the caption text (`Label::title`), what a page shows for a section it
+links to.
+
+Lookup: a key that is a local label resolves locally, whatever the book
+says (a local definition always wins, so a page may redefine `sec:intro`).
+A key that is no local label but is in `book` resolves to
+`Resolution::Sibling { label, location }`, `label` being the formatted
+number, else the title, else the key. The bibliography rule is unchanged:
+a sibling key that is also a bibliography key is `Ambiguous` with
+`ref-ambiguous` on the reference (a local one reports it on the label, as
+before). Sibling keys match case-insensitively, the first entry of a key
+wins, and the prefix routing rule of the spec (`@a:b` with an undeclared
+head is a bibliography key) does not apply to them: the book entry carries
+its prefix, and the site's counter declarations may live in `mkdocs.yml`
+rather than in every page. `@alias:prefix:key` inventories are the other,
+explicit mechanism and stay as they are.
+
+The plugin's two passes are then: pre-pass every page with `numbering:
+All` and the chained `start`, collect `book_labels`; lower every page with
+`book` = the site's labels minus its own (`Resolution::Sibling` gives the
+link text and target). Both are covered by
+`crates/tmark-registry/tests/book.rs`, since the conformance fixtures
+cannot express options.
 
 ## What the LSP gets from this
 
