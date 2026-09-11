@@ -106,11 +106,28 @@ Crates: `tmark-writers` (LaTeX, Typst, HTML, CommonMark profiles), the
   bodies produced here with output equivalent to the HTML-reader path, and
   the preview updates in under a second on a chapter-sized file.
 
+## Migration wave 1 (between M3 and M4, done 2026-09-11)
+
+TeXSmith's `specs/migration/examples-migration.md` §4 items 1–6, 8 and 9,
+worktree `fixes`: `lint --fix --stdout|--diff`; `[^key]` / `^[k1,k2]`
+citations lowered to `Ref` with a fix (decision X7); the `///` fix routes
+`/// latex` to a raw fence and `/// caption` blocks to a caption line;
+attribute lists on fence info strings (C28); string authors, the
+`deprecated-frontmatter-key` line-edit fix, `press.admonition_style`; the
+C20 rows (`[](gls:term)`, `{index}[…]{b}`, `{index:r}`); the `--8<--`
+fence body; `compat-unsupported` on the spellings below until M5
+implements them. Every TeXSmith example except `tables` (X9, worktree
+`tables`) and the ones using M5 constructs passes `check --strict` after
+`lint --fix`.
+
 ## M5 — Bindings, compatibility, polish
 
 - `tmark-py` wheel and `tmark-wasm`; TeXSmith depends on the wheel.
 - PyMdownX compatibility profile completed (critic markup, progress bars,
-  wiki links, smart symbols as the spec lists them).
+  wiki links, smart symbols as the spec lists them). Each spelling is
+  reported as `compat-unsupported` today (`lower/compat.rs`); implementing
+  one means replacing its scan with the construct and updating fixture
+  `diag-compat-unsupported`.
 - Dialect import (`tmark fmt` on GFM/MyST/Pandoc admonitions and crossrefs).
 - Done when: TeXSmith's Python-Markdown extensions are deleted in favour of
   the IR path for PDF, and its MkDocs/Zensical companion emits the `Mkdocs`

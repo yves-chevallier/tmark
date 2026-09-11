@@ -1,4 +1,4 @@
-# 13 — Handoff notes (end of the milestone 3 round, 2026-09-11)
+# 13 — Handoff notes (end of the milestone 3 round and migration wave 1, 2026-09-11)
 
 Written by the agent that implemented most of M3 on top of M1–M2, for the
 agent that takes over. Read `AGENTS.md`, then this file, then
@@ -107,6 +107,51 @@ U10, U11.
 7. **Included files in the editor**: an unsaved buffer of an included
    file is not seen by the analysis (it reads the disk); hover on a label
    of an included file shows its heading text, definition jumps there.
+
+## Migration wave 1, worktree `fixes` (2026-09-11)
+
+Implemented items 1–6, 8 and 9 of TeXSmith's
+`specs/migration/examples-migration.md` §4 (decisions X7; challenges C27,
+C28 filed, C29 closed). Where things live:
+
+- `tmark_reference.rs` gained `footnote_start` (`[^key]` with no
+  definition, keyed on `gfm_footnote_definitions`, never on the
+  bibliography) and `caret_start` (`^[k1,k2]`); `attention.rs` refuses
+  `^[` as an opener. Lowering in `lower/inline.rs` (`Node::TmarkReference`).
+  The printer puts a space before a `Ref` that would fall under the X4
+  guard (`tutor.^[key]` → `tutor. @key`) and prints digit-initial keys
+  bracketed (C27).
+- `lower/block.rs::lower_slash_block`: `/// latex` → `RawBlock`,
+  `/// caption` family → `Caption` (options line parsed as YAML, body
+  re-lowered with `shift_stops`); `Lowerer::generic_captions` lets
+  `attach_captions` pick the kind from the float.
+- `head.rs::parse_fence_info` returns `attrs: Attrs` (bare options plus a
+  trailing `{…}` list); `fmt/block.rs::fence_attrs` prints braces only
+  when there are classes or an id.
+- `tmark_ir::yaml_edit::move_key` is the front-matter fix (line edit);
+  `frontmatter::deprecated_key_target` the one table of moves.
+- `lower/compat.rs`: the `compat-unsupported` scans. Narrow on purpose.
+
+Not done, and why:
+
+- `citation-shadowed-by-footnote` is still never emitted: a defined
+  `[^key]` is a `Note` at tokenization time and the bibliography is
+  unknown to the parser; the registry (worktree `registry`) can emit it
+  by intersecting `Document.footnotes` labels with the bibliography keys.
+- The `--diff` output has no `\ No newline at end of file` marker and
+  compares lines (`str::lines`), which is enough for `lint --fix`.
+- `paper/docs/cheese.md` keeps 3 `ref-unresolved`: its `.bib` lives one
+  directory up and is named by `mkdocs.yml`, which tmark does not read
+  (TeXSmith item 4).
+- Item 7 (table model, X9) belongs to worktree `tables`.
+
+Pitfalls met this round: `diff::lines` yields a trailing empty line for
+text ending in `\n` (use `str::lines` + `diff::slice`); one-letter keys
+are not keys (spec grammar), so `^[a,b]` is literal; `marker.split_at(len
+- 1)` panics on a multibyte last character (the totality proptest caught
+it); a fixture whose sugar hugs a word (`tutor.^[key]`) cannot share the
+IR with its canonical (the printer inserts a space), so the fixture input
+carries the space and a printer test covers the hugging case.
 
 ## Plan of attack for M4 (writers and preview)
 
