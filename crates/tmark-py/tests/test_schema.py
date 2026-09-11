@@ -83,9 +83,8 @@ def test_fragments_are_the_contract_table():
     assert len({f["name"] for f in fragments}) == len(fragments)
 
 
-def test_write_is_milestone_4():
-    with pytest.raises(NotImplementedError, match="milestone 4"):
-        tmark.write(tmark.parse("x"), "latex", {})
+def test_write_is_exported():
+    assert set(tmark.write(tmark.parse("x"), "latex", {})) == {"text", "map", "requires"}
 
 
 def test_loader_protocol():

@@ -53,8 +53,10 @@ tmark.resolve(doc: dict, loader: Loader | None = None, options: dict | None = No
     # refs, bibliography, entries, dois, glossary, index, crossrefs, included, diagnostics
 tmark.edit(text: str, doc: dict, node_id: int, replacement: dict) -> str
 tmark.edit_many(text: str, doc: dict, edits: list[dict]) -> str   # [{"node_id", "replacement"}], disjoint spans or ValueError
-tmark.write(doc: dict, backend: str, options: dict, loader: Loader | None = None, resolved: dict | None = None) -> dict
-    # {"text", "map", "requires"}; raises NotImplementedError until milestone 4
+tmark.write(doc: dict, backend: str, options: dict | None = None, loader: Loader | None = None,
+            resolved: Resolved | dict | None = None, resolve_options: dict | None = None) -> dict
+    # {"text", "map", "requires"}; backend html | latex | typst
+class tmark.Resolved                       # opaque handle in resolve()["handle"]; .view() -> dict, __repr__
 tmark.schema(name: str) -> dict            # "ir", "frontmatter", "diagnostic", "resolved"
 tmark.schema_hash() -> str                 # 16 hex digits, FNV-1a of schema("ir"), platform-independent
 tmark.codes() -> list[dict]                # {"id", "severity", "stage", "doc"} per diagnostic code
@@ -75,6 +77,32 @@ design 06 §Site-wide resolution), `lang` (label words: `fr`, `de-CH`),
 `levels` (code → `off | hint | info | warning | error`; lint rules only,
 parse and resolve diagnostics are facts). An unknown key is a
 `TypeError`, an unknown code or level a `ValueError`.
+
+`write` is `tmark::write` one to one. `options` maps onto `WriterOptions`,
+every key optional: `media` (`print` | `web`), `lang`, `code` {`engine`
+(`pygments` | `minted` | `listings` | `verbatim`), `inline_plain`,
+`inline_breaks`}, `latex` {`legacy_accents`}, `headings` {`base_level`,
+`numbered`}, `refs` {`textual_print`, `textual_web`}, `numbering` (prefix →
+`backend` | `tmark`), `typst` {`math` (`mitex` | `native`)}, `source_map`.
+Keys are checked against the default options at every level (an unknown
+key is a `TypeError` naming its path, `numbering` keys being free) and
+the values decoded by serde (a bad enum value is a `ValueError`), so the
+accepted set follows the Rust struct without a second table. The result
+is the `Body` as JSON: `text`, `map` as `[[start, end, node_id], …]`
+over the output bytes (empty unless `source_map`), `requires` with
+`packages`, `fragments` (names of the `FRAGMENTS` table), `shell_escape`,
+`assets`, `bibliography`, `citations`, `acronyms`, `index`, `counters`.
+
+**The resolution handle.** `Resolved` is not rebuilt from its JSON view,
+so `resolve()` returns, next to the view, `"handle"`: an opaque
+`tmark.Resolved` (a frozen PyO3 class holding the Rust value; `repr` gives
+its label/ref/diagnostic counts, `.view()` the JSON again). `write` takes
+`resolved=` as either that handle or the whole `resolve()` dict; TeXSmith
+calls `resolve` once per document and `write` once per slot body with the
+same handle, so numbering never restarts per slot (the handle is shared,
+`write` only reads it). With `resolved=None`, `write` resolves the
+document itself through `loader` and `resolve_options` (the `options` of
+`resolve`, `start` included) before writing.
 
 `Loader` is a Python protocol (`tmark.Loader`, runtime-checkable) with
 `load(from_path: str, rel: str) -> str | None`, wrapped into a Rust

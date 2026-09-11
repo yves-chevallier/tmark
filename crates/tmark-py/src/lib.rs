@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use pyo3::exceptions::{PyNotImplementedError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pythonize::{depythonize, pythonize};
 use serde::Deserialize;
@@ -30,8 +30,8 @@ use tmark::ir::registry::{
 };
 use tmark::ir::{Block, Code, Inline, LineIndex, NodeId, NodeRef};
 use tmark::{
-    BookLabel, Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit, Profile,
-    Replacement, ResolveNumbering, ResolveOptions,
+    Backend, BookLabel, Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit,
+    Profile, Replacement, ResolveNumbering, ResolveOptions, Resolved, WriterOptions,
 };
 
 // ---------------------------------------------------------------------------
@@ -262,6 +262,36 @@ impl AnyLoader {
     }
 }
 
+/// The opaque handle `resolve` returns next to its JSON view, so that
+/// `write` renders every slot of a document against one resolution
+/// (numbering never restarts per slot). `Resolved` is not rebuilt from
+/// its view: the view is for reading, the handle for writing.
+#[pyclass(name = "Resolved", module = "tmark._tmark", frozen)]
+struct PyResolved(Resolved);
+
+#[pymethods]
+impl PyResolved {
+    fn __repr__(&self) -> String {
+        format!(
+            "<tmark.Resolved: {} labels, {} refs, {} diagnostics>",
+            self.0.labels.in_order.len(),
+            self.0.refs.len(),
+            self.0.diagnostics.len()
+        )
+    }
+
+    /// view() -> dict[str, Any]
+    ///
+    /// The JSON view of this resolution (`schema("resolved")`, without
+    /// the `line`/`col` of `resolve`).
+    fn view<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        to_py(
+            py,
+            &serde_json::to_value(self.0.view()).expect("the view serialises"),
+        )
+    }
+}
+
 /// Parse, resolve, lint, with fixes attached; the shared body of `lint`
 /// and `fixes`.
 fn check(
@@ -402,9 +432,10 @@ fn fixes(
 /// reference, `resolution.kind` in `label`, `sibling`, `citation`,
 /// `glossary`, `doi`, `external`, `ambiguous`, `unresolved`),
 /// `bibliography` (keys), `entries`, `dois` (pending), `glossary`, `index`,
-/// `crossrefs`, `included` (files loaded through includes) and
-/// `diagnostics`. Pass `text` to get `line` and `col` on the diagnostics
-/// of the main file.
+/// `crossrefs`, `included` (files loaded through includes), `diagnostics`
+/// and `handle`, an opaque `tmark.Resolved` that `write` takes (pass this
+/// whole dict, or the handle, as its `resolved`). Pass `text` to get
+/// `line` and `col` on the diagnostics of the main file.
 #[pyfunction]
 #[pyo3(signature = (doc, loader = None, options = None, text = None))]
 fn resolve<'py>(
@@ -429,7 +460,9 @@ fn resolve<'py>(
             diagnostics_json(&resolved.diagnostics, document.file, path, index.as_ref()),
         );
     }
-    to_py(py, &value)
+    let out = to_py(py, &value)?;
+    out.set_item("handle", Py::new(py, PyResolved(resolved))?)?;
+    Ok(out)
 }
 
 /// edit(text: str, doc: dict[str, Any], node_id: int, replacement: dict[str, Any]) -> str
@@ -495,22 +528,106 @@ fn edit_many(text: &str, doc: &Bound<'_, PyAny>, edits: &Bound<'_, PyAny>) -> Py
     tmark::edit_many(text, &document, node_edits).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-/// write(doc: dict[str, Any], backend: str, options: dict[str, Any], loader: Loader | None = None, resolved: dict[str, Any] | None = None) -> dict[str, Any]
+/// write(doc: dict[str, Any], backend: str, options: dict[str, Any] | None = None, loader: Loader | None = None, resolved: Resolved | dict[str, Any] | None = None, resolve_options: dict[str, Any] | None = None) -> dict[str, Any]
 ///
-/// Render a document with a backend (`latex`, `typst`, `html`,
-/// `commonmark`): `{"text", "map", "requires"}`. Not available yet: the
-/// writers are milestone 4 (`design/11-roadmap.md`).
+/// Render a document for a backend (`html`, `latex`, `typst`): a `Body`
+/// as `{"text", "map", "requires"}` (design 07). `map` is
+/// `[[start, end, node_id], ...]` over the output bytes, filled when
+/// `options["source_map"]` is on; `requires` lists `packages`,
+/// `fragments`, `shell_escape`, `assets`, `bibliography`, `citations`,
+/// `acronyms`, `index` and `counters`. `options` maps one to one onto
+/// `WriterOptions`, every key optional: `media` (`print` | `web`), `lang`,
+/// `code` {`engine` (`pygments` | `minted` | `listings` | `verbatim`),
+/// `inline_plain`, `inline_breaks`}, `latex` {`legacy_accents`},
+/// `headings` {`base_level`, `numbered`}, `refs` {`textual_print`,
+/// `textual_web`}, `numbering` (prefix -> `backend` | `tmark`), `typst`
+/// {`math` (`mitex` | `native`)}, `source_map`. An unknown key is a
+/// `TypeError`, a bad value a `ValueError`. `resolved` is the dict
+/// `resolve` returned, or its `handle`: pass the same one for every slot
+/// of a document so numbering never restarts; `None` resolves now, through
+/// `loader` with `resolve_options` (the `options` of `resolve`).
 #[pyfunction]
-#[pyo3(signature = (doc, backend, options, loader = None, resolved = None))]
+#[pyo3(signature = (doc, backend, options = None, loader = None, resolved = None, resolve_options = None))]
 fn write<'py>(
+    py: Python<'py>,
     doc: &Bound<'py, PyAny>,
     backend: &str,
-    options: &Bound<'py, PyAny>,
+    options: Option<&Bound<'py, PyAny>>,
     loader: Option<&Bound<'py, PyAny>>,
     resolved: Option<&Bound<'py, PyAny>>,
+    resolve_options: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let _ = (doc, backend, options, loader, resolved);
-    Err(PyNotImplementedError::new_err("tmark writers: milestone 4"))
+    let document = document_of(doc)?;
+    let Some(backend) = Backend::parse(backend) else {
+        return Err(PyValueError::new_err(format!(
+            "unknown backend `{backend}` (html, latex, typst)"
+        )));
+    };
+    let options = writer_options(options)?;
+    let handle = resolved_handle(resolved)?;
+    let own;
+    let resolved: &Resolved = match &handle {
+        Some(handle) => &handle.get().0,
+        None => {
+            let resolve = Options::parse(resolve_options)?.resolve("<memory>");
+            let loader = AnyLoader::of(loader)?;
+            own = py.allow_threads(|| tmark::resolve(&document, loader.as_dyn(), &resolve));
+            loader.take_error()?;
+            &own
+        }
+    };
+    let body = py.allow_threads(|| tmark::write(&document, resolved, backend, &options));
+    to_py(py, &serde_json::to_value(body).expect("a body serialises"))
+}
+
+/// The `resolved` argument of `write`: a `tmark.Resolved`, or the dict
+/// `resolve` returned (its `handle`), or nothing.
+fn resolved_handle(obj: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Py<PyResolved>>> {
+    let Some(obj) = obj.filter(|o| !o.is_none()) else {
+        return Ok(None);
+    };
+    if let Ok(handle) = obj.extract::<Py<PyResolved>>() {
+        return Ok(Some(handle));
+    }
+    obj.get_item("handle")
+        .and_then(|h| h.extract::<Py<PyResolved>>())
+        .map(Some)
+        .map_err(|_| {
+            PyTypeError::new_err("resolved must be a tmark.Resolved or the dict resolve() returned")
+        })
+}
+
+/// `WriterOptions` from a dict: every key must exist in the default
+/// options at the same path (`TypeError` otherwise; `numbering` keys are
+/// free), then serde decodes the values (`ValueError`).
+fn writer_options(obj: Option<&Bound<'_, PyAny>>) -> PyResult<WriterOptions> {
+    let Some(obj) = obj.filter(|o| !o.is_none()) else {
+        return Ok(WriterOptions::default());
+    };
+    let value: Value = from_py(obj, "options")?;
+    let known = serde_json::to_value(WriterOptions::default()).expect("options serialise");
+    check_keys(&value, &known, &mut Vec::new())?;
+    serde_json::from_value(value).map_err(|e| PyValueError::new_err(format!("options: {e}")))
+}
+
+fn check_keys(value: &Value, known: &Value, path: &mut Vec<String>) -> PyResult<()> {
+    let (Value::Object(given), Value::Object(known)) = (value, known) else {
+        return Ok(());
+    };
+    for (key, inner) in given {
+        let Some(expected) = known.get(key) else {
+            let at = path.iter().map(|p| format!("{p}.")).collect::<String>();
+            return Err(PyTypeError::new_err(format!(
+                "options: unknown key `{at}{key}`"
+            )));
+        };
+        if key != "numbering" {
+            path.push(key.clone());
+            check_keys(inner, expected, path)?;
+            path.pop();
+        }
+    }
+    Ok(())
 }
 
 /// schema(name: str) -> dict[str, Any]
@@ -620,6 +737,7 @@ fn version() -> &'static str {
 #[pymodule]
 fn _tmark(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", tmark::VERSION)?;
+    m.add_class::<PyResolved>()?;
     m.add_function(wrap_pyfunction!(parse, m)?)?;
     m.add_function(wrap_pyfunction!(format, m)?)?;
     m.add_function(wrap_pyfunction!(lint, m)?)?;

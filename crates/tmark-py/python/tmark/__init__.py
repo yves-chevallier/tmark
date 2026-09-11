@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from tmark._tmark import (
+    Resolved,
     __version__,
     codes,
     edit,
@@ -46,6 +47,7 @@ class Loader(Protocol):
 
 __all__ = [
     "Loader",
+    "Resolved",
     "__version__",
     "codes",
     "edit",

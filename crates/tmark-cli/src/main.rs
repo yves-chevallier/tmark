@@ -179,30 +179,9 @@ fn apply_levels(config: &mut LintConfig, levels: &[String]) -> Result<(), ExitCo
     Ok(())
 }
 
-/// Splice every fix into `text`, last first so that earlier spans stay
-/// valid; overlapping fixes after the first are skipped.
+/// The safe fixes of the main file, spliced (`tmark::apply_fixes`).
 fn apply_fixes(text: &str, diagnostics: &[tmark::Diagnostic]) -> (String, usize) {
-    let mut fixes: Vec<&tmark::ir::Fix> = diagnostics
-        .iter()
-        .filter_map(|d| d.fix.as_ref())
-        .filter(|f| f.span.file == FileId::default())
-        .collect();
-    fixes.sort_by_key(|f| std::cmp::Reverse(f.span.start));
-    let mut out = text.to_string();
-    let mut applied = 0;
-    let mut limit = text.len() as u32;
-    for fix in fixes {
-        if fix.span.end > limit {
-            continue;
-        }
-        out.replace_range(
-            fix.span.start as usize..fix.span.end as usize,
-            &fix.replacement,
-        );
-        limit = fix.span.start;
-        applied += 1;
-    }
-    (out, applied)
+    tmark::apply_fixes(text, FileId::default(), diagnostics)
 }
 
 /// What `--fix` does with the fixed text (design 09 §CLI).

@@ -9,6 +9,21 @@ class Loader(Protocol):
 
 __version__: str
 
+class Resolved:
+    """
+    The opaque handle `resolve` returns next to its JSON view, so that
+    `write` renders every slot of a document against one resolution
+    (numbering never restarts per slot). `Resolved` is not rebuilt from
+    its view: the view is for reading, the handle for writing.
+    """
+    def __repr__(self) -> str: ...
+    def view(self) -> dict[str, Any]:
+        """
+        The JSON view of this resolution (`schema("resolved")`, without
+        the `line`/`col` of `resolve`).
+        """
+        ...
+
 def codes() -> list[dict[str, Any]]:
     """
     The diagnostic catalogue in order: `{"id", "severity", "stage", "doc"}`
@@ -110,9 +125,10 @@ def resolve(doc: dict[str, Any], loader: Loader | None = None, options: dict[str
     reference, `resolution.kind` in `label`, `sibling`, `citation`,
     `glossary`, `doi`, `external`, `ambiguous`, `unresolved`),
     `bibliography` (keys), `entries`, `dois` (pending), `glossary`, `index`,
-    `crossrefs`, `included` (files loaded through includes) and
-    `diagnostics`. Pass `text` to get `line` and `col` on the diagnostics
-    of the main file.
+    `crossrefs`, `included` (files loaded through includes), `diagnostics`
+    and `handle`, an opaque `tmark.Resolved` that `write` takes (pass this
+    whole dict, or the handle, as its `resolved`). Pass `text` to get
+    `line` and `col` on the diagnostics of the main file.
     """
     ...
 
@@ -138,10 +154,23 @@ def version() -> str:
     """
     ...
 
-def write(doc: dict[str, Any], backend: str, options: dict[str, Any], loader: Loader | None = None, resolved: dict[str, Any] | None = None) -> dict[str, Any]:
+def write(doc: dict[str, Any], backend: str, options: dict[str, Any] | None = None, loader: Loader | None = None, resolved: Resolved | dict[str, Any] | None = None, resolve_options: dict[str, Any] | None = None) -> dict[str, Any]:
     """
-    Render a document with a backend (`latex`, `typst`, `html`,
-    `commonmark`): `{"text", "map", "requires"}`. Not available yet: the
-    writers are milestone 4 (`design/11-roadmap.md`).
+    Render a document for a backend (`html`, `latex`, `typst`): a `Body`
+    as `{"text", "map", "requires"}` (design 07). `map` is
+    `[[start, end, node_id], ...]` over the output bytes, filled when
+    `options["source_map"]` is on; `requires` lists `packages`,
+    `fragments`, `shell_escape`, `assets`, `bibliography`, `citations`,
+    `acronyms`, `index` and `counters`. `options` maps one to one onto
+    `WriterOptions`, every key optional: `media` (`print` | `web`), `lang`,
+    `code` {`engine` (`pygments` | `minted` | `listings` | `verbatim`),
+    `inline_plain`, `inline_breaks`}, `latex` {`legacy_accents`},
+    `headings` {`base_level`, `numbered`}, `refs` {`textual_print`,
+    `textual_web`}, `numbering` (prefix -> `backend` | `tmark`), `typst`
+    {`math` (`mitex` | `native`)}, `source_map`. An unknown key is a
+    `TypeError`, a bad value a `ValueError`. `resolved` is the dict
+    `resolve` returned, or its `handle`: pass the same one for every slot
+    of a document so numbering never restarts; `None` resolves now, through
+    `loader` with `resolve_options` (the `options` of `resolve`).
     """
     ...

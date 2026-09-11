@@ -144,8 +144,10 @@ The native module `tmark._tmark` and the package `tmark` exist with
 API as built); the Python `Loader` protocol is wrapped at the boundary;
 `maturin develop` and `maturin build` work, the pytest suite under
 `crates/tmark-py/tests` is green, `.github/workflows/wheels.yml` builds the
-abi3 wheels. `write` raises `NotImplementedError` until the writers land
-wheel on PyPI, `tmark-wasm`, the PyMdownX profile, dialect import.
+abi3 wheels; `write` renders through `tmark::write` against a shared
+`Resolved` handle and `fragments()` serves the `FRAGMENTS` table. Not
+started: the wheel on PyPI, `tmark-wasm`, the PyMdownX profile, dialect
+import.
 
 ## Out of scope for all milestones
 

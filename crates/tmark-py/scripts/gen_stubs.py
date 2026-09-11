@@ -34,21 +34,46 @@ __version__: str
 '''
 
 
+def signature_of(name: str, fn) -> tuple[str, str]:
+    """The (signature, description) of a docstring whose first line is the signature."""
+    doc = (fn.__doc__ or "").strip()
+    if not doc:
+        sys.exit(f"{name}: no docstring")
+    signature, _, rest = doc.partition("\n")
+    if not signature.startswith(f"{name}("):
+        sys.exit(f"{name}: the docstring must start with its signature, got {signature!r}")
+    return signature, rest.strip()
+
+
+def function(name: str, fn, indent: str = "") -> str:
+    signature, rest = signature_of(name, fn)
+    if indent:
+        args = signature[len(name) + 1 :]
+        signature = f"{name}(self{args}" if args.startswith(")") else f"{name}(self, {args}"
+    out = f"{indent}def {signature}:\n"
+    if rest:
+        out += f'{indent}    """\n{textwrap.indent(rest, indent + "    ")}\n{indent}    """\n'
+    return out + f"{indent}    ...\n"
+
+
 def render(module) -> str:
     out = [HEADER]
-    for name, fn in inspect.getmembers(module, inspect.isbuiltin):
-        if name.startswith("_"):
+    for name, cls in inspect.getmembers(module, inspect.isclass):
+        if name.startswith("_") or cls.__module__ != module.__name__:
             continue
-        doc = (fn.__doc__ or "").strip()
-        if not doc:
-            sys.exit(f"{name}: no docstring")
-        signature, _, rest = doc.partition("\n")
-        if not signature.startswith(f"{name}("):
-            sys.exit(f"{name}: the docstring must start with its signature, got {signature!r}")
-        body = textwrap.indent(rest.strip(), "    ")
-        out.append(f"def {signature}:\n")
-        out.append(f'    """\n{body}\n    """\n')
-        out.append("    ...\n\n")
+        out.append(f"class {name}:\n")
+        doc = (cls.__doc__ or "").strip()
+        if doc:
+            out.append(f'    """\n{textwrap.indent(doc, "    ")}\n    """\n')
+        if "__repr__" in vars(cls):
+            out.append("    def __repr__(self) -> str: ...\n")
+        for member, fn in sorted(vars(cls).items()):
+            if callable(fn) and not member.startswith("_"):
+                out.append(function(member, fn, "    "))
+        out.append("\n")
+    for name, fn in inspect.getmembers(module, inspect.isbuiltin):
+        if not name.startswith("_"):
+            out.append(function(name, fn) + "\n")
     return "".join(out).rstrip("\n") + "\n"
 
 
