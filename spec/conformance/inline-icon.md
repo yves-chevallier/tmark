@@ -18,8 +18,45 @@ Click :material-cog: Settings.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C34) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Click "
+        },
+        {
+          "type": "Span",
+          "content": [
+            {
+              "type": "Str",
+              "text": ":material-cog:"
+            }
+          ],
+          "attrs": {
+            "classes": [
+              "icon"
+            ],
+            "kv": [
+              [
+                "media",
+                "web"
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Str",
+          "text": " Settings."
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## resolution
 

@@ -32,11 +32,34 @@ Next paragraph.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C40) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "RawBlock",
+      "format": "markdown",
+      "text": "[TOC]"
+    },
+    {
+      "type": "RawBlock",
+      "format": "markdown",
+      "text": "::: texsmith.core.config\n    options:\n      members: true"
+    },
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Next paragraph."
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## resolution
 
 ```text
-directive-foreign @ 3:1-6:1
+directive-foreign @ 3:1-5:20
 ```

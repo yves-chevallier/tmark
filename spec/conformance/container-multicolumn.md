@@ -26,6 +26,68 @@ Spec §Div: `multicolumn` is a name of the closed container registry, a
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C32) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Div",
+      "name": "multicolumn",
+      "content": [
+        {
+          "type": "BulletList",
+          "items": [
+            {
+              "content": [
+                {
+                  "type": "Para",
+                  "content": [
+                    {
+                      "type": "Str",
+                      "text": "alpha"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "Para",
+                  "content": [
+                    {
+                      "type": "Str",
+                      "text": "beta"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "content": [
+                {
+                  "type": "Para",
+                  "content": [
+                    {
+                      "type": "Str",
+                      "text": "gamma"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attrs": {
+        "kv": [
+          [
+            "cols",
+            "2"
+          ]
+        ]
+      }
+    }
+  ]
+}
+```
 

@@ -26,6 +26,51 @@ Raw block.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C37) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Inline "
+        },
+        {
+          "type": "RawInline",
+          "format": "html",
+          "text": "<span class=\"x\">"
+        },
+        {
+          "type": "Str",
+          "text": "text"
+        },
+        {
+          "type": "RawInline",
+          "format": "html",
+          "text": "</span>"
+        },
+        {
+          "type": "Str",
+          "text": " and "
+        },
+        {
+          "type": "RawInline",
+          "format": "html",
+          "text": "<br>"
+        },
+        {
+          "type": "Str",
+          "text": " here."
+        }
+      ]
+    },
+    {
+      "type": "RawBlock",
+      "format": "html",
+      "text": "<div class=\"note\">\nRaw block.\n</div>"
+    }
+  ]
+}
+```
 

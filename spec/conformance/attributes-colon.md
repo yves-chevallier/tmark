@@ -21,8 +21,28 @@ on every host and deprecated; the printer drops the colon.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C35) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Header",
+      "level": 2,
+      "content": [
+        {
+          "type": "Str",
+          "text": "Boot"
+        }
+      ],
+      "attrs": {
+        "id": "sec:boot",
+        "classes": [
+          "draft"
+        ]
+      }
+    }
+  ]
+}
+```
 
 ## diagnostics
 

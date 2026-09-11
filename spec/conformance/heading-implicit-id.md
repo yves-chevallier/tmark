@@ -22,8 +22,54 @@ See [](#boot-sequence) and @boot-sequence.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C38) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Header",
+      "level": 2,
+      "content": [
+        {
+          "type": "Str",
+          "text": "Boot sequence"
+        }
+      ]
+    },
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "See "
+        },
+        {
+          "type": "Link",
+          "target": {
+            "type": "Anchor",
+            "value": "boot-sequence"
+          }
+        },
+        {
+          "type": "Str",
+          "text": " and "
+        },
+        {
+          "type": "Ref",
+          "items": [
+            {
+              "key": "boot-sequence"
+            }
+          ]
+        },
+        {
+          "type": "Str",
+          "text": "."
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## resolution
 

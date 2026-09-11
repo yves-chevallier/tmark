@@ -25,8 +25,35 @@ attribute colon are deprecated sugar (Appendix "Deprecation schedule").
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C35) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "ProgressBar",
+          "value": 25.0,
+          "label": "Research"
+        },
+        {
+          "type": "SoftBreak"
+        },
+        {
+          "type": "ProgressBar",
+          "value": 45.0,
+          "label": "Review",
+          "attrs": {
+            "classes": [
+              "thin"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## diagnostics
 

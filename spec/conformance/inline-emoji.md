@@ -22,6 +22,19 @@ Ship it 🚀 😄 at 12:30:45.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C34) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Ship it 🚀 😄 at 12:30:45."
+        }
+      ]
+    }
+  ]
+}
+```
 

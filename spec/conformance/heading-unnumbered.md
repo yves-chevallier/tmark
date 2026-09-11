@@ -22,6 +22,40 @@ heading over the `press.numbered` default. Pandoc's `{-}` is literal text.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C39) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Header",
+      "level": 1,
+      "content": [
+        {
+          "type": "Str",
+          "text": "Preface"
+        }
+      ],
+      "attrs": {
+        "classes": [
+          "unnumbered"
+        ]
+      }
+    },
+    {
+      "type": "Header",
+      "level": 2,
+      "content": [
+        {
+          "type": "Str",
+          "text": "Colophon"
+        }
+      ],
+      "attrs": {
+        "classes": [
+          "unlisted"
+        ]
+      }
+    }
+  ]
+}
+```
 

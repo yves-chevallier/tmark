@@ -40,6 +40,42 @@ Now {underline}[inserted] text.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C41) with input and canonical only. -->
+```json
+{
+  "front_matter": {
+    "raw": "---\npress:\n  features:\n    inline.insert: true\n---",
+    "keys": {
+      "press": {
+        "features": {
+          "inline.insert": true
+        }
+      }
+    }
+  },
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Now "
+        },
+        {
+          "type": "Underline",
+          "content": [
+            {
+              "type": "Str",
+              "text": "inserted"
+            }
+          ]
+        },
+        {
+          "type": "Str",
+          "text": " text."
+        }
+      ]
+    }
+  ]
+}
+```
 

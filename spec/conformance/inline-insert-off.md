@@ -1,7 +1,9 @@
 # Caret insert with the feature off
 
 Spec §Inline text: with `inline.insert` off (the default) `^^x^^` is
-literal text and lint hints `feature-off`.
+literal text and lint hints `feature-off`. The printer escapes the carets
+(`^x^` is superscript sugar); the escaped spelling is the author's literal
+text and gets no hint.
 
 ## input
 
@@ -12,13 +14,26 @@ Now ^^inserted^^ text.
 ## canonical
 
 ```md
-Now ^^inserted^^ text.
+Now \^\^inserted\^\^ text.
 ```
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C41) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Now ^^inserted^^ text."
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## resolution
 

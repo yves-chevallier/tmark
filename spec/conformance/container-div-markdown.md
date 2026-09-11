@@ -8,13 +8,13 @@ attribute list; `<div markdown>` is `::: div`, class E, kept indefinitely.
 
 ```md
 <div class="grid cards" markdown>
-**Bold** inside.
+Some **bold** inside.
 </div>
 ```
 
 ```md
 ::: div {.grid .cards}
-**Bold** inside.
+Some **bold** inside.
 :::
 ```
 
@@ -22,12 +22,50 @@ attribute list; `<div markdown>` is `::: div`, class E, kept indefinitely.
 
 ```md
 ::: div {.grid .cards}
-**Bold** inside.
+Some **bold** inside.
 :::
 ```
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C37) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Div",
+      "name": "div",
+      "content": [
+        {
+          "type": "Para",
+          "content": [
+            {
+              "type": "Str",
+              "text": "Some "
+            },
+            {
+              "type": "Strong",
+              "content": [
+                {
+                  "type": "Str",
+                  "text": "bold"
+                }
+              ]
+            },
+            {
+              "type": "Str",
+              "text": " inside."
+            }
+          ]
+        }
+      ],
+      "attrs": {
+        "classes": [
+          "grid",
+          "cards"
+        ]
+      }
+    }
+  ]
+}
+```
 

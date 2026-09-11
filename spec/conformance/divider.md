@@ -26,6 +26,31 @@ Second page.
 
 ## ir
 
-<!-- TODO(parser wave): fill in the IR JSON block; this fixture was written
-by the spec wave (challenge C36) with input and canonical only. -->
+```json
+{
+  "blocks": [
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "First page."
+        }
+      ]
+    },
+    {
+      "type": "HorizontalRule"
+    },
+    {
+      "type": "Para",
+      "content": [
+        {
+          "type": "Str",
+          "text": "Second page."
+        }
+      ]
+    }
+  ]
+}
+```
 
