@@ -1,7 +1,6 @@
 //! Facade: the one crate downstream users depend on.
 //!
-//! Design: `design/01-architecture.md` §The facade. `write` arrives with
-//! the writers (milestone 4).
+//! Design: `design/01-architecture.md` §The facade.
 
 #![forbid(unsafe_code)]
 
@@ -19,6 +18,10 @@ pub use tmark_registry::{
     resolve, Host, Label, Loader, MemoryLoader, RefResolution, Resolution, ResolveOptions, Resolved,
 };
 pub use tmark_syntax::{parse, parse_strict, Parsed};
+pub use tmark_writers::{
+    write, writer, AssetRef, Backend, Body, CodeEngine, CodeOptions, HeadingOptions, Media,
+    Numbering, RefOptions, Requires, SourceMap, TypstMath, Writer, WriterOptions,
+};
 
 /// Parse for a profile: the strict profile switches the X-class
 /// constructs off at parse time (spec §Conformance and deviations); the

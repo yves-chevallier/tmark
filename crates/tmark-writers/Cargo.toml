@@ -9,8 +9,15 @@ rust-version.workspace = true
 [dependencies]
 # Writers read the IR...
 tmark-ir = { path = "../tmark-ir" }
-# ...and the resolution (numbers, labels); never the file system.
+# ...and the resolution (numbers, labels, citations); never the file system.
 tmark-registry = { path = "../tmark-registry", default-features = false }
-# Milestone 4 decides whether the CommonMark output lives here or stays a
-# tmark-fmt profile (architecture review C4); the edge is unused today.
-tmark-fmt = { path = "../tmark-fmt" }
+# `Body`, `Requires` and `SourceMap` cross to Python and to `tmark write --map`
+# as JSON (design/07-writers.md, writers-and-passes.md §1).
+serde = { workspace = true }
+
+[dev-dependencies]
+# Tests parse their inputs.
+tmark-syntax = { path = "../tmark-syntax" }
+# One snapshot per conformance fixture and per backend (design/10-testing.md §4).
+insta = { workspace = true }
+serde_json = { workspace = true }
