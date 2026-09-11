@@ -619,8 +619,12 @@ fn named_row(
     };
     let data_columns = columns.get(1..).unwrap_or_default();
     let known: Vec<&str> = data_columns.iter().filter_map(Column::name).collect();
-    for key in cells.keys() {
-        let key = text(key).unwrap_or_default();
+    // Keys by their text: `2024:` is an integer key naming the column "2024".
+    let entries: Vec<(String, &Value)> = cells
+        .iter()
+        .map(|(key, value)| (text(key).unwrap_or_else(|| describe(key)), value))
+        .collect();
+    for (key, _) in &entries {
         if !known.contains(&key.as_str()) {
             let mut available = known.clone();
             available.sort_unstable();
@@ -638,8 +642,8 @@ fn named_row(
         .map(|column| {
             column
                 .name()
-                .and_then(|name| cells.get(name))
-                .map(|value| item_top(value, &label, findings))
+                .and_then(|name| entries.iter().find(|(key, _)| key == name))
+                .map(|(_, value)| item_top(value, &label, findings))
         })
         .collect();
     Some(Written::Named { label, items })
@@ -1107,8 +1111,13 @@ fn place_named(
     }
     for (item, &(start, len)) in items.iter().zip(spans.iter().skip(1)) {
         let Some(item) = item else { continue };
+        let end = (start + len).min(n);
+        if let Item::List(list) = item {
+            // The list addresses the whole column: `~` under a row span.
+            place_list(list, row, start, end - start, label, section, findings);
+            continue;
+        }
         let mut cursor = start;
-        let end = start + len;
         while cursor < end && row[cursor].is_some() {
             cursor += 1;
         }
@@ -1123,11 +1132,8 @@ fn place_named(
             }
             continue;
         }
-        let remaining = end - cursor;
         match item {
-            Item::List(list) => {
-                place_list(list, row, cursor, remaining, label, section, findings);
-            }
+            Item::List(_) => unreachable!("handled above"),
             Item::Rich(cell) => {
                 place_rich(cell, row, cursor, n, label, section, findings);
             }
@@ -1272,6 +1278,14 @@ mod tests {
         assert_eq!(texts(&t.rows[1]), ["Cherries", "", "5", "", ""]);
         assert_eq!(texts(&t.rows[2]), ["2024", "", "", "", ""]);
         assert!(matches!(t.rows[1], RawRow::Data { named: true, .. }));
+    }
+
+    #[test]
+    fn named_rows_find_numeric_column_names() {
+        let t = parse_table("columns: [Year, 2024, 2025]\nrows:\n  - Alpha: {2024: 1, 2025: 2}\n")
+            .unwrap();
+        assert!(codes(&t).is_empty(), "{:?}", t.findings);
+        assert_eq!(texts(&t.rows[0]), ["Alpha", "1", "2"]);
     }
 
     #[test]
