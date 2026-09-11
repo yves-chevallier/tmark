@@ -667,11 +667,17 @@ impl Lowerer {
             }
             self.deprecated(span, "/// name … ///", "::: name … :::");
         }
+        // A dotted name is a foreign directive (`::: pkg.mod` of
+        // mkdocstrings, web-profile.md open question 2): still a `Div`,
+        // but its diagnostics are informational, since the site renders
+        // it and nothing else can.
+        let foreign = name.contains('.');
         if !c.closed {
-            self.diag(
+            self.diag_at(
                 Code::ContainerUnclosed,
                 span,
                 format!("`::: {name}` is never closed"),
+                foreign,
             );
         }
         let was_in_figure = self.in_figure;
@@ -743,10 +749,11 @@ impl Lowerer {
                 })
             }
             _ => {
-                self.diag(
+                self.diag_at(
                     Code::ContainerUnknown,
                     span,
                     format!("`::: {name}` is not a known container"),
+                    foreign,
                 );
                 Block::Div(Div {
                     meta,
@@ -1131,7 +1138,13 @@ impl Lowerer {
         let (kind, skip) = is_caption(&para.content)?;
         let mut content = para.content;
         if let Some(Inline::Str(first)) = content.first_mut() {
-            first.text = first.text[skip..].trim_start().to_string();
+            let rest = first.text[skip..].trim_start().to_string();
+            // The span starts after `Kind:` and the space, as the text does.
+            let removed = (first.text.len() - rest.len()) as u32;
+            if first.meta.span.len() >= removed {
+                first.meta.span.start += removed;
+            }
+            first.text = rest;
             if first.text.is_empty() {
                 content.remove(0);
             }

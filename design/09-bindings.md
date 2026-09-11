@@ -12,6 +12,7 @@ tmark fmt    FILE… [--profile P] [--check] [--write]
 tmark lint   FILE… [--fix [--stdout | --diff]] [--strict] [--level CODE=LEVEL]
 tmark check  FILE…                       parse + resolve + lint, exit code (alias of lint)
 tmark write  FILE --to latex|typst|html [--media print|web] [--map]   (milestone 4)
+tmark lower  FILE --to web [--sections title|number] [--citations inline|passthrough] [--bib FILE]…
 tmark schema frontmatter|ir             print the JSON schema (`inventory`: milestone 4)
 tmark-lsp                                the language server on stdio, a separate binary
 ```
@@ -56,6 +57,9 @@ tmark.edit_many(text: str, doc: dict, edits: list[dict]) -> str   # [{"node_id",
 tmark.write(doc: dict, backend: str, options: dict | None = None, loader: Loader | None = None,
             resolved: Resolved | dict | None = None, resolve_options: dict | None = None) -> dict
     # {"text", "map", "requires"}; backend html | latex | typst
+tmark.lower_web(text: str, doc: dict, resolved: Resolved | dict | None = None, loader: Loader | None = None,
+                options: dict | None = None) -> dict
+    # {"text", "diagnostics", "bibliography"}: the MkDocs page with its TMark constructs spliced
 class tmark.Resolved                       # opaque handle in resolve()["handle"]; .view() -> dict, __repr__
 tmark.schema(name: str) -> dict            # "ir", "frontmatter", "diagnostic", "resolved"
 tmark.schema_hash() -> str                 # 16 hex digits, FNV-1a of schema("ir"), platform-independent
@@ -103,6 +107,24 @@ same handle, so numbering never restarts per slot (the handle is shared,
 `write` only reads it). With `resolved=None`, `write` resolves the
 document itself through `loader` and `resolve_options` (the `options` of
 `resolve`, `start` included) before writing.
+
+`lower_web` is `tmark::lower_web` one to one (design 07 §Web lowering):
+`text` is the source `doc` was parsed from, `resolved` the `resolve`
+result or its handle (the plugin resolves each page with `numbering:
+"all"` and the site's `book` first; `None` resolves the page alone, every
+series numbered), `loader` serves the text of included files, `options`
+maps onto `WebOptions`: `sections` (`title` | `number`), `citations`
+(`inline` | `passthrough`), `lang`, `css_prefix`; an unknown key or value
+is a `TypeError`. The result carries the lowered `text` (the `References`
+list appended under a `## References` heading when citations were
+lowered inline), the lowering's own `diagnostics` (the resolution's are
+in `resolve()`), and `bibliography`, the `<ol class="ts-bibliography">`
+alone, for a plugin that places it itself.
+
+`tmark lower FILE --to web` is the same lowering from the CLI, for
+debugging a page outside the site: the file is resolved alone with
+`numbering: All` (`--bib` feeds the bibliography), so sibling labels
+print as `[?key]`; `--sections` and `--citations` are the two options.
 
 `Loader` is a Python protocol (`tmark.Loader`, runtime-checkable) with
 `load(from_path: str, rel: str) -> str | None`, wrapped into a Rust

@@ -11,6 +11,9 @@ rust-version.workspace = true
 tmark-ir = { path = "../tmark-ir" }
 # ...and the resolution (numbers, labels, citations); never the file system.
 tmark-registry = { path = "../tmark-registry", default-features = false }
+# The web lowering (`mkdocs.rs`) splices its replacements through `edit_many`
+# and prints untouched children in the `Mkdocs` profile (web-profile.md).
+tmark-fmt = { path = "../tmark-fmt" }
 # `Body`, `Requires` and `SourceMap` cross to Python and to `tmark write --map`
 # as JSON (design/07-writers.md, writers-and-passes.md §1).
 serde = { workspace = true }

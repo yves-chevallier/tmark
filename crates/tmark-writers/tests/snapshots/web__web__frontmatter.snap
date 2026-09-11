@@ -1,0 +1,14 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+title: Firmware Review
+lang: fr
+press:
+  template: article
+  features:
+    paragraph.lead: false
+---
+
+**Not a lead.** With the feature off.

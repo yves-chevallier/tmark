@@ -1,0 +1,11 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="span" id="fig:traces" class="ts-subfigures" style="--ts-cols:2">
+![Boot](boot.png){#fig:boot}
+<span class="ts-subcaption">(a)</span>
+![Crash](crash.png){#fig:crash}
+<span class="ts-subcaption">(b)</span>
+<figcaption markdown="span"><span class="ts-caption-label">Figure 3:</span> Watchdog traces before and after the fix.</figcaption>
+</figure>

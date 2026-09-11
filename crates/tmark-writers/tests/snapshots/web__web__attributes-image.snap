@@ -1,0 +1,8 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="span" id="fig:plot">
+![Trace of the boot](trace.png){width=60%}
+<figcaption markdown="span"><span class="ts-caption-label">Figure 2:</span> The watchdog fires **twice**.</figcaption>
+</figure>

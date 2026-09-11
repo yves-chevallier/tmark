@@ -58,7 +58,7 @@ impl Writer for HtmlWriter {
 /// TMark-numbered series, a document-order count per prefix otherwise
 /// (HTML has no backend counter). Images inside a `::: figure` are
 /// sub-figures and take no number.
-fn number_labels(doc: &Document, res: &Resolved) -> BTreeMap<String, String> {
+pub(crate) fn number_labels(doc: &Document, res: &Resolved) -> BTreeMap<String, String> {
     let mut subfigures = std::collections::BTreeSet::new();
     tmark_ir::walk(doc, &mut |node| {
         if let tmark_ir::NodeRef::Block(Block::Figure(f)) = node {
@@ -946,7 +946,7 @@ impl Html<'_> {
                     text.push_str(&format!(
                         "<a href=\"#ref-{}\">{}</a>",
                         escape::attr(&key),
-                        escape::text(&self.author_year(&key, item.suppress_author))
+                        escape::text(&refs::author_year(self.res, &key, item.suppress_author))
                     ));
                     if let Some(suffix) = &item.suffix {
                         text.push_str(", ");
@@ -1000,32 +1000,6 @@ impl Html<'_> {
             self.out.push(")</span>");
         }
         self.out.end(n.meta.id);
-    }
-
-    /// The minimal built-in style (design 07): `Author Year`.
-    fn author_year(&self, key: &str, suppress_author: bool) -> String {
-        let Some(entry) = self.res.bibliography.get(key) else {
-            return key.to_string();
-        };
-        let year = entry
-            .fields
-            .get("year")
-            .or_else(|| entry.fields.get("date"))
-            .map(|d| d.chars().take(4).collect::<String>());
-        let author = entry.fields.get("author").map(|a| {
-            let first = a.split(" and ").next().unwrap_or(a);
-            match first.split_once(',') {
-                Some((last, _)) => last.trim().to_string(),
-                None => first.rsplit(' ').next().unwrap_or(first).to_string(),
-            }
-        });
-        match (author, year, suppress_author) {
-            (_, Some(year), true) => year,
-            (Some(author), Some(year), false) => format!("{author} {year}"),
-            (Some(author), None, false) => author,
-            (None, Some(year), _) => year,
-            _ => key.to_string(),
-        }
     }
 
     fn note(&mut self, n: &Note) {
@@ -1193,42 +1167,48 @@ impl Html<'_> {
         let keys = self.req.citations.clone();
         self.out.push("<section class=\"bibliography\">\n<ol>\n");
         for key in &keys {
-            self.out
-                .push(&format!("<li id=\"ref-{}\">", escape::attr(key)));
-            match self.res.bibliography.get(key) {
-                Some(entry) => {
-                    let field = |name: &str| entry.fields.get(name).cloned();
-                    let mut parts = Vec::new();
-                    if let Some(author) = field("author") {
-                        parts.push(escape::text(&author.replace(" and ", ", ")));
-                    }
-                    if let Some(year) = field("year").or_else(|| field("date")) {
-                        parts.push(format!("({})", escape::text(&year)));
-                    }
-                    if let Some(title) = field("title") {
-                        parts.push(format!("<em>{}</em>", escape::text(&title)));
-                    }
-                    if let Some(journal) = field("journal").or_else(|| field("journaltitle")) {
-                        parts.push(escape::text(&journal));
-                    }
-                    if let Some(doi) = field("doi") {
-                        parts.push(format!(
-                            "<a href=\"https://doi.org/{}\">doi:{}</a>",
-                            escape::attr(&doi),
-                            escape::text(&doi)
-                        ));
-                    }
-                    if parts.is_empty() {
-                        parts.push(escape::text(key));
-                    }
-                    self.out.push(&parts.join(". "));
-                }
-                None => self.out.push(&escape::text(key)),
-            }
-            self.out.push("</li>\n");
+            self.out.push(&format!(
+                "<li id=\"ref-{}\">{}</li>\n",
+                escape::attr(key),
+                bibliography_entry(self.res, key)
+            ));
         }
         self.out.push("</ol>\n</section>\n");
     }
+}
+
+/// One entry of the built-in author-year bibliography (design 07
+/// §Mapping rules, "Citations"): the fields joined, the DOI linked; the
+/// key alone when the bibliography has no record.
+pub(crate) fn bibliography_entry(res: &Resolved, key: &str) -> String {
+    let Some(entry) = res.bibliography.get(key) else {
+        return escape::text(key);
+    };
+    let field = |name: &str| entry.fields.get(name).cloned();
+    let mut parts = Vec::new();
+    if let Some(author) = field("author") {
+        parts.push(escape::text(&author.replace(" and ", ", ")));
+    }
+    if let Some(year) = field("year").or_else(|| field("date")) {
+        parts.push(format!("({})", escape::text(&year)));
+    }
+    if let Some(title) = field("title") {
+        parts.push(format!("<em>{}</em>", escape::text(&title)));
+    }
+    if let Some(journal) = field("journal").or_else(|| field("journaltitle")) {
+        parts.push(escape::text(&journal));
+    }
+    if let Some(doi) = field("doi") {
+        parts.push(format!(
+            "<a href=\"https://doi.org/{}\">doi:{}</a>",
+            escape::attr(&doi),
+            escape::text(&doi)
+        ));
+    }
+    if parts.is_empty() {
+        parts.push(escape::text(key));
+    }
+    parts.join(". ")
 }
 
 /// The inline content of a `Para` or `Plain`; empty for other blocks.
@@ -1283,7 +1263,7 @@ pub fn is_zero_width(inline: &Inline) -> bool {
     }
 }
 
-fn align_attr(align: Option<Align>) -> String {
+pub(crate) fn align_attr(align: Option<Align>) -> String {
     match align {
         Some(Align::Left) => " style=\"text-align: left\"".to_string(),
         Some(Align::Center) => " style=\"text-align: center\"".to_string(),

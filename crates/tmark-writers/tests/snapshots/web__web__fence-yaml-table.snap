@@ -1,0 +1,31 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="1" class="ts-table" id="tbl:stock">
+<figcaption markdown="span"><span class="ts-caption-label">Table 1:</span> Stock by warehouse.</figcaption>
+
+<table class="ts-table" data-ts-table="1" markdown="block">
+<thead markdown="block">
+<tr markdown="block">
+<th markdown="span" rowspan="2">Fruit</th>
+<th markdown="span" colspan="2">Warehouses</th>
+</tr>
+<tr markdown="block">
+<th markdown="span">Geneva</th>
+<th markdown="span">Zurich</th>
+</tr>
+</thead>
+<tbody markdown="block">
+<tr markdown="block">
+<td markdown="span">Apples</td>
+<td markdown="span">3</td>
+<td markdown="span">4</td>
+</tr>
+<tr markdown="block">
+<td markdown="span" colspan="3">Total</td>
+</tr>
+</tbody>
+</table>
+
+</figure>

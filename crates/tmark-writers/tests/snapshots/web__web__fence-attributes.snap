@@ -1,0 +1,16 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+```md {.snippet caption="A title" width="60%"}
+# Hello
+```
+
+```mermaid image width="80%"
+flowchart LR
+  A --> B
+```
+
+```python {.wide title="hanoi.py"}
+print(1)
+```

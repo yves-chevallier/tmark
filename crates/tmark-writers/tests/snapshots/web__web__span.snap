@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+An anchor on <span id="claim:one">this claim</span>, a <span lang="en">quote with a [link](x.md)</span>, and [plain brackets].

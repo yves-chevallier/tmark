@@ -23,10 +23,12 @@ use tmark_registry::Resolved;
 pub mod common;
 pub mod html;
 pub mod latex;
+pub mod mkdocs;
 pub mod typst;
 
 pub use html::HtmlWriter;
 pub use latex::LatexWriter;
+pub use mkdocs::{lower_web, Citations, Lowered, SectionRefs, WebOptions};
 pub use typst::TypstWriter;
 
 /// The Typst side of the fragment contracts: a definition for every

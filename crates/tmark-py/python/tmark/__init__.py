@@ -19,6 +19,7 @@ from tmark._tmark import (
     format,
     fragments,
     lint,
+    lower_web,
     parse,
     registries,
     resolve,
@@ -31,7 +32,7 @@ from tmark._tmark import (
 
 @runtime_checkable
 class Loader(Protocol):
-    """What ``lint``, ``fixes``, ``resolve`` and ``write`` load files through.
+    """What ``lint``, ``fixes``, ``resolve``, ``write`` and ``lower_web`` load files through.
 
     ``from_path`` is the file the request comes from (the document, or an
     ``{include base=...}`` directory); ``rel`` is the path as written. Return
@@ -56,6 +57,7 @@ __all__ = [
     "format",
     "fragments",
     "lint",
+    "lower_web",
     "parse",
     "registries",
     "resolve",

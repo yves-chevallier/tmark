@@ -1,0 +1,13 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+- a
+
+* b
+
+1. c
+
+1) d
+
+- e

@@ -124,6 +124,102 @@ map plus `Document` spans give output range → source span. Consumers:
   profile must be the fixed point of `04-printer.md` (the CommonMark writer
   *is* the printer; `tmark-writers::commonmark` re-exports `tmark-fmt`).
 
+## Web lowering
+
+Module `mkdocs.rs`, entry point `lower_web(text, doc, res, loader, opts)
+-> Lowered { text, diagnostics, bibliography }`, re-exported by the facade.
+Specification: TeXSmith `specs/migration/web-profile.md` (§Recommendation,
+the per-construct table). A MkDocs page is rendered by Python-Markdown
+with Material's extension set, which knows nothing of `@fig:x`,
+`#(fw:x)`, `::: figure` or `Figure:` lines; the plugin hands the page to
+`lower_web` in `on_page_markdown`, resolved with `Numbering::All` and the
+site's `book`, and gets back Markdown Material renders.
+
+It is not a writer: there is no body, no `Requires`, no source map. The
+lowering walks the tree and emits one `NodeEdit` per construct of the
+table, applied through `tmark_fmt::edit_many`, so **every byte outside a
+recognised construct is untouched** (mkdocstrings, tabs, icons, critic,
+`!!!` callouts, custom fences, `{{ macros }}` pass through). A construct
+kept as written still gets the splices of its children (a `@` reference
+inside an unclosed `::: pkg.mod`, a `#(fw:x)` in a pipe-table cell). The
+replacement text is:
+
+- the `Mkdocs` profile's spelling (`tmark_fmt::print_node_with`) for a
+  PyMdownX construct (`==x==`, `++ctrl+s++`, `` `#!py x` ``), and the
+  HTML element when the profile had to keep the role;
+- an HTML wrapper the standard extensions read (`md_in_html`,
+  `attr_list`): `<figure markdown="span">` around an image as written and
+  its `<figcaption>` with a `ts-caption-label`, `<figure markdown="1"
+  class="ts-table">` around a pipe table as written, `<table
+  data-ts-table="1" markdown="block">` with `<td markdown="span">` cells
+  for a `yaml table` (verified: `md_in_html` reads cells only when
+  `table`, `thead`/`tbody` and `tr` carry `markdown="block"`, which
+  settles web-profile open question 3), `<div class="ts-equation"
+  markdown="1">` around display math, `<div class="admonition …"
+  markdown="1">` or `<details>` for a numbered or labelled callout,
+  `<aside class="ts-aside" markdown="1">` for a block aside and `<span
+  class="ts-aside">` for an inline one (an `<aside>` at the start of a
+  paragraph would open an HTML block), `<span class="ts-counter" id=…
+  data-counter data-key>`, `<span class="ts-index" data-tag…>`,
+  `<span class="ts-smallcaps">`, `<u>`, `<span id class lang data-*>`,
+  `<abbr title>` for a glossary term;
+- Markdown for references: `[FW-10](#fw:x)`, `[Figure 3](#fig:x)`,
+  `[Figures 3 and 4](#fig:a)` for a group of one series, `[title](#sec:x)`
+  (or `[Section 2]` with `sections: Number`), `[label](location)` for a
+  `Resolution::Sibling`, `[?key]` unresolved, `[doi:…](https://doi.org/…)`;
+  citations as `(<a class="ts-cite" href="#ref-key">Author Year</a>)` in
+  the HTML writer's author-year style (`common::refs::author_year`,
+  `html::bibliography_entry`) with a `## References` list appended to the
+  page and returned alone in `Lowered.bibliography`, or Pandoc `[@key]`
+  with `citations: Passthrough`;
+- `!!! type cls "title"` (`???`, `???+` when `collapsed`) for a `:::`
+  callout the `!!!` line can carry, its body re-indented by `Out`;
+- the lowered text of the included file for `{include}(f)` (its
+  `Document` from `Resolved.included`, its text from the `Loader`, its own
+  labels and numbers from the same `Resolved`); `--8<--` stays for
+  `snippets`;
+- the empty string for `media=print`, raw LaTeX/Typst, a consumed caption
+  line or `yaml table-config`; a removed inline takes one adjacent space
+  with it (the zero-width collapse). `media=web` unwraps.
+
+Numbers are the resolution's (`html::number_labels`, shared with the HTML
+writer: a document-order count stands in for a series the resolution did
+not number), sub-figures take the figure's number and a letter (`3b`).
+The label word comes from the counter (`Resolved::lang` localises the
+predeclared ones); the lowering's own words (`and`, `References`) follow
+`WebOptions::lang`, then the resolution's language.
+
+Nesting: a whole-block replacement is re-indented for the line it is
+spliced on (the text before the block on its line, list markers turned
+into spaces, `>` kept), and a block kept as written inside a lowered
+wrapper has that prefix removed from its continuation lines before `Out`
+adds the wrapper's own. Inline spans that are not the text's (a title
+parsed from an attribute value, a `yaml table` cell) are detected — every
+`Str` must read back from its span — and printed instead of sliced.
+
+Deviations from the per-construct table, taken here: the inline aside is
+a `<span class="ts-aside">` (see above); the `data-ts-table` attribute
+carries the value `1` (`md_in_html` re-serialises a bare attribute as
+`data-ts-table="data-ts-table"`); the figure wrapper carries the id and
+the image is reprinted without it, so a page has one element per id; a
+captioned float without a label stays unnumbered (design 06 §Site-wide
+resolution leaves the choice to the lowering: a synthetic id would drift
+from the print numbering). Not lowered: `media=web` on a block other than
+a heading (the attribute reaches `attr_list`, harmless); the blank lines
+left where a caption or configuration was emptied stay (Markdown ignores
+them). `Lowered.diagnostics` carries only what the lowering itself found
+(an include the resolution did not parse); `ref-unresolved` and
+`include-missing` are the resolution's.
+
+Tests: `tests/web.rs` snapshots every conformance fixture (`web__*`), a
+document exercising every row of the table with one assertion per row,
+the mkdocstrings case (`spec/conformance/container-dotted.md`: an
+unclosed `::: pkg.mod` whose bytes stay while the prose after it is
+lowered; its `container-unknown` and `container-unclosed` are `info` for
+a dotted name), sibling labels, `sections: Number`, `citations:
+Passthrough`, a French `and`, a custom `css_prefix`, and that plain
+CommonMark with `!!!`, tabs and macros comes back byte for byte.
+
 ## Implementation notes (milestone 4)
 
 State of `crates/tmark-writers` at the end of the first M4 writers pass

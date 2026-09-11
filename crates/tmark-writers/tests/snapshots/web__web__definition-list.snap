@@ -1,0 +1,12 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Term
+:   Definition, indented continuation lines aligned.
+
+    Second paragraph of the definition.
+:   Second definition.
+
+Other
+:   Its definition.

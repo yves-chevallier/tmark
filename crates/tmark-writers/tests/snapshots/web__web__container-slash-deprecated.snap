@@ -1,0 +1,20 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="span" id="fig:melting">
+![Melting](mozzarella.svg){width=80%}
+<figcaption markdown="span"><span class="ts-caption-label">Figure 1:</span> Melting behavior of high-moisture cheese
+upon heating</figcaption>
+</figure>
+
+
+
+<figure markdown="1" class="ts-table" id="tbl:samples">
+<figcaption markdown="span"><span class="ts-caption-label">Table 1:</span> Hard cheese samples</figcaption>
+
+| Cheese | Age |
+| ------ | --- |
+| Comté  | 18  |
+
+</figure>

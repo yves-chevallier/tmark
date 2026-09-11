@@ -1,0 +1,12 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="1" class="ts-listing" id="lst:bubble">
+
+```python title="bubble_sort.py" linenums="1" hl_lines="2-3"
+def bubble_sort(items): ...
+```
+
+<figcaption markdown="span"><span class="ts-caption-label">Listing 1:</span> Bubble sort, naive version.</figcaption>
+</figure>

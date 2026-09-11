@@ -964,6 +964,7 @@ dependencies = [
  "insta",
  "serde",
  "serde_json",
+ "tmark-fmt",
  "tmark-ir",
  "tmark-registry",
  "tmark-syntax",

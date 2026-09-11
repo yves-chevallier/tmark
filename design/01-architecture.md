@@ -32,7 +32,7 @@ upward. A crate may only use the public API of the crates below it.
 | `tmark-registry` | Builds the registries from the front matter, the document and, through `Loader`, included files and external sources (`.bib`, `refs.json`). Resolves `@` and `#`. | `tmark-ir`, `tmark-syntax` | `06-registries.md` |
 | `tmark-fmt` | Canonical printer and profiles; local edit splicing. | `tmark-ir`, `tmark-syntax` (for idempotence tests) | `04-printer.md` |
 | `tmark-lint` | Rule catalogue over IR + registries; produces `Diagnostic`s. | `tmark-ir`, `tmark-registry` | `05-diagnostics.md` |
-| `tmark-writers` | `Writer` trait and three implementations: `html`, `latex`, `typst` (the CommonMark output is a `tmark-fmt` profile, review C4). Emit a body plus `Requires` and a source map. | `tmark-ir`, `tmark-registry` | `07-writers.md` |
+| `tmark-writers` | `Writer` trait and three implementations: `html`, `latex`, `typst` (the CommonMark output is a `tmark-fmt` profile, review C4). Emit a body plus `Requires` and a source map. Also `mkdocs::lower_web`, the web lowering of a MkDocs page: local splices over the source through `tmark-fmt`'s `edit_many` and `Mkdocs` profile (§Web lowering of `07-writers.md`). | `tmark-ir`, `tmark-registry`, `tmark-fmt` | `07-writers.md` |
 | `tmark` | Facade. The one crate downstream users depend on. Re-exports and a handful of pipeline functions. | all of the above | this document |
 | `tmark-cli` | `tmark parse|fmt|lint|write|check`. Filesystem `Loader`. | `tmark` | `09-bindings.md` |
 | `tmark-lsp` | Language server over stdio. Filesystem `Loader`, document store, incremental re-parse. | `tmark` | `08-lsp.md` |

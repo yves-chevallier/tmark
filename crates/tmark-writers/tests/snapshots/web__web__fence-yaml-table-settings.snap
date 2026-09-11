@@ -1,0 +1,28 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<table class="ts-table" data-ts-table="1" markdown="block">
+<thead markdown="block">
+<tr markdown="block">
+<th markdown="span">Category</th>
+<th markdown="span" style="text-align: right">Q1</th>
+<th markdown="span" style="text-align: right">Q2</th>
+</tr>
+</thead>
+<tbody markdown="block">
+<tr markdown="block">
+<td markdown="span">Salaries</td>
+<td markdown="span" style="text-align: right">120</td>
+<td markdown="span" style="text-align: right">122</td>
+</tr>
+<tr class="ts-separator ts-double"><td colspan="3"><em>Totals</em></td></tr>
+</tbody>
+<tfoot markdown="block">
+<tr markdown="block">
+<td markdown="span">Total</td>
+<td markdown="span" style="text-align: right">120</td>
+<td markdown="span" style="text-align: right">122</td>
+</tr>
+</tfoot>
+</table>

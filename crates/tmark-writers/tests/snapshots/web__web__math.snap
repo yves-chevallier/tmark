@@ -1,0 +1,15 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Inline $a^2$ and $b^2$.
+
+$$
+a^2 + b^2 = c^2
+$$
+
+<div id="eq:einstein" class="ts-equation" markdown="1">
+$$
+e = mc^2
+$$
+</div>

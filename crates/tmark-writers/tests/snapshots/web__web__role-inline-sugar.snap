@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Some ==marked==, ~~deleted~~, H~2~O, E=mc^2^, ++ctrl+alt+s++, **bold** and *emph*.

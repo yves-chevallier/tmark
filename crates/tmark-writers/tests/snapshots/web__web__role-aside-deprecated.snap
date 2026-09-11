@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Hooke's law <span class="ts-aside" data-side="left">linear only</span> holds.
