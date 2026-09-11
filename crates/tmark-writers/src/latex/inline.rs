@@ -10,7 +10,7 @@ use tmark_registry::Resolution;
 
 use super::escape;
 use super::Latex;
-use crate::common::{abbr, fragments, media, refs, text, zero};
+use crate::common::{abbr, media, refs, text, zero};
 use crate::{CodeEngine, Media};
 
 /// Zero-width inlines (spec §Attributes): comments, index entries, asides,
@@ -80,7 +80,7 @@ impl Latex<'_> {
                 self.wrap("uline", &n.content);
             }
             Inline::Highlight(n) => {
-                self.req.fragment(fragments::TYPESETTING);
+                self.req.fragment("ts-typesetting");
                 self.wrap("tsmark", &n.content);
             }
             Inline::Subscript(n) => self.wrap("textsubscript", &n.content),
@@ -139,7 +139,7 @@ impl Latex<'_> {
     /// (`formatter.py:150-170`); a language is dropped under
     /// `inline_plain`.
     fn code(&mut self, lang: Option<&str>, code: &str) {
-        self.req.fragment(fragments::CODE);
+        self.req.fragment("ts-code");
         let lang = if self.opts.code.inline_plain {
             None
         } else {
@@ -212,7 +212,7 @@ impl Latex<'_> {
             *written += 1;
             let command = if n.bracketed { "cite" } else { "textcite" };
             if !n.bracketed {
-                this.req.fragment(fragments::BIBLIOGRAPHY);
+                this.req.fragment("ts-bibliography");
             }
             this.out
                 .push(&format!("\\{command}{{{}}}", pending.join(",")));
@@ -241,7 +241,7 @@ impl Latex<'_> {
                     "textcite"
                 };
                 if !n.bracketed {
-                    self.req.fragment(fragments::BIBLIOGRAPHY);
+                    self.req.fragment("ts-bibliography");
                 }
                 self.out.push(&format!("\\{command}"));
                 match (&item.prefix, &item.suffix) {
@@ -306,7 +306,7 @@ impl Latex<'_> {
                     }
                 }
                 Resolution::Glossary { term } => {
-                    self.req.fragment(fragments::GLOSSARY);
+                    self.req.fragment("ts-glossary");
                     self.req.package("glossaries");
                     self.out
                         .push(&format!("\\tsgls{{{}}}", escape::escape(&term)));
@@ -389,7 +389,7 @@ impl Latex<'_> {
     /// `extensions/index/renderer.py`): the sort key is the plain text,
     /// emitted only when the formatted entry differs.
     fn index_entry(&mut self, n: &IndexEntry) {
-        self.req.fragment(fragments::INDEX);
+        self.req.fragment("ts-index");
         self.req.package("imakeidx");
         self.req
             .index
@@ -421,7 +421,7 @@ impl Latex<'_> {
     /// `\tskeys{Ctrl,Alt,Del}` with the label table; a literal comma is
     /// braced (fragment-contracts.md §1).
     fn keystroke(&mut self, n: &Keystroke) {
-        self.req.fragment(fragments::KEYSTROKES);
+        self.req.fragment("ts-keystrokes");
         let labels: Vec<String> = n
             .keys
             .iter()
@@ -440,7 +440,7 @@ impl Latex<'_> {
 
     /// `\tsaside[side=left]{…}`.
     fn aside(&mut self, n: &Aside) {
-        self.req.fragment(fragments::TYPESETTING);
+        self.req.fragment("ts-typesetting");
         let body = self.render_blocks_inline(&n.content);
         if body.is_empty() {
             return;
@@ -463,7 +463,7 @@ impl Latex<'_> {
             ));
         }
         if let Some(slug) = n.attrs.get("script") {
-            self.req.fragment(fragments::FONTS);
+            self.req.fragment("ts-fonts");
             self.out.push(&format!(
                 "\\tsscript{{{}}}{{{}}}",
                 escape::escape(slug),
@@ -472,7 +472,7 @@ impl Latex<'_> {
             return;
         }
         if n.attrs.get("emoji").is_some() {
-            self.req.fragment(fragments::FONTS);
+            self.req.fragment("ts-fonts");
             self.out.push("\\tsemoji{");
             self.out.push(&plain_text(&n.content));
             self.out.push("}");
@@ -522,7 +522,7 @@ impl Latex<'_> {
                 candidate
             }
         };
-        self.req.fragment(fragments::GLOSSARY);
+        self.req.fragment("ts-glossary");
         self.req.package("glossaries");
         self.req.acronym(&key);
         self.out.push(&format!("\\tsacr{{{key}}}"));

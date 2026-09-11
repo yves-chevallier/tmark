@@ -1,7 +1,6 @@
 //! Shared Unicode tables (dashes, quotes, super/subscript runs), the key
-//! labels of keystrokes, and the slug rules writers share
-//! (writers-and-passes.md §1 `common/text.rs`, fragment-contracts.md
-//! open question 2).
+//! label lookup, and the slug rules writers share (writers-and-passes.md
+//! §1 `common/text.rs`, fragment-contracts.md open question 2).
 
 /// `–`, `‒`, `—`, `―` → `--` / `---` (`escaper.py:232`).
 pub const DASHES: &[(char, &str)] = &[
@@ -137,60 +136,12 @@ pub fn lookup(table: &[(char, &'static str)], c: char) -> Option<&'static str> {
     table.iter().find(|(k, _)| *k == c).map(|(_, v)| *v)
 }
 
-/// Key names and their labels (`keystroke.tex`). TODO(registry): move to
-/// `tmark_ir::registry::KEY_LABELS` once `wt/registry` lands. Labels are
-/// plain text; a writer escapes them for its backend.
-pub const KEY_LABELS: &[(&str, &str)] = &[
-    ("control", "Ctrl"),
-    ("ctrl", "Ctrl"),
-    ("alt", "Alt"),
-    ("delete", "Del"),
-    ("del", "Del"),
-    ("enter", "⏎ Enter"),
-    ("shift", "⇧ Shift"),
-    ("slash", "/"),
-    ("comma", ","),
-    ("period", "."),
-    ("arrow-up", "↑"),
-    ("arrow-down", "↓"),
-    ("arrow-left", "←"),
-    ("arrow-right", "→"),
-    ("backslash", "\\"),
-    ("double-quote", "\""),
-    ("backspace", "⌫ Delete"),
-    ("command", "⌘"),
-    ("cmd", "⌘"),
-    ("tab", "Tab"),
-    ("esc", "Esc"),
-    ("escape", "Esc"),
-    ("insert", "Ins"),
-    ("home", "Home"),
-    ("end", "End"),
-    ("page-up", "PgUp"),
-    ("page-down", "PgDn"),
-    ("space", "Space"),
-    ("f1", "F1"),
-    ("f2", "F2"),
-    ("f3", "F3"),
-    ("f4", "F4"),
-    ("f5", "F5"),
-    ("f6", "F6"),
-    ("f7", "F7"),
-    ("f8", "F8"),
-    ("f9", "F9"),
-    ("f10", "F10"),
-    ("f11", "F11"),
-    ("f12", "F12"),
-];
-
-/// The label of a key: the table entry (case-insensitive), else the key
-/// upper-cased (`keystroke.tex`: `key|upper`).
+/// The label of a key: the registry row (`tmark_ir::registry::KEY_LABELS`,
+/// case-insensitive), else the key upper-cased (`keystroke.tex`:
+/// `key|upper`).
 pub fn key_label(key: &str) -> String {
-    let lower = key.trim().to_ascii_lowercase();
-    KEY_LABELS
-        .iter()
-        .find(|(k, _)| *k == lower)
-        .map(|(_, v)| (*v).to_string())
+    tmark_ir::registry::key_label(key.trim())
+        .map(|k| k.label.to_string())
         .unwrap_or_else(|| key.trim().to_uppercase())
 }
 

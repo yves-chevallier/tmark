@@ -9,7 +9,10 @@ expression: snapshot
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox"
+  ],
   "fragments": [
     "ts-code"
   ],

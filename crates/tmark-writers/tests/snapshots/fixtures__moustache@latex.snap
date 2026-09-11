@@ -6,7 +6,10 @@ Built with as but not \tscodeinline{\{\{ code \}\}}.
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox"
+  ],
   "fragments": [
     "ts-code"
   ],

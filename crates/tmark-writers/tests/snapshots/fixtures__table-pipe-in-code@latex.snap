@@ -16,7 +16,9 @@ expression: snapshot
 {
   "packages": [
     "booktabs",
-    "tabularx"
+    "fvextra",
+    "tabularx",
+    "tcolorbox"
   ],
   "fragments": [
     "ts-code"

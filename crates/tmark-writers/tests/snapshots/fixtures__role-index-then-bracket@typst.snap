@@ -6,7 +6,9 @@ expression: snapshot
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "imakeidx"
+  ],
   "fragments": [
     "ts-index"
   ],

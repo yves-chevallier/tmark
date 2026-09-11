@@ -17,7 +17,7 @@ use tmark_ir::{
 };
 use tmark_registry::Resolved;
 
-use crate::common::{abbr, fragments, media, Out};
+use crate::common::{abbr, media, Out};
 use crate::{Backend, Body, Media, Requires, Writer, WriterOptions};
 
 /// The Typst writer.
@@ -40,6 +40,7 @@ impl Writer for TypstWriter {
             abbr_keys: abbr::keys(doc),
         };
         w.blocks(&doc.blocks);
+        w.req.close();
         let (text, map) = w.out.finish();
         Body {
             text,
@@ -114,7 +115,7 @@ impl Typst<'_> {
             Block::OrderedList(l) => self.ordered_list(l),
             Block::DefinitionList(d) => self.definition_list(d),
             Block::HorizontalRule(_) => {
-                self.req.fragment(fragments::TYPESETTING);
+                self.req.fragment("ts-typesetting");
                 self.out.push("#ts-divider()\n");
             }
             Block::Table(t) => self.table(t, config, caption),
@@ -164,7 +165,7 @@ impl Typst<'_> {
             _ => {}
         }
         if let Some(lead) = &p.lead {
-            self.req.fragment(fragments::TYPESETTING);
+            self.req.fragment("ts-typesetting");
             self.out.push("#ts-lead[");
             self.inlines(lead);
             self.out.push("] ");
@@ -198,20 +199,26 @@ impl Typst<'_> {
     }
 
     /// A bare fence when the block carries no option, else `#ts-code(…)`
-    /// around the fence.
+    /// around the fence with the label after the call.
     fn code_block(&mut self, c: &CodeBlock, caption: Option<&Caption>) {
         let body = c.text.trim_end_matches('\n');
         let fence = escape::fence_for(body);
         let lang = c.lang.as_deref().filter(|l| *l != "text").unwrap_or("");
         let args = self.code_args(&c.options, caption);
-        if args.is_empty() {
+        let labelled = c.options.id().is_some() || caption.is_some_and(|c| c.attrs.id().is_some());
+        if args.is_empty() && !labelled {
             self.out.push(&format!("{fence}{lang}\n{body}\n{fence}\n"));
             return;
         }
-        self.req.fragment(fragments::CODE);
+        self.req.fragment("ts-code");
         self.out.push(&format!("#ts-code({})[\n", args.join(", ")));
         self.out.push(&format!("{fence}{lang}\n{body}\n{fence}\n"));
-        self.out.push("]\n");
+        self.out.push("]");
+        // The label attaches to the element the call returns.
+        if let Some(id) = c.options.id().or(caption.and_then(|c| c.attrs.id())) {
+            self.out.push(&format!(" <{}>", escape::label(id)));
+        }
+        self.out.push("\n");
     }
 
     /// `title`, `linenums`, `hl_lines`, `id`, the caption, other attributes.
@@ -236,9 +243,6 @@ impl Typst<'_> {
             if !ranges.is_empty() {
                 args.push(format!("hl-lines: ({},)", ranges.join(", ")));
             }
-        }
-        if let Some(id) = options.id().or(caption.and_then(|c| c.attrs.id())) {
-            args.push(format!("id: \"{}\"", escape::label(id)));
         }
         if let Some(caption) = caption {
             let text = self.render_inlines(&caption.content);
@@ -276,7 +280,7 @@ impl Typst<'_> {
     }
 
     fn epigraph(&mut self, content: &[Block], source: Option<&str>) {
-        self.req.fragment(fragments::TYPESETTING);
+        self.req.fragment("ts-typesetting");
         self.out.push("#ts-epigraph");
         if let Some(source) = source {
             self.out
@@ -294,7 +298,7 @@ impl Typst<'_> {
             self.out.push("- ");
             match item.task {
                 Some(task) => {
-                    self.req.fragment(fragments::TODOLIST);
+                    self.req.fragment("ts-todolist");
                     let state = match task {
                         Task::Open => "open",
                         Task::Done => "done",
@@ -344,7 +348,7 @@ impl Typst<'_> {
         let (first, rest) = match content.split_first() {
             Some((Block::Para(p), rest)) => {
                 if let Some(lead) = &p.lead {
-                    self.req.fragment(fragments::TYPESETTING);
+                    self.req.fragment("ts-typesetting");
                     self.out.push("#ts-lead[");
                     self.inlines(lead);
                     self.out.push("] ");
@@ -390,7 +394,7 @@ impl Typst<'_> {
 
     /// `#ts-callout(kind: "note", title: […], id: "x", collapsed: true)[…]`.
     fn admonition(&mut self, a: &Admonition) {
-        self.req.fragment(fragments::CALLOUTS);
+        self.req.fragment("ts-callouts");
         let mut args = vec![format!("kind: \"{}\"", escape::string(&a.kind))];
         if let Some(title) = &a.title {
             let title = self.render_inlines(title);
@@ -404,9 +408,8 @@ impl Typst<'_> {
         self.out.push("]\n");
     }
 
-    /// `Div{name}`: `epigraph`, `code` (nothing to show: the LaTeX
-    /// highlight payload), `typst` (slash raw block shim), else
-    /// `#ts-div("name", key: value)[…]`.
+    /// `Div{name}`: `epigraph`, `code` (the fence when the highlight pass
+    /// kept it), else `#ts-div("name", key: value)[…]`.
     fn div(&mut self, d: &Div, caption: Option<&Caption>) {
         match d.name.as_str() {
             "epigraph" => self.epigraph(&d.content, d.attrs.get("source")),
@@ -419,25 +422,8 @@ impl Typst<'_> {
                     }
                 }
             }
-            "typst" => {
-                for block in &d.content {
-                    match block {
-                        Block::Para(p) => {
-                            self.out.push(&plain_text(&p.content));
-                            self.out.ensure_newline();
-                        }
-                        Block::Plain(p) => {
-                            self.out.push(&plain_text(&p.content));
-                            self.out.ensure_newline();
-                        }
-                        Block::RawBlock(r) if r.format == "typst" => self.raw_block(r),
-                        _ => {}
-                    }
-                }
-            }
-            "latex" | "html" => {}
             name => {
-                self.req.fragment(fragments::TYPESETTING);
+                self.req.fragment("ts-typesetting");
                 let mut args = vec![format!("\"{}\"", escape::string(name))];
                 args.extend(attr_args(&d.attrs, &[]));
                 self.out.push(&format!("#ts-div({})[\n", args.join(", ")));
@@ -454,7 +440,7 @@ impl Typst<'_> {
             self.req.package(math::MITEX_PACKAGE);
         }
         if rendered.labelled {
-            self.req.fragment(fragments::EQUATIONS);
+            self.req.fragment("ts-equations");
         }
         self.out.push(&rendered.text);
         self.out.push("\n");
@@ -632,7 +618,7 @@ impl Typst<'_> {
                 Block::Para(p) => {
                     let mut s = String::new();
                     if let Some(lead) = &p.lead {
-                        self.req.fragment(fragments::TYPESETTING);
+                        self.req.fragment("ts-typesetting");
                         s.push_str(&format!("#ts-lead[{}] ", self.render_inlines(lead)));
                     }
                     s.push_str(&self.render_inlines(&p.content));

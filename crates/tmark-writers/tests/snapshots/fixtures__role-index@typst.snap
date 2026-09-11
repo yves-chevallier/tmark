@@ -6,7 +6,9 @@ Bytes#ts-index([endianness]) and#ts-index([byte order], [endianness]) and#ts-ind
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "imakeidx"
+  ],
   "fragments": [
     "ts-index"
   ],

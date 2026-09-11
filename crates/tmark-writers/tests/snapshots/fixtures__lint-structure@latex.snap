@@ -26,8 +26,14 @@ expression: snapshot
 {
   "packages": [
     "booktabs",
+    "epigraph",
     "float",
-    "tabularx"
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "tabularx",
+    "xcolor"
   ],
   "fragments": [
     "ts-typesetting"

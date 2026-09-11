@@ -147,11 +147,26 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   `blank_line` never doubles), `zero.rs` (the zero-width collapse, shared),
   `media.rs`, `refs.rs` (template rendering, `[?key]`, label word
   capitalisation, `Resolved` lookups), `text.rs` (dash/quote/script tables,
-  `KEY_LABELS`, `slugify`, `acronym_key`, ASCII fold), `abbr.rs`
-  (whole-word acronym substitution in `Str`, see below), `fragments.rs`
-  (the contract names as constants — **TODO** switch to
-  `tmark_ir::registry::FRAGMENTS` when `wt/registry` lands; the names are
-  the `press.fragments` spellings and must stay identical).
+  `key_label` over `tmark_ir::registry::KEY_LABELS`, `slugify`,
+  `acronym_key`, ASCII fold), `abbr.rs` (whole-word acronym substitution
+  in `Str`, see below). Fragment names are written as the registry
+  spells them; `Requires::fragment` asserts the row exists in debug
+  builds, and `Requires::close` (called once per body) merges the
+  `packages` and `shell_escape` of every named row of
+  `tmark_ir::registry::FRAGMENTS` into `Requires.packages`.
+- `assets/texsmith.typ`, exposed as `tmark_writers::TEXSMITH_TYP`: a
+  default definition for every `#ts-…` function the Typst writer emits
+  (`ts-lead`, `ts-divider`, `ts-epigraph`, `ts-aside`, `ts-div`,
+  `ts-callout`, `ts-code`, `ts-task`, `ts-keys`, `ts-gls`, `ts-acr`,
+  `ts-index`, `ts-script`, `ts-emoji`, `ts-page`). TeXSmith writes it next
+  to the `.typ`; a body compiles with `#import "texsmith.typ": *` (plus
+  the `mitex` import when `Requires.packages` names it, and `#set
+  math.equation(numbering: …)` when `ts-equations` is required) in front
+  of it. Checked with typst 0.15.1 on the examples: 46 of 52 bodies
+  compile; the six that do not fail on remote or unconverted images
+  (`book`, `markdown/features`, `diagrams`, `mermaid`: the assets pass),
+  on a `#cite` without a `#bibliography` (`paper`: the template) and on
+  `mitex` rejecting `\imath` (`math`: pre-existing, `baseline.md`).
 - `html/`: the `<article>` innerHTML, one function per node, `data-src`
   only when `source_map` is on, labels numbered in document order (the
   web has no backend counter; sub-figure images take no number),
@@ -224,10 +239,14 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   `press.declare.acronyms`). When the parser emits `Abbr`, the helper
   finds nothing and can be deleted. `examples/abbr` and
   `examples/glossary` render `\tsacr` with this.
-- `Div{name=latex|typst|html}` is rendered as raw text of its paragraphs
-  by the matching backend: a shim for the `/// latex` slash blocks the
-  parser still lowers to a container (deprecation `slash-raw-block`, on
-  the `wt/fixes` list). Delete when the parser lowers them to `RawBlock`.
+- A `Listing: …` caption line on a fence is passed to `tscode` as
+  `caption={…}` (and to `#ts-code` as `caption: […]`); the key is in
+  fragment-contracts.md §5. The Typst writer writes the label after the
+  call (`#ts-code(…)[…] <lst:x>`), never as an argument, so it attaches
+  to the figure the function returns.
+- `ts-equations` is a row of `FRAGMENTS` with no macro and no package:
+  the Typst writer names it when an equation label was emitted so the
+  template numbers equations (writers-and-passes.md §4).
 - `WriterOptions.latex.legacy_accents` is accepted and ignored (the
   `pylatexenc` path has no Rust twin; engines read UTF-8).
 - The Greek subscript entries map to `\beta` etc. as the legacy table did
@@ -242,10 +261,7 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
 
 ### What is next
 
-1. Switch `common/fragments.rs` to `tmark_ir::registry::FRAGMENTS` and
-   `KEY_LABELS` once `wt/registry` merges; add a test that every
-   fragment name the writers emit is a row of the table.
-2. Run the TeXSmith parity harness (`scripts/parity.py --reader tmark`)
+1. Run the TeXSmith parity harness (`scripts/parity.py --reader tmark`)
    and triage: expected differences are `\item{}` → `\item`, the
    zero-width spacing, `\clearpage` → `\tsdivider`, `\index` →
    `\tsindex`, `\acrshort` → `\tsacr`, `\marginnote` → `\tsaside`,
@@ -254,22 +270,19 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
 3. `Requires.assets` for generated images (`Image` with empty `src` and
    `generate=`): the writers emit nothing for them today; decide with the
    assets pass whether the writer should still list them.
-4. Listing captions: `tscode` receives `caption={…}`; the fragment
-   contract of fragment-contracts.md §5 does not list that key yet — add
-   it there or drop it here.
-5. Typst: `#ts-page(<id>)` for `{page}` in a textual template and
-   `#ts-task`, `#ts-acr`, `#ts-code`, `#ts-index`, `#ts-anchor`-less
-   anchors (`#metadata(none) <id>`) need their `texsmith.typ`
-   definitions on TeXSmith's side; nothing here compiles a `.typ` yet.
-6. Typst preview in the LSP (ADR 0005) and the source-map consumers
+4. `texsmith.typ`: `ts-acr` and `ts-gls` show the key/term (no glossary
+   table yet), `ts-index` is a no-op, `ts-aside` places the note in the
+   margin with a fixed offset; a template restyles them. Nothing in this
+   repository runs `typst` in CI; the check above was manual.
+5. Typst preview in the LSP (ADR 0005) and the source-map consumers
    (`%` line markers, SyncTeX sidecar) are untouched.
-7. The CommonMark failures are IR-level: list tightness is not in the IR
+6. The CommonMark failures are IR-level: list tightness is not in the IR
    (an `Item`/`List` `tight` flag would fix ~15 examples), URL
    percent-encoding and entity decoding, raw HTML blocks dropped, tabs
    in indented code. None is a writer bug.
-8. Table validation (X9, `wt/tables`): once nested per-group cells and
-   mapping rows parse, `examples/tables` renders through the model path;
-   today those fences fall back to code blocks in the parser.
+7. `examples/tables` now renders through the model path (X9 merged);
+   a fence the parser rejected keeps `Table.source`, which the writers
+   ignore (the best-effort model is written).
 
 ### Pitfalls
 

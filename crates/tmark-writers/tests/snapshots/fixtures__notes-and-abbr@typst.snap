@@ -6,7 +6,9 @@ The #ts-acr("HTML") spec#footnote[The living standard.] is maintained by the #ts
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "glossaries"
+  ],
   "fragments": [
     "ts-glossary"
   ],

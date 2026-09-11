@@ -16,7 +16,10 @@ print(1)
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox"
+  ],
   "fragments": [
     "ts-code"
   ],

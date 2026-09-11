@@ -8,7 +8,10 @@ def bubble_sort(items): ...
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox"
+  ],
   "fragments": [
     "ts-code"
   ],

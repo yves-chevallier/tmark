@@ -12,7 +12,10 @@ Shown by default.
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "tcolorbox",
+    "xcolor"
+  ],
   "fragments": [
     "ts-callouts"
   ],

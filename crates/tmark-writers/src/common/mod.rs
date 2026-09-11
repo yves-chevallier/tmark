@@ -4,7 +4,6 @@
 //! a base class."
 
 pub mod abbr;
-pub mod fragments;
 pub mod media;
 pub mod out;
 pub mod refs;

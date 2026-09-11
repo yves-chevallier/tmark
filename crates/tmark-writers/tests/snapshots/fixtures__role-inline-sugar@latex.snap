@@ -7,7 +7,14 @@ Some \tsmark{marked}, \sout{deleted}, H\textsubscript{2}O, E=mc\textsuperscript{
 ---requires---
 {
   "packages": [
-    "ulem"
+    "epigraph",
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "tikz",
+    "ulem",
+    "xcolor"
   ],
   "fragments": [
     "ts-keystrokes",

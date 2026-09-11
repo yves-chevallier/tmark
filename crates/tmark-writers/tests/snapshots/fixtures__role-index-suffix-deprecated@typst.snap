@@ -6,7 +6,9 @@ Relativity#ts-index([relativity], main: true) and#ts-index([Einstein], [_papers_
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "imakeidx"
+  ],
   "fragments": [
     "ts-index"
   ],
