@@ -8,7 +8,9 @@
 mod config;
 
 pub use config::Config;
-pub use tmark_fmt::{edit, format, print_node, NodeEdit, Profile, Replacement};
+pub use tmark_fmt::{
+    edit, edit_many, format, print_node, EditError, NodeEdit, Profile, Replacement,
+};
 pub use tmark_ir as ir;
 pub use tmark_ir::schema;
 pub use tmark_ir::{Diagnostic, Document, FileId};

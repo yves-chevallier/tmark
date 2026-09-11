@@ -15,3 +15,7 @@ tmark-ir = { path = "../tmark-ir" }
 tmark-syntax = { path = "../tmark-syntax" }
 # Scratch example and JSON dumps in tests.
 serde_json = { workspace = true }
+# Property tests: edit_many splices are the identity on canonical text.
+proptest = { workspace = true }
+# Snapshots of the Mkdocs profile over the fixture corpus.
+insta = { workspace = true }

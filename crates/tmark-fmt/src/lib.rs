@@ -16,7 +16,7 @@ mod out;
 
 use tmark_ir::Document;
 
-pub use edit::{edit, print_node, NodeEdit, Replacement};
+pub use edit::{edit, edit_many, print_node, EditError, NodeEdit, Replacement};
 
 /// Which spellings the printer emits. Design `04-printer.md` §Profiles.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]

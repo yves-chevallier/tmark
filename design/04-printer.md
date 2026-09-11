@@ -70,8 +70,10 @@ Profiles are a *table* (construct → spelling function), not subclasses.
 ## Local edits
 
 ```rust
-pub struct NodeEdit { pub id: NodeId, pub replacement: Node }
+pub enum Replacement { Block(Block), Inline(Inline), Text(String) }
+pub struct NodeEdit { pub id: NodeId, pub replacement: Replacement }
 pub fn edit(text: &str, doc: &Document, edit: NodeEdit) -> String
+pub fn edit_many(text: &str, doc: &Document, edits: Vec<NodeEdit>) -> Result<String, EditError>
 ```
 
 Prints `replacement` in the context of its parent (block vs inline, current
@@ -79,6 +81,19 @@ indentation for nested blocks) and splices it into `doc[id].span`. Every
 other byte is untouched. This is how the LSP renames a label, rewrites a
 citation, converts sugar to canonical on a code action. A whole-document
 `format` is the same operation applied to the root.
+
+`edit_many` is the batch form: the spans are located first, sorted, and
+spliced from the end of the text so that earlier offsets stay valid. The
+spans must be disjoint; an unknown node (`NotFound`), a span outside the
+text or in another file (`OutOfRange`) or two edits that touch the same
+bytes (`Overlap`, which includes a node and one of its descendants) is an
+error and nothing is applied. `Replacement::Text` splices literal text: a
+lowering whose output has no IR node (the HTML wrappers of the MkDocs
+companion, `web-profile.md`) builds its edits with it. Property tests:
+splicing any set of disjoint nodes with their own source is the identity;
+splicing any set of top-level blocks of a canonical text with their own
+printed form is the identity (adjacent lists excepted: their alternating
+marker is a property of the sequence, not of one list).
 
 ## Implementation notes
 
