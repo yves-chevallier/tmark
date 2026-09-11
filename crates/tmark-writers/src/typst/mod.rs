@@ -153,7 +153,8 @@ impl Typst<'_> {
 
     fn para(&mut self, p: &Para, caption: Option<&Caption>) {
         match p.content.as_slice() {
-            [Inline::Image(image)] => {
+            // An icon (`Image{.icon}`) is never a figure.
+            [Inline::Image(image)] if !image.attrs.has_class("icon") => {
                 self.figure_image(image, caption, None);
                 return;
             }

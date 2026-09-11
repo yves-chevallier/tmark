@@ -356,6 +356,13 @@ impl Typst<'_> {
         });
         self.out.begin(n.meta.id);
         let src = escape::string(crate::latex::figure_src(&n.src));
+        if n.attrs.has_class("icon") {
+            // `\tsicon{path}`: an inline icon the height of the line.
+            self.out
+                .push(&format!("#box(image(\"{src}\"), height: 1em)"));
+            self.out.end(n.meta.id);
+            return;
+        }
         let width = n.attrs.get("width").map(|w| {
             if w.ends_with('%') || w.parse::<f64>().is_err() {
                 w.to_string()

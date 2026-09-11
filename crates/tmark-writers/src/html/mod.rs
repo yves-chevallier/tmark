@@ -202,7 +202,9 @@ impl Html<'_> {
     fn para(&mut self, p: &Para, caption: Option<&Caption>) {
         match p.content.as_slice() {
             [Inline::Image(image)] => {
-                if caption.is_some() || !image.attrs.is_empty() {
+                // An icon (`Image{.icon}`) is never a figure.
+                if !image.attrs.has_class("icon") && (caption.is_some() || !image.attrs.is_empty())
+                {
                     self.figure_image(image, caption, &p.meta);
                 } else {
                     self.out.push(&format!("<p{}>", self.src(&p.meta)));

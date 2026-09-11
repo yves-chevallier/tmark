@@ -412,18 +412,30 @@ impl Latex<'_> {
         self.out.end(n.meta.id);
     }
 
-    /// An image in running text: `\includegraphics` without a float.
+    /// An image in running text: `\includegraphics` without a float; an
+    /// `Image{.icon}` (the emoji pass in artifact mode) is `\tsicon{path}`
+    /// (fragment-contracts.md §1, row `icon`).
     fn image_inline(&mut self, n: &Image) {
         if n.src.is_empty() {
             // A generated image the assets pass did not render.
             return;
         }
-        self.req.package("graphicx");
         self.req.assets.push(crate::AssetRef {
             src: n.src.clone(),
             node: n.meta.id,
             attrs: n.attrs.kv.clone(),
         });
+        if n.attrs.has_class("icon") {
+            self.req.fragment("ts-typesetting");
+            self.out.begin(n.meta.id);
+            self.out.push(&format!(
+                "\\tsicon{{{}}}",
+                escape::escape(super::figure::strip_theme_variant(&n.src))
+            ));
+            self.out.end(n.meta.id);
+            return;
+        }
+        self.req.package("graphicx");
         self.out.begin(n.meta.id);
         self.out.push(&format!(
             "\\includegraphics[width={}]{{{}}}",

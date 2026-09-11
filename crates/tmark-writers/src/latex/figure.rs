@@ -96,6 +96,14 @@ impl Latex<'_> {
             width(image.attrs.get("width"), "\\linewidth"),
             escape::escape(strip_theme_variant(&image.src))
         );
+        // A generated diagram (`generate=<lang>`, converted by the assets
+        // pass) may be wider than the text: `media.py:213`.
+        let include = if image.attrs.get("generate").is_some() {
+            self.req.package("adjustbox");
+            format!("\\adjustbox{{max width=\\textwidth}}{{{include}}}")
+        } else {
+            include
+        };
         let include = match link {
             Some(url) => format!("\\href{{{}}}{{{include}}}", escape::url(url)),
             None => include,
