@@ -379,6 +379,15 @@ pub fn destination(u: &str) -> String {
 
 /// `@key` when one plain item; `@[…]` otherwise (spec §Ref).
 fn reference(out: &mut Out, items: &[RefItem]) {
+    // The X4 guard: `@` fires only after a non-word character that is not
+    // one of `@/:.-` (spec §Lexical grammar). A reference printed right
+    // after such a character (`text.` then `[^key]`) gets a space.
+    if out
+        .last_char()
+        .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '@' | '/' | ':' | '.' | '-'))
+    {
+        out.push(" ");
+    }
     if let [item] = items {
         if item.prefix.is_none()
             && item.suffix.is_none()

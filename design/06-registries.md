@@ -136,10 +136,15 @@ reference), document links for includes.
 - Inventories are read from `sources.crossrefs`; a missing or invalid file
   is `crossref-inventory-missing`. The staleness check (`hash`) waits for
   the writer side in TeXSmith, which fixes the hash algorithm.
-- Footnote-versus-citation shadowing is not implemented: the GFM footnote
-  construct only forms a footnote reference when a definition exists, so a
-  `[^key]` citation never reaches the IR as a `Note`. The deprecated sugar
-  needs its own tokenizer rule if it is ever wanted (milestone 5, or never).
+- Footnote-versus-citation shadowing (decision X7, examples-migration
+  item 2): the tokenizer rule in `tmark_reference.rs` turns a `[^key]`
+  whose label has no `[^key]:` definition (and `^[k1,k2]` groups) into a
+  `Ref`, keyed on the *missing definition*, not on the bibliography (a
+  `.bib` given on the CLI is invisible to the parser). A defined label
+  wins and stays a `Note`, whatever the bibliography holds; the
+  `citation-shadowed-by-footnote` diagnostic for that case is still not
+  emitted. A `[^key]` that resolves nowhere is `ref-unresolved`, which is
+  the loud outcome the spec wants (P4).
 - Glossary terms come from `declare.glossary`, `declare.acronyms` (term to
   string or object with `name`/`description`) and the `*[KEY]: …` lines.
 

@@ -222,9 +222,23 @@ impl Lowerer {
                     }
                 }
                 Node::TmarkReference(n) => {
-                    let meta = self.meta_at(ctx, n.position.as_ref());
+                    let span = self.span(ctx, n.position.as_ref());
+                    let meta = self.meta(span);
                     let local = n.position.as_ref().map_or(0, |p| p.start.offset);
                     let (items, bracketed) = match n.value.strip_prefix('[') {
+                        // Deprecated `[^key]` citation (decision X7): one
+                        // item, the fix prints `@key`.
+                        Some(inner) if inner.starts_with('^') => {
+                            let key = inner[1..].trim_end_matches(']');
+                            let at = local + 2;
+                            let item = tmark_ir::RefItem {
+                                key: doi_key(key),
+                                key_span: SubSpan(self.span_of(ctx, at, at + key.len())),
+                                ..Default::default()
+                            };
+                            self.deprecated(span, "[^key]", "@key");
+                            (vec![item], true)
+                        }
                         Some(inner) => {
                             // Pandoc's `[@key, …]` import form carries `@` before
                             // each key; the item grammar is the same. The inner
@@ -237,6 +251,23 @@ impl Lowerer {
                                     (item.key_span.0.start as usize, item.key_span.0.end as usize);
                                 item.key_span = SubSpan(self.span_of(ctx, base + s, base + e));
                             }
+                            (items, true)
+                        }
+                        // Deprecated `^[k1,k2]` citation group: one item per
+                        // comma, the fix prints `@[k1; k2]` (or `@k1`).
+                        None if n.value.starts_with("^[") => {
+                            let inner = n.value[2..].trim_end_matches(']');
+                            let mut at = local + 2;
+                            let mut items = Vec::new();
+                            for key in inner.split(',') {
+                                items.push(tmark_ir::RefItem {
+                                    key: doi_key(key),
+                                    key_span: SubSpan(self.span_of(ctx, at, at + key.len())),
+                                    ..Default::default()
+                                });
+                                at += key.len() + 1;
+                            }
+                            self.deprecated(span, "^[k1,k2]", "@[k1; k2]");
                             (items, true)
                         }
                         None => (
@@ -884,12 +915,17 @@ pub(crate) fn trim_trailing_space(inlines: &mut Vec<Inline>) {
     }
 }
 
-/// `@https://doi.org/…` is sugar for `@doi:…` (spec §Cite).
+/// `@https://doi.org/…` is sugar for `@doi:…` (spec §Cite); a bare DOI
+/// (`10.<digits>/…`, only reachable through the deprecated citation forms)
+/// takes the `doi:` prefix too.
 fn doi_key(key: &str) -> String {
     for prefix in ["https://doi.org/", "http://doi.org/", "https://dx.doi.org/"] {
         if let Some(doi) = key.strip_prefix(prefix) {
             return format!("doi:{doi}");
         }
+    }
+    if key.starts_with("10.") && key.contains('/') {
+        return format!("doi:{key}");
     }
     key.to_string()
 }

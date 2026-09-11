@@ -62,7 +62,8 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Abbreviation `*[HTML]: …` | §Glossary | block | New construct, definition-only line; lowering records it in the document's abbreviation table and substitutes `Abbr` inlines. |
 | `!!! type "Title"`, `??? type` | §Admonition | block | New construct; body is the following indented block. Lowers to `Admonition` (same node as `::: type`). |
 | `/// name … ///` | deprecated | block | New construct, lowers like a container, diagnostic `deprecated`. |
-| Footnote `[^1]`, `[^1]:` | §Note | block+inline | GFM footnotes construct (vendored). Deprecated citation use (`[^key]` with no definition but a bibliography key) is decided in resolution, not parsing. |
+| Footnote `[^1]`, `[^1]:` | §Note | block+inline | GFM footnotes construct (vendored). |
+| Citation sugar `[^key]`, `^[k1,k2]` | deprecated (X7) | inline | `tmark_reference`: `[^key]` whose key is a citation key with no `[^key]:` definition, and `^[…]` holding comma-separated keys, tokenise as references; lowering gives a bracketed `Ref` and a `deprecated` fix (`@key`, `@[k1; k2]`; a bare DOI gets `doi:`). `^[` never opens a caret superscript. A numeric label (`[^1]`) or a defined one stays a footnote. |
 | Math `$…$`, `$$…$$`, `\(…\)`, `\[…\]` | §Math | inline/block | Vendored math construct plus the two LaTeX-habit delimiters. |
 | Moustache `{{ key }}` | §Front matter | lowering | Text scan in lowering; produces `Var` inline. Not inside code. |
 | Comment `<!-- -->` | §Comment | block/inline | HTML construct; lowering produces `Comment` for the comment form only, `RawInline`/`RawBlock` with `format = "html"` for other HTML. |
@@ -166,7 +167,12 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
   `Strong` first.
 - Not implemented yet, deliberately: grid tables (listing with lang
   `grid table`), critic markup, progress bars, wiki links, inline footnotes
-  `^[…]`, fancy list styles (milestone 5), and `Space` nodes (see 03).
+  `^[…]` (the spelling is still the deprecated citation group; a `^[…]`
+  that is not a key list is literal text), fancy list styles (milestone
+  5), and `Space` nodes (see 03).
+- The printer puts a space before a `Ref` that would otherwise follow a
+  word character or one of `@/:.-` (the X4 guard), so `tutor.^[key]`
+  prints as `tutor. @key`.
 - Strict profile: `__x__` is bold and `~x~` is literal; the rest of the
   Appendix-PyMdownX sugar is still accepted (milestone 5 completes the
   profile).

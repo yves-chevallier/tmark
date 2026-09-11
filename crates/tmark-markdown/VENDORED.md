@@ -26,5 +26,6 @@ edits the fork.
 - `src/construct/raw_flow.rs`: an attribute list after a closing math fence (`$$ {#eq:x}`) is accepted under `tmark_brace` and recorded as the fence meta.
 - `src/lib.rs`: `pub use util::tmark;` re-exports the TMark predicates for `tmark-syntax`.
 - `src/to_mdast.rs`: the meta of a closing math fence is attached to the node below the content buffer.
-- `src/construct/text.rs`: `[` tries the Pandoc citation form before the label starts.
+- `src/construct/text.rs`: `[` tries the Pandoc citation form, then the deprecated `[^key]` citation, before the label starts; `^` tries the deprecated `^[k1,k2]` citation before attention.
+- `src/construct/attention.rs`: `^[` never opens a superscript (decision X7; `tmark_reference.rs` owns the spelling).
 - `src/construct/frontmatter.rs`: the opening fence is only taken when a closing fence exists (upstream panics on `---\n\n> quote`).

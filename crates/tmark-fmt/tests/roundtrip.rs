@@ -128,3 +128,23 @@ fn spec_round_trips() {
     let failures = roundtrip("tmark.md", spec);
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
+
+/// A deprecated citation hugging the word before it prints with a space,
+/// because the X4 guard keeps `@` from firing after a word character or
+/// `.` (spec §Lexical grammar); the printed text parses back to the same
+/// references.
+#[test]
+fn hugging_citations_get_a_space() {
+    let text = "Slow to talk,^[ein05,AI2027] he said.[^ein05] Then^[10.1007/x] more.\n";
+    let doc = parse(text, FileId::default()).document;
+    let printed = format(&doc, Profile::Canonical);
+    assert_eq!(
+        printed,
+        "Slow to talk,@[ein05; AI2027] he said. @ein05 Then @doi:10.1007/x more.\n"
+    );
+    // The inserted space changes the `Str` text, so the sugar is not a
+    // strict round trip; the printed text is a fixed point that parses back
+    // to the same references.
+    let failures = roundtrip("citations", &printed);
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
