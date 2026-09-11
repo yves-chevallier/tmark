@@ -1,0 +1,37 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{center}
+\begin{tabular}{lllll}
+\toprule
+\multirow{2}{*}{Product} & \multicolumn{2}{c}{FY23} & \multicolumn{2}{c}{FY24} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+ & Q1 & Q2 & Q1 & Q2 \\
+\midrule
+Apples & 1 & 2 & 3 & 4 \\
+\midrule
+\addlinespace
+\multicolumn{5}{l}{\textit{Stone fruit}} \\
+\addlinespace
+Cherries &  & 5 &  &  \\
+2024 &  &  & 6 & 7 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+---requires---
+{
+  "packages": [
+    "booktabs",
+    "multirow"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

@@ -1,0 +1,32 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#figure(
+  image("trace.png", width: 60%),
+  caption: [The watchdog fires *twice*.],
+) <fig:plot>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "trace.png",
+      "node": 2,
+      "attrs": [
+        [
+          "width",
+          "60%"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

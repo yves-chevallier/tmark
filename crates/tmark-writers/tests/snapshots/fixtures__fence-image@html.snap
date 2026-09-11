@@ -1,0 +1,60 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<figure>
+<pre class="python">plt.plot([1, 2, 4, 8])</pre>
+</figure>
+<figure>
+<pre class="mermaid">flowchart LR
+  A --&gt; B</pre>
+</figure>
+<pre><code class="language-mermaid">flowchart LR
+  A --&gt; B
+</code></pre>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "",
+      "node": 2,
+      "attrs": [
+        [
+          "generate",
+          "python"
+        ],
+        [
+          "code",
+          "plt.plot([1, 2, 4, 8])"
+        ],
+        [
+          "include",
+          "plot.py"
+        ]
+      ]
+    },
+    {
+      "src": "",
+      "node": 4,
+      "attrs": [
+        [
+          "generate",
+          "mermaid"
+        ],
+        [
+          "code",
+          "flowchart LR\n  A --> B"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

@@ -123,3 +123,167 @@ map plus `Document` spans give output range → source span. Consumers:
 - Round-trip of the CommonMark writer through the parser: the `canonical`
   profile must be the fixed point of `04-printer.md` (the CommonMark writer
   *is* the printer; `tmark-writers::commonmark` re-exports `tmark-fmt`).
+
+## Implementation notes (milestone 4)
+
+State of `crates/tmark-writers` at the end of the first M4 writers pass
+(branch `wt/writers`), for whoever continues. Specification of the
+behaviour: TeXSmith's `specs/migration/writers-and-passes.md` (§1 layout
+and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
+`specs/migration/fragment-contracts.md` (§1, §3, §5) and `decisions.md`
+(X1–X4). Read those before this section.
+
+### What exists
+
+- `lib.rs`: `Writer`, `Backend` (`html`, `latex`, `typst`), `Media`,
+  `WriterOptions { media, lang, code {engine, inline_plain,
+  inline_breaks}, latex {legacy_accents}, headings {base_level, numbered},
+  refs {textual_print, textual_web}, numbering, typst {math}, source_map
+  }`, `Body { text, map, requires }`, `Requires` (design fields plus
+  `citations`, `acronyms`), `SourceMap` (serialises as `[[start, end,
+  node], …]`), `write(doc, res, backend, opts)`, `writer(backend)`. All
+  serde-derived: `tmark-py` and `tmark write --map` hand the JSON over.
+- `common/`: `out.rs` (the printer's `Out` plus `begin`/`end` map entries,
+  `blank_line` never doubles), `zero.rs` (the zero-width collapse, shared),
+  `media.rs`, `refs.rs` (template rendering, `[?key]`, label word
+  capitalisation, `Resolved` lookups), `text.rs` (dash/quote/script tables,
+  `KEY_LABELS`, `slugify`, `acronym_key`, ASCII fold), `abbr.rs`
+  (whole-word acronym substitution in `Str`, see below), `fragments.rs`
+  (the contract names as constants — **TODO** switch to
+  `tmark_ir::registry::FRAGMENTS` when `wt/registry` lands; the names are
+  the `press.fragments` spellings and must stay identical).
+- `html/`: the `<article>` innerHTML, one function per node, `data-src`
+  only when `source_map` is on, labels numbered in document order (the
+  web has no backend counter; sub-figure images take no number),
+  footnotes and an author-year bibliography appended, `<abbr>` for
+  acronyms. 564 of the 652 CommonMark examples render byte for byte
+  (`tests/commonmark.rs`, golden list asserted).
+- `latex/`: `mod.rs` (blocks), `inline.rs`, `figure.rs`, `table.rs`,
+  `escape.rs` (the `escaper.py` tables and order; no math scan of `Str`).
+- `typst/`: `mod.rs`, `inline.rs`, `table.rs`, `math.rs` (mitex),
+  `escape.rs`.
+- Facade `tmark::write` and re-exports; CLI `tmark write FILE --to
+  latex|typst|html [--media print|web] [--map]` (`--map` prints the whole
+  `Body` as JSON).
+- Tests: `tests/fixtures.rs` snapshots every `spec/conformance` fixture
+  per backend, text plus `Requires`, under `tests/snapshots/`
+  (`INSTA_UPDATE=always cargo test -p tmark-writers` regenerates; read
+  the diff). Unit tests for the escapers, tables layout, widths, math,
+  zero-width, slugs.
+
+### Construct coverage
+
+| Construct | LaTeX | Typst | HTML |
+| --- | --- | --- | --- |
+| Paragraphs, inline text, `\tslead` | done | done | done |
+| Headings (levels, `*`, `\label`, slug) | done | done | done (id only when explicit) |
+| Lists, tasks (`tstasklist`), definition lists | done | done | done (tightness approximated) |
+| Code (`tscode`, `\tscodeinline`, `Div{code}` X3) | done | done (`#ts-code`, `#raw`) | done |
+| Pipe and model tables | done | done | done |
+| Figures, sub-figures, captions, `\captionof` in a box | done | done | done |
+| Footnotes | done (`\par` joins paragraphs) | done | done |
+| References, citations, glossary, DOI, external | done | done | done |
+| Index (`\tsindex`) | done | done (`#ts-index`, no-op in `texsmith.typ`) | dropped (zero-width) |
+| Acronyms (`\tsacr`, key rule, `Requires.acronyms`) | done | done | done |
+| Counters | done | done | done |
+| Asides, admonitions, keystrokes | done | done | done |
+| Math (verbatim; `equation` + `\label` for an anchored block) | done | done (mitex) | done (MathJax delimiters) |
+| Links, anchors, textual template | done | done (`{page}` → `#ts-page`, not in the contract yet) | done |
+| Raw, comments, zero-width collapse, media | done | done | done |
+| `Div` dispatch (`epigraph`, `code`, `tsdiv`) | done | done | done |
+| `Include`, `\tsdivider` | done | done | done |
+| Scripts, emoji (`\tsscript`, `\tsemoji`) | done, untested on a corpus | done | plain spans |
+| Progress bars | not started (no IR node) | — | — |
+| `multicolumn`/`tab` containers | via `tsdiv` | via `#ts-div` | `<div>` |
+
+### Decisions taken here (not in the notes)
+
+- Blocks are separated by exactly one blank line in every backend; the
+  legacy `\n` join with per-emitter trailing newlines is not reproduced
+  (parity normalisation collapses blank runs anyway).
+- `\ref` and `\hyperref` use the label *as defined* (`Labels::get(key).id`),
+  because TMark matches keys case-insensitively and LaTeX does not.
+- A backend-numbered reference renders the `ref` template with
+  `{number}` → `\ref{key}` and a `~` between name and number
+  (`Figure~\ref{fig:x}`); a TMark-numbered one renders the text inside
+  `\hyperref[key]{…}`. A capitalised prefix capitalises the label word;
+  a lower-case one keeps the declared word.
+- Citations: a bracketed group → `\cite{k1,k2}` (locators as
+  `\cite[pre][post]{k}`), a bare `@key` → `\textcite{key}` (and
+  `ts-bibliography` in `Requires.fragments` for the fallback),
+  `-@key` → `\citeyear`. Typst: `#cite(<k>, form: "prose")` for bare.
+- An `Image` alone in a paragraph is a figure; its alt is the caption when
+  no caption line follows (legacy `render_images`), and the short caption
+  when one does and the alt is not longer. Inside `tscallout`/`tscode`
+  the figure is `center` + `\captionof{figure}`.
+- `::: figure` with several images → `subfigure` (package `subcaption`),
+  `cols` per row; Typst uses a `grid`.
+- The acronym substitution lives in the writers (`common/abbr.rs`): the
+  parser fills `Document.abbreviations` but emits no `Abbr` node, so
+  `Str` runs are split at whole-word keys (`*[X]:` and
+  `press.declare.acronyms`). When the parser emits `Abbr`, the helper
+  finds nothing and can be deleted. `examples/abbr` and
+  `examples/glossary` render `\tsacr` with this.
+- `Div{name=latex|typst|html}` is rendered as raw text of its paragraphs
+  by the matching backend: a shim for the `/// latex` slash blocks the
+  parser still lowers to a container (deprecation `slash-raw-block`, on
+  the `wt/fixes` list). Delete when the parser lowers them to `RawBlock`.
+- `WriterOptions.latex.legacy_accents` is accepted and ignored (the
+  `pylatexenc` path has no Rust twin; engines read UTF-8).
+- The Greek subscript entries map to `\beta` etc. as the legacy table did
+  (`escaper.py:223`, latent bug reproduced for parity; fix both sides).
+- HTML `id`s on headings only when written; auto-slugs are LaTeX/Typst
+  labels only (open question b: `python-slugify` on the plain text).
+- `Requires.packages` lists what *structural* output needs (`ulem`,
+  `csquotes`, `booktabs`, `tabularx`, `longtable`, `multirow`, `float`,
+  `graphicx`, `caption`, `subcaption`, `enumitem`, `babel`, `glossaries`,
+  `imakeidx`); contract packages come from the `FRAGMENTS` table on
+  TeXSmith's side.
+
+### What is next
+
+1. Switch `common/fragments.rs` to `tmark_ir::registry::FRAGMENTS` and
+   `KEY_LABELS` once `wt/registry` merges; add a test that every
+   fragment name the writers emit is a row of the table.
+2. Run the TeXSmith parity harness (`scripts/parity.py --reader tmark`)
+   and triage: expected differences are `\item{}` → `\item`, the
+   zero-width spacing, `\clearpage` → `\tsdivider`, `\index` →
+   `\tsindex`, `\acrshort` → `\tsacr`, `\marginnote` → `\tsaside`,
+   `\keystroke` → `\tskeys`, `callout` → `tscallout`, `code` → `tscode`,
+   blank-line runs, heading slugs of headings containing inline markup.
+3. `Requires.assets` for generated images (`Image` with empty `src` and
+   `generate=`): the writers emit nothing for them today; decide with the
+   assets pass whether the writer should still list them.
+4. Listing captions: `tscode` receives `caption={…}`; the fragment
+   contract of fragment-contracts.md §5 does not list that key yet — add
+   it there or drop it here.
+5. Typst: `#ts-page(<id>)` for `{page}` in a textual template and
+   `#ts-task`, `#ts-acr`, `#ts-code`, `#ts-index`, `#ts-anchor`-less
+   anchors (`#metadata(none) <id>`) need their `texsmith.typ`
+   definitions on TeXSmith's side; nothing here compiles a `.typ` yet.
+6. Typst preview in the LSP (ADR 0005) and the source-map consumers
+   (`%` line markers, SyncTeX sidecar) are untouched.
+7. The CommonMark failures are IR-level: list tightness is not in the IR
+   (an `Item`/`List` `tight` flag would fix ~15 examples), URL
+   percent-encoding and entity decoding, raw HTML blocks dropped, tabs
+   in indented code. None is a writer bug.
+8. Table validation (X9, `wt/tables`): once nested per-group cells and
+   mapping rows parse, `examples/tables` renders through the model path;
+   today those fences fall back to code blocks in the parser.
+
+### Pitfalls
+
+- `Out::scratch()` for anything rendered aside (captions, titles, cell
+  text): `render_inlines` swaps the buffer and loses map entries inside;
+  push the enclosing node's `begin`/`end` at the outer level.
+- `blank_line` is idempotent; `ensure_newline` is what a nested list
+  wants after `\item text`.
+- `zero::collapse` clones the inline sequence; it is applied at every
+  `inlines()` call, so nested content is collapsed at its own level.
+- `in_box` (LaTeX) is what decides `\captionof`; `in_cell` decides
+  `\newline` for a hard break.
+- `render_blocks_inline` joins paragraphs with `\par ` (LaTeX) and
+  `#parbreak()` (Typst); a footnote with a list inside renders the list
+  environment inline, which LaTeX accepts.
+- The fixture snapshot names are `<fixture>@<backend>`; a new fixture
+  needs `INSTA_UPDATE=always` once, then review the three new files.

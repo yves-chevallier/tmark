@@ -1,0 +1,28 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<!-- include chapters/boot.md -->
+<!-- include chapters/setup.md -->
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "chapters/boot.md",
+      "node": 1
+    },
+    {
+      "src": "chapters/setup.md",
+      "node": 2
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

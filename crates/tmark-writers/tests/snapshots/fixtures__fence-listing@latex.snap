@@ -1,0 +1,22 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{tscode}[lang=python, title={bubble\_sort.py}, linenums, hl_lines={2-3}, id=lst:bubble, caption={Bubble sort, naive version.}]
+def bubble_sort(items): ...
+\end{tscode}
+
+---requires---
+{
+  "packages": [],
+  "fragments": [
+    "ts-code"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

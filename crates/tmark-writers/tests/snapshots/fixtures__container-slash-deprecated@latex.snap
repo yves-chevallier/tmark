@@ -1,0 +1,55 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{mozzarella.svg}
+\caption[Melting]{Melting behavior of high-moisture cheese
+upon heating}\label{fig:melting}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Hard cheese samples}
+\label{tbl:samples}
+\vspace{0.5em}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Cheese} & \textbf{Age} \\
+\midrule
+Comté & 18 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\vspace{1em}
+
+---requires---
+{
+  "packages": [
+    "booktabs",
+    "float",
+    "graphicx",
+    "tabularx"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "mozzarella.svg",
+      "node": 2,
+      "attrs": [
+        [
+          "width",
+          "80%"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

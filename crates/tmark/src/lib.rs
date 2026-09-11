@@ -1,7 +1,6 @@
 //! Facade: the one crate downstream users depend on.
 //!
-//! Design: `design/01-architecture.md` §The facade. `write` arrives with
-//! the writers (milestone 4).
+//! Design: `design/01-architecture.md` §The facade.
 
 #![forbid(unsafe_code)]
 
@@ -23,6 +22,10 @@ pub use tmark_registry::{
     Resolved, ResolvedView,
 };
 pub use tmark_syntax::{parse, parse_strict, Parsed};
+pub use tmark_writers::{
+    write, writer, AssetRef, Backend, Body, CodeEngine, CodeOptions, HeadingOptions, Media,
+    Numbering, RefOptions, Requires, SourceMap, TypstMath, Writer, WriterOptions,
+};
 
 /// The JSON schema of a public shape, by name: the ones of `tmark_ir::schema`
 /// (`"ir"`, `"frontmatter"`, `"diagnostic"`) plus `"resolved"` (the

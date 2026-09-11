@@ -1,8 +1,6 @@
 //! `tmark` command-line interface. Design: `design/09-bindings.md`.
 //!
-//! `parse`, `fmt`, `check`, `lint` and `schema`; `write` arrives with the
-//! writers (milestone 4). `lint --fix` is a milestone-3 item (it needs the
-//! fixes the LSP also applies).
+//! `parse`, `fmt`, `check`, `lint`, `write` and `schema`.
 
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
@@ -10,7 +8,10 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use tmark::ir::{Code, LineIndex, Severity};
-use tmark::{check, format, parse, Config, FileId, FsLoader, LintConfig, Profile, ResolveOptions};
+use tmark::{
+    check, format, parse, Backend, Config, FileId, FsLoader, LintConfig, Media, Profile,
+    ResolveOptions, WriterOptions,
+};
 
 #[derive(Parser)]
 #[command(name = "tmark", version, about = "The TMark language toolchain")]
@@ -84,6 +85,21 @@ enum Command {
         #[arg(long, requires = "fix")]
         diff: bool,
     },
+    /// Write the body of a file for a backend (design 07-writers.md).
+    Write {
+        /// The file to write; `-` for standard input.
+        file: PathBuf,
+        /// `latex`, `typst` or `html`.
+        #[arg(long, value_name = "BACKEND")]
+        to: String,
+        /// `print` (default for latex and typst) or `web` (default for html).
+        #[arg(long)]
+        media: Option<String>,
+        /// Print the whole `Body` as JSON (`text`, `map`, `requires`)
+        /// instead of the text alone.
+        #[arg(long)]
+        map: bool,
+    },
     /// Print a JSON schema: `ir` or `frontmatter`.
     Schema { name: String },
 }
@@ -121,6 +137,12 @@ fn main() -> ExitCode {
             };
             cmd_check(&files, strict, &levels, mode)
         }
+        Command::Write {
+            file,
+            to,
+            media,
+            map,
+        } => cmd_write(&file, &to, media.as_deref(), map),
         Command::Schema { name } => cmd_schema(&name),
     }
 }
@@ -505,6 +527,70 @@ fn cmd_fmt(files: &[PathBuf], profile: Option<&str>, check: bool, write: bool) -
     } else {
         ExitCode::SUCCESS
     }
+}
+
+fn cmd_write(file: &PathBuf, to: &str, media: Option<&str>, map: bool) -> ExitCode {
+    let Some(backend) = Backend::parse(to) else {
+        eprintln!("tmark: unknown backend `{to}` (latex, typst, html)");
+        return ExitCode::from(2);
+    };
+    let media = match media {
+        None => match backend {
+            Backend::Html => Media::Web,
+            Backend::Latex | Backend::Typst => Media::Print,
+        },
+        Some("print") => Media::Print,
+        Some("web") => Media::Web,
+        Some(other) => {
+            eprintln!("tmark: unknown media `{other}` (print, web)");
+            return ExitCode::from(2);
+        }
+    };
+    let text = match read(file) {
+        Ok(text) => text,
+        Err(error) => {
+            eprintln!("tmark: {}: {error}", file.display());
+            return ExitCode::from(2);
+        }
+    };
+    let workspace = match config_for(file) {
+        Ok(config) => config,
+        Err(code) => return code,
+    };
+    let parsed = tmark::parse_with(&text, FileId::default(), workspace.profile);
+    let options = workspace.resolve_options(file);
+    let resolved = tmark::resolve(&parsed.document, &FsLoader, &options);
+    let index = LineIndex::new(&text);
+    let name = file.display().to_string();
+    for d in parsed.diagnostics.iter().chain(&resolved.diagnostics) {
+        if d.span.file != FileId::default() {
+            continue;
+        }
+        let at = index.line_col(d.span.start);
+        eprintln!(
+            "{name}:{}:{}: {} {}: {}",
+            at.line + 1,
+            at.col + 1,
+            d.severity.as_str(),
+            d.code.id(),
+            d.message
+        );
+    }
+    let opts = WriterOptions {
+        media,
+        lang: parsed.document.front_matter.keys.lang.clone(),
+        source_map: map,
+        ..WriterOptions::default()
+    };
+    let body = tmark::write(&parsed.document, &resolved, backend, &opts);
+    let mut out = io::stdout().lock();
+    if map {
+        let json = serde_json::to_string_pretty(&body).expect("the body serialises");
+        let _ = writeln!(out, "{json}");
+    } else {
+        let _ = out.write_all(body.text.as_bytes());
+    }
+    ExitCode::SUCCESS
 }
 
 fn cmd_schema(name: &str) -> ExitCode {

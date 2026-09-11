@@ -961,9 +961,12 @@ dependencies = [
 name = "tmark-writers"
 version = "0.0.0"
 dependencies = [
- "tmark-fmt",
+ "insta",
+ "serde",
+ "serde_json",
  "tmark-ir",
  "tmark-registry",
+ "tmark-syntax",
 ]
 
 [[package]]
