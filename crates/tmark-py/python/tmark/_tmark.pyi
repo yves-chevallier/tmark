@@ -91,6 +91,27 @@ def lint(text: str, file: str = "<memory>", loader: Loader | None = None, option
     """
     ...
 
+def lower_web(text: str, doc: dict[str, Any], resolved: Resolved | dict[str, Any] | None = None, loader: Loader | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Lower a page for a MkDocs site (design 07 §Web lowering, TeXSmith
+    `web-profile.md`): `text` is the source `doc` was parsed from; every
+    TMark construct of the per-construct table is spliced into what
+    Material renders (`<span class="ts-counter">FW-01</span>`,
+    `[FW-01](#fw:x)`, `<figure markdown="span">`, `!!! note`, sibling
+    links) and every other byte is kept, mkdocstrings directives
+    included. `resolved` is the `resolve` result or its `handle`, made
+    with `numbering: "all"` and the site's `book`; `None` resolves now
+    through `loader` with every series numbered. `loader` also serves the
+    text of included files (the file system when `None`). `options`:
+    `sections` (`title` | `number`, what `@sec:x` shows), `citations`
+    (`inline` | `passthrough`), `lang`, `css_prefix` (`ts-`); an unknown
+    key or value is a `TypeError`. Returns `{"text", "diagnostics",
+    "bibliography"}`: the lowered page (the `References` list appended
+    when citations were lowered inline), the lowering's own diagnostics
+    (with `line`/`col`), and the `References` list alone or `None`.
+    """
+    ...
+
 def parse(text: str, file: str = "<memory>", file_id: int = 0, profile: str = "default") -> dict[str, Any]:
     """
     Parse a TMark text. Returns the document as JSON (design 03 §Serialization)

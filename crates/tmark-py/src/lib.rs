@@ -31,7 +31,7 @@ use tmark::ir::registry::{
 use tmark::ir::{Block, Code, Inline, LineIndex, NodeId, NodeRef};
 use tmark::{
     Backend, BookLabel, Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit,
-    Profile, Replacement, ResolveNumbering, ResolveOptions, Resolved, WriterOptions,
+    Profile, Replacement, ResolveNumbering, ResolveOptions, Resolved, WebOptions, WriterOptions,
 };
 
 // ---------------------------------------------------------------------------
@@ -580,8 +580,70 @@ fn write<'py>(
     to_py(py, &serde_json::to_value(body).expect("a body serialises"))
 }
 
-/// The `resolved` argument of `write`: a `tmark.Resolved`, or the dict
-/// `resolve` returned (its `handle`), or nothing.
+/// lower_web(text: str, doc: dict[str, Any], resolved: Resolved | dict[str, Any] | None = None, loader: Loader | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]
+///
+/// Lower a page for a MkDocs site (design 07 §Web lowering, TeXSmith
+/// `web-profile.md`): `text` is the source `doc` was parsed from; every
+/// TMark construct of the per-construct table is spliced into what
+/// Material renders (`<span class="ts-counter">FW-01</span>`,
+/// `[FW-01](#fw:x)`, `<figure markdown="span">`, `!!! note`, sibling
+/// links) and every other byte is kept, mkdocstrings directives
+/// included. `resolved` is the `resolve` result or its `handle`, made
+/// with `numbering: "all"` and the site's `book`; `None` resolves now
+/// through `loader` with every series numbered. `loader` also serves the
+/// text of included files (the file system when `None`). `options`:
+/// `sections` (`title` | `number`, what `@sec:x` shows), `citations`
+/// (`inline` | `passthrough`), `lang`, `css_prefix` (`ts-`); an unknown
+/// key or value is a `TypeError`. Returns `{"text", "diagnostics",
+/// "bibliography"}`: the lowered page (the `References` list appended
+/// when citations were lowered inline), the lowering's own diagnostics
+/// (with `line`/`col`), and the `References` list alone or `None`.
+#[pyfunction]
+#[pyo3(signature = (text, doc, resolved = None, loader = None, options = None))]
+fn lower_web<'py>(
+    py: Python<'py>,
+    text: &str,
+    doc: &Bound<'py, PyAny>,
+    resolved: Option<&Bound<'py, PyAny>>,
+    loader: Option<&Bound<'py, PyAny>>,
+    options: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let document = document_of(doc)?;
+    let options: WebOptions = match options.filter(|o| !o.is_none()) {
+        Some(obj) => from_py(obj, "options")?,
+        None => WebOptions::default(),
+    };
+    let loader = AnyLoader::of(loader)?;
+    let handle = resolved_handle(resolved)?;
+    let own;
+    let resolved: &Resolved = match &handle {
+        Some(handle) => &handle.get().0,
+        None => {
+            let resolve = ResolveOptions {
+                numbering: ResolveNumbering::All,
+                ..ResolveOptions::default()
+            };
+            own = py.allow_threads(|| tmark::resolve(&document, loader.as_dyn(), &resolve));
+            loader.take_error()?;
+            &own
+        }
+    };
+    let lowered =
+        py.allow_threads(|| tmark::lower_web(text, &document, resolved, loader.as_dyn(), &options));
+    loader.take_error()?;
+    let index = LineIndex::new(text);
+    let path = resolved.path.to_string_lossy();
+    let path = if path.is_empty() { "<memory>" } else { &path };
+    let value = json!({
+        "text": lowered.text,
+        "diagnostics": diagnostics_json(&lowered.diagnostics, document.file, path, Some(&index)),
+        "bibliography": lowered.bibliography,
+    });
+    to_py(py, &value)
+}
+
+/// The `resolved` argument of `write` and `lower_web`: a `tmark.Resolved`,
+/// or the dict `resolve` returned (its `handle`), or nothing.
 fn resolved_handle(obj: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Py<PyResolved>>> {
     let Some(obj) = obj.filter(|o| !o.is_none()) else {
         return Ok(None);
@@ -746,6 +808,7 @@ fn _tmark(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(edit, m)?)?;
     m.add_function(wrap_pyfunction!(edit_many, m)?)?;
     m.add_function(wrap_pyfunction!(write, m)?)?;
+    m.add_function(wrap_pyfunction!(lower_web, m)?)?;
     m.add_function(wrap_pyfunction!(schema, m)?)?;
     m.add_function(wrap_pyfunction!(schema_hash, m)?)?;
     m.add_function(wrap_pyfunction!(codes, m)?)?;
