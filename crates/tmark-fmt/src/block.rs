@@ -770,10 +770,18 @@ fn yaml_positional(cells: &[Cell], spans: &[(usize, usize)]) -> String {
 }
 
 /// A named row (Python `_parse_named_row` inverted): the label, then the
-/// top-level data columns that hold something, by name; an unnamed column
-/// or a cell spanning out of its column has no named spelling and falls
-/// back to the positional form.
+/// top-level data columns that hold something, by name; an unnamed or
+/// duplicated column name, a rich label or a cell spanning out of its
+/// column have no named spelling and fall back to the positional form.
 fn yaml_named(cells: &[Cell], columns: &[Column], spans: &[(usize, usize)]) -> Option<String> {
+    let names: Vec<&str> = columns.iter().skip(1).filter_map(Column::name).collect();
+    if names
+        .iter()
+        .enumerate()
+        .any(|(i, n)| names[..i].contains(n))
+    {
+        return None;
+    }
     let covered = covered_by_colspan(cells);
     let label = cells
         .first()

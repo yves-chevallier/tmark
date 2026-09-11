@@ -15,3 +15,5 @@ tmark-ir = { path = "../tmark-ir" }
 tmark-syntax = { path = "../tmark-syntax" }
 # Scratch example and JSON dumps in tests.
 serde_json = { workspace = true }
+# Generated table models round-trip through the printer (tests/tables.rs).
+proptest.workspace = true

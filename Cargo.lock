@@ -720,6 +720,7 @@ dependencies = [
 name = "tmark-fmt"
 version = "0.0.0"
 dependencies = [
+ "proptest",
  "serde_json",
  "tmark-ir",
  "tmark-syntax",
