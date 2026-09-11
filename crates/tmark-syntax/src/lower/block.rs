@@ -85,7 +85,15 @@ impl Lowerer {
                             attrs_span,
                             "attribute list with no host element",
                         );
-                        content.push(self.literal_text(attrs_span, attrs_text(&attrs)));
+                        let literal = self.literal_text(attrs_span, attrs_text(&attrs));
+                        // Adjacent text merges, as inside `lower_inlines`.
+                        match (content.last_mut(), literal) {
+                            (Some(Inline::Str(last)), Inline::Str(next)) => {
+                                last.text.push_str(&next.text);
+                                last.meta.span = last.meta.span.join(next.meta.span);
+                            }
+                            (_, literal) => content.push(literal),
+                        }
                         out.push(Item::Block(Block::Para(Para {
                             meta,
                             content,
