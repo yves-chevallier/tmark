@@ -11,7 +11,11 @@ expression: snapshot
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "amssymb",
+    "enumitem",
+    "pifont"
+  ],
   "fragments": [
     "ts-todolist"
   ],

@@ -16,7 +16,9 @@ expression: snapshot
 ---requires---
 {
   "packages": [
-    "enumitem"
+    "amssymb",
+    "enumitem",
+    "pifont"
   ],
   "fragments": [
     "ts-todolist"

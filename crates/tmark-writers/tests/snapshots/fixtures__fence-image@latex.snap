@@ -9,7 +9,10 @@ flowchart LR
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox"
+  ],
   "fragments": [
     "ts-code"
   ],

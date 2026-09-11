@@ -9,7 +9,7 @@ use tmark_registry::Resolution;
 use super::escape;
 use super::math;
 use super::Typst;
-use crate::common::{abbr, fragments, media, refs, text, zero};
+use crate::common::{abbr, media, refs, text, zero};
 use crate::Media;
 
 /// Zero-width inlines (spec §Attributes).
@@ -104,7 +104,7 @@ impl Typst<'_> {
                     self.req.package(math::MITEX_PACKAGE);
                 }
                 if rendered.labelled {
-                    self.req.fragment(fragments::EQUATIONS);
+                    self.req.fragment("ts-equations");
                 }
                 self.out.push(&rendered.text);
             }
@@ -246,7 +246,7 @@ impl Typst<'_> {
                     continue;
                 }
                 Resolution::Glossary { term } => {
-                    self.req.fragment(fragments::GLOSSARY);
+                    self.req.fragment("ts-glossary");
                     self.out
                         .push(&format!("#ts-gls(\"{}\")", escape::string(&term)));
                 }
@@ -329,7 +329,7 @@ impl Typst<'_> {
 
     /// `#ts-index("a", "b", registry: "r", main: true)`.
     fn index_entry(&mut self, n: &IndexEntry) {
-        self.req.fragment(fragments::INDEX);
+        self.req.fragment("ts-index");
         self.req
             .index
             .insert(n.registry.clone().unwrap_or_default());
@@ -349,7 +349,7 @@ impl Typst<'_> {
 
     /// `#ts-keys("Ctrl", "S")`.
     fn keystroke(&mut self, n: &Keystroke) {
-        self.req.fragment(fragments::KEYSTROKES);
+        self.req.fragment("ts-keystrokes");
         let keys: Vec<String> = n
             .keys
             .iter()
@@ -360,7 +360,7 @@ impl Typst<'_> {
 
     /// `#ts-aside(side: "left")[…]`.
     fn aside(&mut self, n: &Aside) {
-        self.req.fragment(fragments::TYPESETTING);
+        self.req.fragment("ts-typesetting");
         let body = self.render_blocks_inline(&n.content);
         if body.is_empty() {
             return;
@@ -377,14 +377,14 @@ impl Typst<'_> {
     fn span(&mut self, n: &SpanNode) {
         let label = n.attrs.id().map(escape::label);
         if let Some(slug) = n.attrs.get("script") {
-            self.req.fragment(fragments::FONTS);
+            self.req.fragment("ts-fonts");
             self.out.push(&format!(
                 "#ts-script(\"{}\")[{}]",
                 escape::string(slug),
                 escape::markup(&plain_text(&n.content))
             ));
         } else if n.attrs.get("emoji").is_some() {
-            self.req.fragment(fragments::FONTS);
+            self.req.fragment("ts-fonts");
             self.out
                 .push(&format!("#ts-emoji[{}]", plain_text(&n.content)));
         } else {
@@ -437,7 +437,7 @@ impl Typst<'_> {
                 candidate
             }
         };
-        self.req.fragment(fragments::GLOSSARY);
+        self.req.fragment("ts-glossary");
         self.req.acronym(&key);
         self.out
             .push(&format!("#ts-acr(\"{}\")", escape::string(&key)));

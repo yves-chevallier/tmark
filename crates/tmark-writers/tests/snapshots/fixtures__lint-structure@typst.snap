@@ -20,7 +20,14 @@ expression: snapshot
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "epigraph",
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "xcolor"
+  ],
   "fragments": [
     "ts-typesetting"
   ],

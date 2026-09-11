@@ -25,7 +25,7 @@ use tmark_ir::{
 };
 use tmark_registry::Resolved;
 
-use crate::common::{abbr, fragments, media, text, Out};
+use crate::common::{abbr, media, text, Out};
 use crate::{Backend, Body, CodeEngine, Media, Requires, Writer, WriterOptions};
 
 /// The LaTeX writer.
@@ -50,6 +50,7 @@ impl Writer for LatexWriter {
             abbr_keys: abbr::keys(doc),
         };
         w.blocks(&doc.blocks);
+        w.req.close();
         let (text, map) = w.out.finish();
         Body {
             text,
@@ -175,7 +176,7 @@ impl Latex<'_> {
             _ => {}
         }
         if let Some(lead) = &p.lead {
-            self.req.fragment(fragments::TYPESETTING);
+            self.req.fragment("ts-typesetting");
             self.out.push("\\tslead{");
             self.inlines(lead);
             self.out.push("} ");
@@ -244,7 +245,7 @@ impl Latex<'_> {
     }
 
     fn begin_code(&mut self, keys: &str) {
-        self.req.fragment(fragments::CODE);
+        self.req.fragment("ts-code");
         if self.opts.code.engine == CodeEngine::Minted {
             self.req.shell_escape = true;
         }
@@ -349,7 +350,7 @@ impl Latex<'_> {
 
     /// `\tsepigraph[source={…}]{text}` (fragment-contracts.md §1).
     fn epigraph(&mut self, content: &[Block], source: Option<&str>) {
-        self.req.fragment(fragments::TYPESETTING);
+        self.req.fragment("ts-typesetting");
         self.out.push("\\tsepigraph");
         if let Some(source) = source {
             self.out
@@ -365,7 +366,7 @@ impl Latex<'_> {
     fn bullet_list(&mut self, items: &[ListItem]) {
         let tasks = items.iter().any(|i| i.task.is_some());
         if tasks {
-            self.req.fragment(fragments::TODOLIST);
+            self.req.fragment("ts-todolist");
             self.out.push("\\begin{tstasklist}\n");
         } else {
             self.out.push("\\begin{itemize}\n");
@@ -425,7 +426,7 @@ impl Latex<'_> {
                 _ => (None, None, content),
             };
         if let Some(lead) = lead {
-            self.req.fragment(fragments::TYPESETTING);
+            self.req.fragment("ts-typesetting");
             self.out.push("\\tslead{");
             self.inlines(lead);
             self.out.push("} ");
@@ -466,7 +467,7 @@ impl Latex<'_> {
 
     /// `\tsdivider` (decisions.md X2).
     fn horizontal_rule(&mut self) {
-        self.req.fragment(fragments::TYPESETTING);
+        self.req.fragment("ts-typesetting");
         self.out.push("\\tsdivider\n");
     }
 
@@ -483,7 +484,7 @@ impl Latex<'_> {
     /// `tscallout` (fragment-contracts.md §1, §3 rule 6): `kind`, `title`,
     /// `id`, `class`, then the attributes; `collapsed` stays bare.
     fn admonition(&mut self, a: &Admonition) {
-        self.req.fragment(fragments::CALLOUTS);
+        self.req.fragment("ts-callouts");
         let mut keys = vec![format!("kind={}", a.kind)];
         if let Some(title) = &a.title {
             let title = self.render_inlines(title);
@@ -505,25 +506,6 @@ impl Latex<'_> {
     fn div(&mut self, d: &Div, caption: Option<&Caption>) {
         match d.name.as_str() {
             "epigraph" => self.epigraph(&d.content, d.attrs.get("source")),
-            // A `/// latex` slash block the parser still lowers to a
-            // container (deprecation `slash-raw-block`): raw passthrough.
-            "latex" => {
-                for block in &d.content {
-                    match block {
-                        Block::Para(p) => {
-                            self.out.push(&plain_text(&p.content));
-                            self.out.ensure_newline();
-                        }
-                        Block::Plain(p) => {
-                            self.out.push(&plain_text(&p.content));
-                            self.out.ensure_newline();
-                        }
-                        Block::RawBlock(r) if r.format == "latex" => self.raw_block(r),
-                        _ => {}
-                    }
-                }
-            }
-            "typst" | "html" => {}
             "code" => {
                 let keys = self.code_keys(None, &d.attrs, caption, None, Some("pygments"));
                 self.begin_code(&keys);
@@ -543,7 +525,7 @@ impl Latex<'_> {
                 self.end_code();
             }
             name => {
-                self.req.fragment(fragments::TYPESETTING);
+                self.req.fragment("ts-typesetting");
                 let keys = attr_keys(&d.attrs, &[]);
                 self.out.push(&format!("\\begin{{tsdiv}}{{{name}}}"));
                 if !keys.is_empty() {
@@ -643,7 +625,7 @@ impl Latex<'_> {
                 Block::Para(p) => {
                     let mut s = String::new();
                     if let Some(lead) = &p.lead {
-                        self.req.fragment(fragments::TYPESETTING);
+                        self.req.fragment("ts-typesetting");
                         s.push_str(&format!("\\tslead{{{}}} ", self.render_inlines(lead)));
                     }
                     s.push_str(&self.render_inlines(&p.content));

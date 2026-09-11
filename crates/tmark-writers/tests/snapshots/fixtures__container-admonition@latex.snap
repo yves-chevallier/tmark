@@ -8,7 +8,11 @@ Install TeX Live before \tscodeinline{texsmith -\allowbreak{}-\allowbreak{}build
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox",
+    "xcolor"
+  ],
   "fragments": [
     "ts-callouts",
     "ts-code"

@@ -6,7 +6,9 @@ Relativity#ts-index([relativity], registry: "physics").
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "imakeidx"
+  ],
   "fragments": [
     "ts-index"
   ],

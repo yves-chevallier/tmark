@@ -6,7 +6,14 @@ Hooke's law#ts-aside(side: "left")[linear only at small strain] holds.
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "epigraph",
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "xcolor"
+  ],
   "fragments": [
     "ts-typesetting"
   ],

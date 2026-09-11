@@ -6,7 +6,9 @@ Some #highlight[marked], #strike[deleted], H#sub[2]O, E=mc#super[2], #ts-keys("C
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "tikz"
+  ],
   "fragments": [
     "ts-keystrokes"
   ],

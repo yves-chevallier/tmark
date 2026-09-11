@@ -2,15 +2,18 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-#ts-code(title: [bubble\_sort.py], linenums: 1, hl-lines: ("2-3",), id: "lst:bubble", caption: [Bubble sort, naive version.])[
+#ts-code(title: [bubble\_sort.py], linenums: 1, hl-lines: ("2-3",), caption: [Bubble sort, naive version.])[
 ```python
 def bubble_sort(items): ...
 ```
-]
+] <lst:bubble>
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "fvextra",
+    "tcolorbox"
+  ],
   "fragments": [
     "ts-code"
   ],

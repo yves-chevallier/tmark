@@ -266,6 +266,13 @@
       ],
       "shell_escape": false,
       "description": "critic markup (tmark M5)"
+    },
+    {
+      "name": "ts-equations",
+      "provides": [],
+      "packages": [],
+      "shell_escape": false,
+      "description": "Typst: an equation label was emitted, the template numbers equations (writers-and-passes.md §4)"
     }
   ],
   "key_labels": [

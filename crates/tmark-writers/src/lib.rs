@@ -29,6 +29,13 @@ pub use html::HtmlWriter;
 pub use latex::LatexWriter;
 pub use typst::TypstWriter;
 
+/// The Typst side of the fragment contracts: a definition for every
+/// `#ts-…` function the Typst writer emits (fragment-contracts.md §3 rule
+/// 7). TeXSmith writes it next to the `.typ` it builds as `texsmith.typ`;
+/// a body compiles with `#import "texsmith.typ": *` (and the `mitex`
+/// import when `Requires.packages` names it) in front of it.
+pub const TEXSMITH_TYP: &str = include_str!("../assets/texsmith.typ");
+
 /// A target language. Design 07 §The trait.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -216,11 +223,12 @@ pub struct AssetRef {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Requires {
-    /// LaTeX packages structural output needs (`booktabs`, `csquotes`);
-    /// Typst packages (`@preview/mitex:0.2.6`).
+    /// LaTeX packages structural output needs (`booktabs`, `csquotes`)
+    /// plus those the named fragments imply (`Requires::close`); Typst
+    /// packages (`@preview/mitex:0.2.6`).
     pub packages: BTreeSet<String>,
-    /// Fragment contracts named (`ts-code` provides `tscode`). The list is
-    /// the `FRAGMENTS` table of `tmark_ir::registry` once merged.
+    /// Fragment contracts named (`ts-code` provides `tscode`), rows of
+    /// `tmark_ir::registry::FRAGMENTS`.
     pub fragments: BTreeSet<String>,
     pub shell_escape: bool,
     pub assets: Vec<AssetRef>,
@@ -236,8 +244,27 @@ pub struct Requires {
 }
 
 impl Requires {
+    /// Names a fragment contract. The name must be a row of
+    /// `tmark_ir::registry::FRAGMENTS` (checked in debug builds; the
+    /// fixture snapshots check it in release).
     pub fn fragment(&mut self, name: &str) {
+        debug_assert!(
+            tmark_ir::registry::fragment(name).is_some(),
+            "`{name}` is not a registered fragment contract"
+        );
         self.fragments.insert(name.to_string());
+    }
+
+    /// Merges the packages (and `shell_escape`) every named fragment
+    /// implies, from the registry; a writer calls it once at the end.
+    pub fn close(&mut self) {
+        for name in &self.fragments {
+            if let Some(fragment) = tmark_ir::registry::fragment(name) {
+                self.packages
+                    .extend(fragment.packages.iter().map(|p| p.to_string()));
+                self.shell_escape |= fragment.shell_escape;
+            }
+        }
     }
 
     pub fn package(&mut self, name: &str) {

@@ -43,6 +43,7 @@ impl Writer for HtmlWriter {
         w.blocks(&doc.blocks);
         w.footnotes();
         w.bibliography();
+        w.req.close();
         let (text, map) = w.out.finish();
         Body {
             text,
@@ -878,7 +879,7 @@ impl Html<'_> {
                 }
                 Resolution::Glossary { term } => {
                     let expansion = self.res.glossary.get(&term).cloned().unwrap_or_default();
-                    self.req.fragment(crate::common::fragments::GLOSSARY);
+                    self.req.fragment("ts-glossary");
                     self.out.push(&format!(
                         "<a href=\"#gls-{}\" class=\"glossary\" title=\"{}\">{}</a>",
                         escape::attr(&term),

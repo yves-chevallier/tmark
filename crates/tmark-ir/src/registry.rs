@@ -759,6 +759,12 @@ pub const FRAGMENTS: &[Fragment] = &[
         &["ulem", "xcolor"],
         "critic markup (tmark M5)",
     ),
+    frag(
+        "ts-equations",
+        &[],
+        &[],
+        "Typst: an equation label was emitted, the template numbers equations (writers-and-passes.md §4)",
+    ),
 ];
 
 /// Looks a fragment contract up by its exact name.
