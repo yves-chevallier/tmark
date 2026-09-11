@@ -137,7 +137,36 @@ impl Typst<'_> {
                     self.out.push(&n.text);
                 }
             }
+            Inline::ProgressBar(n) => self.progress_bar(n),
         }
+    }
+
+    /// `#ts-progress(0.45, label: "…", thin: true)` (spec §ProgressBar):
+    /// the value as a fraction; `thin` when the class is set, the other
+    /// classes as `class: ("a", "b")`.
+    fn progress_bar(&mut self, n: &tmark_ir::ProgressBar) {
+        self.req.fragment(fragments::TYPESETTING);
+        let value = n.value.clamp(0.0, 100.0) / 100.0;
+        let mut args = vec![crate::common::text::trim_float(value)];
+        let label = n
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("{}%", n.value_text()));
+        args.push(format!("label: \"{}\"", escape::string(&label)));
+        if n.attrs.has_class("thin") {
+            args.push("thin: true".to_string());
+        }
+        let classes: Vec<String> = n
+            .attrs
+            .classes
+            .iter()
+            .filter(|c| *c != "thin")
+            .map(|c| format!("\"{}\"", escape::string(c)))
+            .collect();
+        if !classes.is_empty() {
+            args.push(format!("class: ({},)", classes.join(", ")));
+        }
+        self.out.push(&format!("#ts-progress({})", args.join(", ")));
     }
 
     /// `#link("url")[text]`; an anchor through the textual template with

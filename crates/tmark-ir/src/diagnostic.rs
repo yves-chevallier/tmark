@@ -81,10 +81,12 @@ pub enum Code {
     ParseInternal,
     /// Appendix "PyMdownX compatibility profile": a spelling of the profile
     /// the parser recognises but does not implement yet (milestone 5), so
-    /// it is literal text: content tabs, critic markup, progress bars, wiki
-    /// links, fancy list markers, `^^x^^` without `inline.insert`, emoji
-    /// and icon shortcodes, `[TOC]`. Loud rather than silent (P4).
+    /// it is literal text: critic markup, wiki links, fancy list markers.
+    /// Loud rather than silent (P4).
     CompatUnsupported,
+    /// Spec §Tabs: a `::: tab` outside `::: tabs`; wrapped in a `tabs` of
+    /// one.
+    ContainerOrphan,
     /// Spec §Table rung 5: the payload of a `yaml table` or
     /// `yaml table-config` fence is not YAML or not a mapping; the fence
     /// stays a code block.
@@ -133,6 +135,9 @@ pub enum Code {
     CrossrefInventoryStale,
     /// Spec §Includes: an included file that cannot be loaded.
     IncludeMissing,
+    /// Spec §Header: a reference to a heading's implicit id, which changes
+    /// whenever the title is edited; write `{#id}`.
+    RefImplicitId,
     // --- Lint (tmark-lint) ---
     /// Spec §Ref: "Figure 3" typed in prose.
     HardcodedNumber,
@@ -155,6 +160,15 @@ pub enum Code {
     TableWidth,
     /// Spec §Table: column percentages that add up to more than 100.
     TableWidthSum,
+    /// Spec §Foreign directive: a dotted `::: a.b` directive, which the
+    /// HTML and paged writers drop.
+    DirectiveForeign,
+    /// Spec §Emoji and icon shortcodes: a Material icon shortcode, which
+    /// print drops.
+    IconWebOnly,
+    /// Spec §Feature registry: a spelling gated on a feature that is off
+    /// (`^^x^^` without `inline.insert`), literal text.
+    FeatureOff,
 }
 
 /// The pipeline stage that emits a code. Design `05-diagnostics.md` §Who
@@ -185,6 +199,7 @@ impl Code {
         Code::Deprecated,
         Code::ParseInternal,
         Code::CompatUnsupported,
+        Code::ContainerOrphan,
         Code::TableYaml,
         Code::TableUnknownKey,
         Code::TableColumns,
@@ -202,6 +217,7 @@ impl Code {
         Code::CrossrefInventoryMissing,
         Code::CrossrefInventoryStale,
         Code::IncludeMissing,
+        Code::RefImplicitId,
         Code::HardcodedNumber,
         Code::PositionWord,
         Code::CaptionIdOffConvention,
@@ -212,6 +228,9 @@ impl Code {
         Code::TablePlacement,
         Code::TableWidth,
         Code::TableWidthSum,
+        Code::DirectiveForeign,
+        Code::IconWebOnly,
+        Code::FeatureOff,
     ];
 
     /// The code with this kebab-case identifier.
@@ -236,6 +255,7 @@ impl Code {
             Code::Deprecated => "deprecated",
             Code::ParseInternal => "parse-internal",
             Code::CompatUnsupported => "compat-unsupported",
+            Code::ContainerOrphan => "container-orphan",
             Code::TableYaml => "table-yaml",
             Code::TableUnknownKey => "table-unknown-key",
             Code::TableColumns => "table-columns",
@@ -253,6 +273,7 @@ impl Code {
             Code::CrossrefInventoryMissing => "crossref-inventory-missing",
             Code::CrossrefInventoryStale => "crossref-inventory-stale",
             Code::IncludeMissing => "include-missing",
+            Code::RefImplicitId => "ref-implicit-id",
             Code::HardcodedNumber => "hardcoded-number",
             Code::PositionWord => "position-word",
             Code::CaptionIdOffConvention => "caption-id-off-convention",
@@ -263,6 +284,9 @@ impl Code {
             Code::TablePlacement => "table-placement",
             Code::TableWidth => "table-width",
             Code::TableWidthSum => "table-width-sum",
+            Code::DirectiveForeign => "directive-foreign",
+            Code::IconWebOnly => "icon-web-only",
+            Code::FeatureOff => "feature-off",
         }
     }
 
@@ -305,10 +329,15 @@ impl Code {
             | Code::TableWidthSum => Severity::Warning,
             Code::LeadPromotion => Severity::Info,
             Code::RoleUnknown
+            | Code::ContainerOrphan
+            | Code::RefImplicitId
             | Code::HardcodedNumber
             | Code::PositionWord
             | Code::CaptionIdOffConvention
-            | Code::HeadingSkip => Severity::Hint,
+            | Code::HeadingSkip
+            | Code::DirectiveForeign
+            | Code::IconWebOnly
+            | Code::FeatureOff => Severity::Hint,
         }
     }
 
@@ -328,6 +357,7 @@ impl Code {
             | Code::Deprecated
             | Code::ParseInternal
             | Code::CompatUnsupported
+            | Code::ContainerOrphan
             | Code::TableYaml
             | Code::TableUnknownKey
             | Code::TableColumns
@@ -344,7 +374,8 @@ impl Code {
             | Code::CitationShadowedByFootnote
             | Code::CrossrefInventoryMissing
             | Code::CrossrefInventoryStale
-            | Code::IncludeMissing => Stage::Resolve,
+            | Code::IncludeMissing
+            | Code::RefImplicitId => Stage::Resolve,
             Code::HardcodedNumber
             | Code::PositionWord
             | Code::CaptionIdOffConvention
@@ -354,7 +385,10 @@ impl Code {
             | Code::HeadingSkip
             | Code::TablePlacement
             | Code::TableWidth
-            | Code::TableWidthSum => Stage::Lint,
+            | Code::TableWidthSum
+            | Code::DirectiveForeign
+            | Code::IconWebOnly
+            | Code::FeatureOff => Stage::Lint,
         }
     }
 
@@ -416,6 +450,19 @@ impl Code {
             Code::LeadPromotion => "Spec §Para: a leading strong span promoted to a lead-in",
             Code::CompatUnsupported => {
                 "Appendix \"PyMdownX compatibility profile\": a spelling milestone 5 implements, literal today"
+            }
+            Code::ContainerOrphan => "Spec §Tabs: a `::: tab` outside `::: tabs`, wrapped in a set of one",
+            Code::RefImplicitId => {
+                "Spec §Header: a reference to a heading's implicit id, which changes with the title"
+            }
+            Code::DirectiveForeign => {
+                "Spec §Foreign directive: a dotted `:::` directive the HTML and paged writers drop"
+            }
+            Code::IconWebOnly => {
+                "Spec §Emoji and icon shortcodes: a Material icon shortcode, dropped in print"
+            }
+            Code::FeatureOff => {
+                "Spec §Feature registry: a spelling gated on a feature that is off, literal text"
             }
             Code::HeadingSkip => "Spec §Header: a heading level skipped",
             Code::TableYaml => "Spec §Table rung 5: a `yaml table` payload that is not a YAML mapping",

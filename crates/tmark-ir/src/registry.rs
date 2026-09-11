@@ -1,6 +1,6 @@
 //! The closed registries: roles, node words, predeclared counter prefixes,
-//! admonition types, features, deprecated spellings, fragment contracts and
-//! keystroke labels.
+//! admonition types, container names, features, deprecated spellings,
+//! fragment contracts, keystroke labels and the TeX logo words.
 //!
 //! Design: `design/03-ir.md` §Closed registries. Each table is a `const`
 //! slice of a small struct; grammars, completion lists, lint messages and
@@ -366,6 +366,60 @@ pub fn admonition(name: &str) -> Option<&'static Admonition> {
 }
 
 // ---------------------------------------------------------------------------
+// Containers
+// ---------------------------------------------------------------------------
+
+/// A name of the closed container registry (spec §Div): the `::: name`
+/// fences that have a node or a layout meaning. Admonition types are the
+/// other container names ([`ADMONITIONS`] plus `declare.admonitions`); any
+/// other name is `container-unknown`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Container {
+    /// The word after `:::`.
+    pub name: &'static str,
+    /// The block node produced (`Figure`, `Aside`, `Div`).
+    pub node: &'static str,
+    /// The attribute keys the container takes besides `#id`, `.class`,
+    /// `lang` and `media`.
+    pub keys: &'static [&'static str],
+    /// The spec section.
+    pub section: &'static str,
+}
+
+const fn container_row(
+    name: &'static str,
+    node: &'static str,
+    keys: &'static [&'static str],
+    section: &'static str,
+) -> Container {
+    Container {
+        name,
+        node,
+        keys,
+        section,
+    }
+}
+
+/// Spec §Div: "The container names TMark knows form a closed registry".
+/// A layout container (`multicolumn`, `div`, `tabs`, `tab`) renders through
+/// the `tsdiv` / `#ts-div` / `<div class="name">` contract with its
+/// attributes forwarded.
+pub const CONTAINERS: &[Container] = &[
+    container_row("figure", "Figure", &["cols"], "Image, Figure"),
+    container_row("aside", "Aside", &["side"], "Aside"),
+    container_row("tabs", "Div", &[], "Tabs"),
+    container_row("tab", "Div", &["title"], "Tabs"),
+    container_row("multicolumn", "Div", &["cols"], "Div"),
+    container_row("div", "Div", &[], "Div"),
+];
+
+/// Looks a container name up (admonition types excluded: see
+/// [`admonition`]).
+pub fn container(name: &str) -> Option<&'static Container> {
+    CONTAINERS.iter().find(|c| c.name == name)
+}
+
+// ---------------------------------------------------------------------------
 // Features
 // ---------------------------------------------------------------------------
 
@@ -426,7 +480,18 @@ pub const FEATURES: &[Feature] = &[
         "Glossary and acronyms",
         "fetch glossary summaries from Wikipedia links",
     ),
-    mk_feature("inline.insert", false, "Inline text", "`^^x^^` as <ins>"),
+    mk_feature(
+        "inline.insert",
+        false,
+        "Inline text",
+        "`^^x^^` as {underline}[x]; off: literal text and the hint `feature-off`",
+    ),
+    mk_feature(
+        "typography.tex-logos",
+        true,
+        "TeX logos",
+        "set the TeX logo words (`TEX_LOGOS`) as logos in the writers",
+    ),
     mk_feature(
         "compat.pymdownx",
         true,
@@ -641,6 +706,34 @@ pub const DEPRECATIONS: &[Deprecation] = &[
         "none",
         Horizon::Indefinite,
     ),
+    dep(
+        "attr-colon",
+        "{: .cls #id} attribute list",
+        "{.cls #id}",
+        "draft 3",
+        Horizon::Fmt,
+    ),
+    dep(
+        "progress-fraction",
+        "[=a/b \"…\"] progress fraction",
+        "[=NN% \"…\"]",
+        "draft 3",
+        Horizon::Fmt,
+    ),
+    dep(
+        "tabbed",
+        "=== \"Title\" tabs",
+        "::: tabs / ::: tab {title=…}",
+        "draft 3",
+        Horizon::Indefinite,
+    ),
+    dep(
+        "md-in-html",
+        "<div markdown>",
+        "::: div",
+        "draft 3",
+        Horizon::Indefinite,
+    ),
 ];
 
 pub fn deprecation(id: &str) -> Option<&'static Deprecation> {
@@ -764,6 +857,24 @@ pub const FRAGMENTS: &[Fragment] = &[
 /// Looks a fragment contract up by its exact name.
 pub fn fragment(name: &str) -> Option<&'static Fragment> {
     FRAGMENTS.iter().find(|f| f.name == name)
+}
+
+// ---------------------------------------------------------------------------
+// TeX logos
+// ---------------------------------------------------------------------------
+
+/// The words the feature `typography.tex-logos` sets as logos (spec §TeX
+/// logos): whole words, case-sensitive, never inside code, math, raw
+/// passthroughs, link destinations or attribute values. No node: the
+/// words stay `Str` and the writers apply the rule.
+pub const TEX_LOGOS: &[&str] = &[
+    "TeX", "LaTeX", "LaTeX2e", "XeTeX", "XeLaTeX", "LuaTeX", "LuaLaTeX", "pdfTeX", "pdfLaTeX",
+    "BibTeX", "BibLaTeX", "ConTeXt",
+];
+
+/// Whether `word` is a TeX logo word.
+pub fn tex_logo(word: &str) -> bool {
+    TEX_LOGOS.contains(&word)
 }
 
 // ---------------------------------------------------------------------------
@@ -910,13 +1021,40 @@ mod tests {
         assert!(admonition("solution").is_none());
         assert!(feature("paragraph.lead").unwrap().default);
         assert!(!feature("figures.exec").unwrap().default);
-        assert_eq!(FEATURES.len(), 7);
+        assert_eq!(FEATURES.len(), 8);
+        assert!(feature("typography.tex-logos").unwrap().default);
         assert_eq!(deprecation("margin-role").unwrap().horizon, Horizon::Fmt);
-        assert_eq!(DEPRECATIONS.len(), 22);
+        assert_eq!(deprecation("tabbed").unwrap().horizon, Horizon::Indefinite);
+        assert_eq!(DEPRECATIONS.len(), 26);
         let mut ids: Vec<_> = DEPRECATIONS.iter().map(|d| d.id).collect();
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), DEPRECATIONS.len(), "deprecation ids are unique");
+    }
+
+    #[test]
+    fn containers_and_logos() {
+        assert_eq!(container("multicolumn").unwrap().node, "Div");
+        assert_eq!(container("tab").unwrap().keys, &["title"]);
+        assert!(
+            container("note").is_none(),
+            "admonition types have their own table"
+        );
+        assert!(container("grid").is_none());
+        for c in CONTAINERS {
+            assert!(
+                admonition(c.name).is_none(),
+                "{}: not an admonition",
+                c.name
+            );
+            assert!(role(c.name).is_none() || c.name == "aside");
+        }
+        assert!(tex_logo("LaTeX") && tex_logo("ConTeXt"));
+        assert!(!tex_logo("latex") && !tex_logo("Tex"));
+        let mut names: Vec<&str> = CONTAINERS.iter().map(|c| c.name).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), CONTAINERS.len());
     }
 
     #[test]

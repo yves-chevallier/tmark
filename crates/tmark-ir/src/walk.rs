@@ -62,6 +62,13 @@ pub fn plain_text(inlines: &[Inline]) -> String {
             Inline::Link(n) => out.push_str(&plain_text(&n.content)),
             Inline::Span(n) => out.push_str(&plain_text(&n.content)),
             Inline::Abbr(a) => out.push_str(&a.text),
+            Inline::ProgressBar(p) => match &p.label {
+                Some(label) => out.push_str(label),
+                None => {
+                    out.push_str(&p.value_text());
+                    out.push('%');
+                }
+            },
             _ => {}
         }
     }
@@ -197,6 +204,7 @@ fn walk_inline<'a>(inline: &'a Inline, f: &mut impl FnMut(NodeRef<'a>)) {
         | Inline::Var(_)
         | Inline::Abbr(_)
         | Inline::Comment(_)
-        | Inline::RawInline(_) => {}
+        | Inline::RawInline(_)
+        | Inline::ProgressBar(_) => {}
     }
 }

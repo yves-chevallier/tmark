@@ -255,6 +255,14 @@ pub fn slugify(text: &str) -> String {
     slug_with(text, "-", true)
 }
 
+/// `0.45` for 0.45, `1` for 1.0: a fraction with at most four decimals
+/// and no trailing zeros (progress bar values).
+pub fn trim_float(value: f64) -> String {
+    let text = format!("{value:.4}");
+    let text = text.trim_end_matches('0');
+    text.trim_end_matches('.').to_string()
+}
+
 /// The acronym key of `\tsacr{key}` (`context.py:52-98`:
 /// `slugify(term, separator="", lowercase=False)`); a caller adds the
 /// `2`, `3`, … collision suffixes.

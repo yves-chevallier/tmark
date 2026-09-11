@@ -131,6 +131,14 @@
     "definition",
     "proof"
   ],
+  "containers": [
+    "figure",
+    "aside",
+    "tabs",
+    "tab",
+    "multicolumn",
+    "div"
+  ],
   "fragments": [
     {
       "name": "ts-typesetting",

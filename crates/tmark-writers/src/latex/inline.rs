@@ -131,7 +131,30 @@ impl Latex<'_> {
                     self.out.push(&n.text);
                 }
             }
+            Inline::ProgressBar(n) => self.progress_bar(n),
         }
+    }
+
+    /// `\tsprogress[thin]{0.45}{label}` (`ts-typesetting`, spec
+    /// §ProgressBar): the value as a fraction, the label as prose, the
+    /// classes as the option (`thin` halves the height; the others are the
+    /// web stylesheet's and are forwarded for the template).
+    fn progress_bar(&mut self, n: &tmark_ir::ProgressBar) {
+        self.req.fragment(fragments::TYPESETTING);
+        let value = n.value.clamp(0.0, 100.0) / 100.0;
+        let label = n
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("{}%", n.value_text()));
+        self.out.push("\\tsprogress");
+        if !n.attrs.classes.is_empty() {
+            self.out.push(&format!("[{}]", n.attrs.classes.join(",")));
+        }
+        self.out.push(&format!(
+            "{{{}}}{{{}}}",
+            text::trim_float(value),
+            escape::prose(&label)
+        ));
     }
 
     /// `\tscodeinline[lang=py]{…}` (fragment-contracts.md §5) with an

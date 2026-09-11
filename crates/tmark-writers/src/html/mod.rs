@@ -775,7 +775,28 @@ impl Html<'_> {
                     self.out.push(&n.text);
                 }
             }
+            Inline::ProgressBar(n) => self.progress_bar(n),
         }
+    }
+
+    /// `<span class="progress thin"><progress value="45" max="100">…
+    /// </progress><span class="progress-label">label</span></span>` (spec
+    /// §ProgressBar: `<div class="progress">` is PyMdownX's block; the node
+    /// is inline, so a span carries the classes).
+    fn progress_bar(&mut self, n: &tmark_ir::ProgressBar) {
+        let mut attrs = n.attrs.clone();
+        attrs.classes.insert(0, "progress".to_string());
+        let label = n
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("{}%", n.value_text()));
+        self.out.push(&format!(
+            "<span{}><progress value=\"{}\" max=\"100\">{}</progress><span class=\"progress-label\">{}</span></span>",
+            self.attrs(&attrs, &[]),
+            n.value_text(),
+            escape::text(&label),
+            escape::text(&label)
+        ));
     }
 
     fn link(&mut self, n: &Link) {
