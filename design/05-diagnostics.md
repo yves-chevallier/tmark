@@ -107,3 +107,22 @@ spelling is safe, guessing a label for an unresolved reference is not.
 - Conformance fixtures gained a `## resolution` section for the resolve
   and lint stages; one fixture per diagnostic code lives under
   `spec/conformance/diag-*.md` and `lint-*.md`.
+
+## Implementation notes (migration wave 1)
+
+- `deprecated-frontmatter-key` carries a fix: the whole YAML island with
+  every deprecated key moved to its canonical place, as a *line edit*
+  (`tmark_ir::yaml_edit::move_key`: the key's block is cut, dedented,
+  renamed when the spelling changes, and re-indented at the end of its
+  target mapping, which is created when missing). Nothing else in the
+  island moves, which is what the printer's byte-for-byte copy of the
+  front matter asks for. A key with a flow value (`press: {…}`) on the
+  path gives no fix. Every deprecated key's diagnostic carries the same
+  replacement, so `lint --fix` moves them all in one pass (overlapping
+  fixes after the first are skipped). The message names the target
+  (`` `counters` is deprecated, write `press.declare.counters` ``);
+  `frontmatter::deprecated_key_target` is the one table.
+- `deprecated` on `[^key]` / `^[k1,k2]` citations, `/// latex`,
+  `/// caption` blocks, `[](gls:term)`, `{index}[…]{b}`, `{index:r}[…]`
+  and the `--8<--` fence body all carry the generic node-reprint fix
+  (`tmark::fixes`), so the fix for a spelling lives in the printer once.

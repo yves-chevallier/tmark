@@ -31,6 +31,7 @@ pub mod registry;
 pub mod span;
 pub mod table;
 pub mod walk;
+pub mod yaml_edit;
 
 pub use attrs::Attrs;
 pub use diagnostic::{Code, Diagnostic, Fix, Severity};

@@ -39,4 +39,4 @@ deleting the entry from this file.
 Open questions the spec already lists (Appendix "Open questions") are not
 repeated here; their answers, when taken, go in the same appendix.
 
-Closed: C7 (attachment rule written into §Caption, including the `::: figure` case); C25 (quoted values gained `\"` and `\\` escapes in §Lexical grammar, fixture `attributes-value-quote`).
+Closed: C7 (attachment rule written into §Caption, including the `::: figure` case); C25 (quoted values gained `\"` and `\\` escapes in §Lexical grammar, fixture `attributes-value-quote`); C29 (`press.admonition_style`, TeXSmith's real key, added to the `press.callout_style` deprecation row; fixture `frontmatter-deprecated`).
