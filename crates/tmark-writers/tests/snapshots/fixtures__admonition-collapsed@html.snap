@@ -1,0 +1,25 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<details class="admonition note">
+<summary class="admonition-title">Folded</summary>
+<p>Hidden by default.</p>
+</details>
+<details class="admonition tip" open>
+<summary class="admonition-title">Tip</summary>
+<p>Shown by default.</p>
+</details>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

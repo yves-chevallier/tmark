@@ -1,0 +1,54 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<table>
+<thead>
+<tr>
+<th rowspan="3">Product</th>
+<th colspan="4">2024</th>
+</tr>
+<tr>
+<th colspan="2">H1</th>
+<th colspan="2">H2</th>
+</tr>
+<tr>
+<th>Q1</th>
+<th>Q2</th>
+<th>Q3</th>
+<th>Q4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Alpha</td>
+<td rowspan="2" colspan="2">Maria</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Beta</td>
+<td>5</td>
+<td>6</td>
+</tr>
+<tr>
+<td>Gamma</td>
+<td>1</td>
+<td>2</td>
+<td colspan="2" style="text-align: center">Sum</td>
+</tr>
+</tbody>
+</table>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

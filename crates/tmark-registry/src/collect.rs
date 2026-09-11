@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tmark_ir::{
     plain_text, walk, Attrs, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline,
     NodeId, NodeRef, Span,
@@ -15,7 +15,7 @@ use crate::counters::Counters;
 use crate::loader::{join, Loader};
 
 /// What an anchor sits on; the host decides the counter (spec §Anchor).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Host {
     Header,
@@ -62,9 +62,13 @@ pub struct Label {
     /// §Identity and spans): what rename and go-to-definition select.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id_span: Option<Span>,
-    /// Position in the series (TeXSmith-numbered series only).
+    /// Position in the series (tmark-numbered series only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub number: Option<u32>,
+    /// The heading text of a header, the caption text of a caption: what
+    /// a sibling document shows for the label (`BookLabel::title`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 /// All labels, by lower-cased id and in document order.
@@ -152,22 +156,34 @@ impl<'a> Collector<'a> {
 
     fn block(&mut self, block: &Block, includes: &mut Vec<(Span, String, Option<String>)>) {
         match block {
-            Block::Header(h) => self.define(&h.attrs, Host::Header, h.meta.id, h.meta.span),
+            Block::Header(h) => {
+                let title = Some(plain_text(&h.content));
+                self.define(&h.attrs, Host::Header, h.meta.id, h.meta.span, title);
+            }
             Block::Caption(c) => {
                 let host = match c.kind {
                     CaptionKind::Table => Host::Table,
                     CaptionKind::Figure => Host::Figure,
                     CaptionKind::Listing => Host::Listing,
                 };
-                self.define(&c.attrs, host, c.meta.id, c.meta.span);
+                let title = Some(plain_text(&c.content));
+                self.define(&c.attrs, host, c.meta.id, c.meta.span, title);
             }
-            Block::Table(t) => self.define(&t.attrs, Host::Table, t.meta.id, t.meta.span),
-            Block::Figure(f) => self.define(&f.attrs, Host::Figure, f.meta.id, f.meta.span),
-            Block::MathBlock(m) => self.define(&m.attrs, Host::Equation, m.meta.id, m.meta.span),
-            Block::CodeBlock(c) => self.define(&c.options, Host::Listing, c.meta.id, c.meta.span),
-            Block::Admonition(a) => self.define(&a.attrs, Host::Admonition, a.meta.id, a.meta.span),
-            Block::Div(d) => self.define(&d.attrs, Host::Anchor, d.meta.id, d.meta.span),
-            Block::BlockQuote(q) => self.define(&q.attrs, Host::Anchor, q.meta.id, q.meta.span),
+            Block::Table(t) => self.define(&t.attrs, Host::Table, t.meta.id, t.meta.span, None),
+            Block::Figure(f) => self.define(&f.attrs, Host::Figure, f.meta.id, f.meta.span, None),
+            Block::MathBlock(m) => {
+                self.define(&m.attrs, Host::Equation, m.meta.id, m.meta.span, None)
+            }
+            Block::CodeBlock(c) => {
+                self.define(&c.options, Host::Listing, c.meta.id, c.meta.span, None)
+            }
+            Block::Admonition(a) => {
+                self.define(&a.attrs, Host::Admonition, a.meta.id, a.meta.span, None)
+            }
+            Block::Div(d) => self.define(&d.attrs, Host::Anchor, d.meta.id, d.meta.span, None),
+            Block::BlockQuote(q) => {
+                self.define(&q.attrs, Host::Anchor, q.meta.id, q.meta.span, None)
+            }
             Block::Include(i) => includes.push((i.meta.span, i.path.clone(), i.base.clone())),
             _ => {}
         }
@@ -175,8 +191,8 @@ impl<'a> Collector<'a> {
 
     fn inline(&mut self, inline: &Inline) {
         match inline {
-            Inline::Image(i) => self.define(&i.attrs, Host::Figure, i.meta.id, i.meta.span),
-            Inline::Span(s) => self.define(&s.attrs, Host::Anchor, s.meta.id, s.meta.span),
+            Inline::Image(i) => self.define(&i.attrs, Host::Figure, i.meta.id, i.meta.span, None),
+            Inline::Span(s) => self.define(&s.attrs, Host::Anchor, s.meta.id, s.meta.span, None),
             Inline::CounterItem(c) => {
                 // Spec §CounterItem: "An undeclared prefix warns."
                 if !self.counters.is_declared(&c.prefix) {
@@ -196,6 +212,7 @@ impl<'a> Collector<'a> {
                     span: c.meta.span,
                     id_span: (!c.key_span.0.is_empty()).then_some(c.key_span.0),
                     number: None,
+                    title: None,
                 });
             }
             Inline::IndexEntry(e) => {
@@ -212,7 +229,14 @@ impl<'a> Collector<'a> {
 
     /// An `#id` on a host. The prefix, when present, must agree with the
     /// host (`prefix-host-mismatch`); a bare id takes the host's counter.
-    fn define(&mut self, attrs: &Attrs, host: Host, node: NodeId, span: Span) {
+    fn define(
+        &mut self,
+        attrs: &Attrs,
+        host: Host,
+        node: NodeId,
+        span: Span,
+        title: Option<String>,
+    ) {
         let Some(id) = attrs.id() else { return };
         let id_span = attrs.id_span.map(|s| s.0);
         let (prefix, key) = match id.split_once(':') {
@@ -252,6 +276,7 @@ impl<'a> Collector<'a> {
             span,
             id_span,
             number: None,
+            title,
         });
     }
 

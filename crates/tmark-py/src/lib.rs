@@ -30,8 +30,8 @@ use tmark::ir::registry::{
 };
 use tmark::ir::{Block, Code, Inline, LineIndex, NodeId, NodeRef};
 use tmark::{
-    Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit, Profile, Replacement,
-    ResolveOptions,
+    BookLabel, Diagnostic, Document, FileId, FsLoader, LintConfig, Loader, NodeEdit, Profile,
+    Replacement, ResolveNumbering, ResolveOptions,
 };
 
 // ---------------------------------------------------------------------------
@@ -112,9 +112,17 @@ struct Options {
     path: Option<String>,
     /// `.bib` files, relative to the document's directory.
     bibliography: Vec<String>,
-    /// First value of each TeXSmith-numbered series (the previous
+    /// First value of each tmark-numbered series (the previous
     /// document's `next_start`).
     start: BTreeMap<String, u32>,
+    /// `backend` (user series only) or `all` (every series, for the web).
+    numbering: ResolveNumbering,
+    /// Language of the label words (`fr`, `de-CH`); the front matter's
+    /// `lang`, then English, when absent.
+    lang: Option<String>,
+    /// Labels of the other documents of the book (`book` entries of their
+    /// `resolve` results): what a key defined nowhere here may resolve to.
+    book: Vec<BookLabel>,
     /// `default`, `canonical`, `strict` or `mkdocs`.
     profile: Option<String>,
     /// Lint levels by code: `off`, `hint`, `info`, `warning`, `error`.
@@ -139,6 +147,9 @@ impl Options {
             path,
             bibliography: self.bibliography.iter().map(PathBuf::from).collect(),
             start: self.start.clone(),
+            numbering: self.numbering,
+            lang: self.lang.clone(),
+            book: self.book.clone(),
         }
     }
 
@@ -335,6 +346,7 @@ fn format(py: Python<'_>, text: &str, profile: &str) -> PyResult<String> {
 /// `loader` (the file system when `None`) relative to `options["path"]`
 /// (`file` when it is a real path). `options` accepts `path`,
 /// `bibliography` (list of `.bib` paths), `start` (prefix -> first value),
+/// `numbering` (`backend` or `all`), `lang`, `book` (sibling labels),
 /// `profile` and `levels` (code -> `off`/`hint`/`info`/`warning`/`error`).
 /// Each diagnostic is the JSON of `tmark_ir::Diagnostic` (`code` as its
 /// kebab-case id) plus `stage`, `path`, `line` and `col` (1-based, byte
@@ -381,15 +393,18 @@ fn fixes(
 /// Build the registries of a parsed document and resolve its references
 /// (design 06). `doc` is a `parse` result (its `"tmark"` version must
 /// match); `loader` and `options` are those of `lint` (`path`,
-/// `bibliography`, `start`). The result is `schema("resolved")`:
-/// `counters` (every series with its `numbers` and `next`), `next_start`
-/// (prefix -> the first free value, for the next document of a build),
-/// `labels` (in document order, with `formatted` numbers), `refs` (one per
-/// reference, `resolution.kind` in `label`, `citation`, `glossary`, `doi`,
-/// `external`, `ambiguous`, `unresolved`), `bibliography` (keys), `entries`,
-/// `dois` (pending), `glossary`, `index`, `crossrefs`, `included` (files
-/// loaded through includes) and `diagnostics`. Pass `text` to get `line`
-/// and `col` on the diagnostics of the main file.
+/// `bibliography`, `start`, `numbering`, `lang`, `book`). The result is
+/// `schema("resolved")`: `numbering` and `lang` as used, `counters` (every
+/// series with its `numbers` and `next`), `next_start` (prefix -> the
+/// first free value, for the next document of a build), `labels` (in
+/// document order, with `formatted` numbers), `book` (this document's
+/// labels for its siblings, located at `path#key`), `refs` (one per
+/// reference, `resolution.kind` in `label`, `sibling`, `citation`,
+/// `glossary`, `doi`, `external`, `ambiguous`, `unresolved`),
+/// `bibliography` (keys), `entries`, `dois` (pending), `glossary`, `index`,
+/// `crossrefs`, `included` (files loaded through includes) and
+/// `diagnostics`. Pass `text` to get `line` and `col` on the diagnostics
+/// of the main file.
 #[pyfunction]
 #[pyo3(signature = (doc, loader = None, options = None, text = None))]
 fn resolve<'py>(

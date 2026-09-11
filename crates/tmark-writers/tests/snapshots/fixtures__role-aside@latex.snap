@@ -1,0 +1,20 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+Hooke's law\tsaside[side=left]{linear only at small strain} holds.
+
+---requires---
+{
+  "packages": [],
+  "fragments": [
+    "ts-typesetting"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

@@ -140,6 +140,69 @@
           ]
         },
         {
+          "description": "Appendix \"PyMdownX compatibility profile\": a spelling of the profile the parser recognises but does not implement yet (milestone 5), so it is literal text: content tabs, critic markup, progress bars, wiki links, fancy list markers, `^^x^^` without `inline.insert`, emoji and icon shortcodes, `[TOC]`. Loud rather than silent (P4).",
+          "type": "string",
+          "enum": [
+            "compat-unsupported"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: the payload of a `yaml table` or `yaml table-config` fence is not YAML or not a mapping; the fence stays a code block.",
+          "type": "string",
+          "enum": [
+            "table-yaml"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: a key the table schema does not know (top level, `table:`, a column, a cell, a separator, a named row). Python `extra=\"forbid\"`.",
+          "type": "string",
+          "enum": [
+            "table-unknown-key"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: `columns` missing, not a list, fewer than two, a descriptor that is neither a name nor a mapping, a group without a name or without columns.",
+          "type": "string",
+          "enum": [
+            "table-columns"
+          ]
+        },
+        {
+          "description": "Spec §Table: an `align` value outside `l|c|r|j` and their long forms.",
+          "type": "string",
+          "enum": [
+            "table-align"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: a value of the wrong shape (a row that is neither a list nor a mapping, an empty row, a cell mapping without `value`, `rows`/`cols` below 1, `long` that is not a boolean or `auto`, a width that is not text).",
+          "type": "string",
+          "enum": [
+            "table-shape"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: a row that does not cover the declared columns (extra cells, missing cells, a list longer than its group).",
+          "type": "string",
+          "enum": [
+            "table-row-width"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: a span that collides with another, runs past the last column or row, or is not acknowledged with `~`.",
+          "type": "string",
+          "enum": [
+            "table-span"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5 (named-row mode): a key that names no top-level data column.",
+          "type": "string",
+          "enum": [
+            "table-column-unknown"
+          ]
+        },
+        {
           "description": "Spec §Ref: a key found in no registry.",
           "type": "string",
           "enum": [
@@ -249,6 +312,27 @@
           "type": "string",
           "enum": [
             "heading-skip"
+          ]
+        },
+        {
+          "description": "Spec §Table rung 5: a `placement` that is not made of `hHtbpT!`.",
+          "type": "string",
+          "enum": [
+            "table-placement"
+          ]
+        },
+        {
+          "description": "Spec §Table: a width that is empty or a percentage outside (0, 100].",
+          "type": "string",
+          "enum": [
+            "table-width"
+          ]
+        },
+        {
+          "description": "Spec §Table: column percentages that add up to more than 100.",
+          "type": "string",
+          "enum": [
+            "table-width-sum"
           ]
         }
       ]

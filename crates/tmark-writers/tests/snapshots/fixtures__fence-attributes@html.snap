@@ -1,0 +1,47 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<pre><code class="language-md"># Hello
+</code></pre>
+<figure>
+<pre class="mermaid">flowchart LR
+  A --&gt; B</pre>
+</figure>
+<figure class="listing wide">
+<div class="title">hanoi.py</div>
+<pre><code class="language-python">print(1)
+</code></pre>
+</figure>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "",
+      "node": 3,
+      "attrs": [
+        [
+          "generate",
+          "mermaid"
+        ],
+        [
+          "code",
+          "flowchart LR\n  A --> B"
+        ],
+        [
+          "width",
+          "80%"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

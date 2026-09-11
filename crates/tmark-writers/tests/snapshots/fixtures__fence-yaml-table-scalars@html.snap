@@ -1,0 +1,42 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<table>
+<thead>
+<tr>
+<th>A</th>
+<th>B</th>
+<th>C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.10</td>
+<td>+1</td>
+<td>0x1F</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NULL</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td colspan="2">1e3</td>
+<td>on</td>
+</tr>
+</tbody>
+</table>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

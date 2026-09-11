@@ -49,8 +49,8 @@ tmark.lint(text: str, file: str = "<memory>", loader: Loader | None = None, opti
 tmark.fixes(text: str, file: str = "<memory>", loader: Loader | None = None, options: dict | None = None) -> str
     # what `tmark lint --fix` writes
 tmark.resolve(doc: dict, loader: Loader | None = None, options: dict | None = None, text: str | None = None) -> dict
-    # schema("resolved"): counters (numbers, next), next_start, labels, refs,
-    # bibliography, entries, dois, glossary, index, crossrefs, included, diagnostics
+    # schema("resolved"): numbering, lang, counters (numbers, next), next_start, labels, book,
+    # refs, bibliography, entries, dois, glossary, index, crossrefs, included, diagnostics
 tmark.edit(text: str, doc: dict, node_id: int, replacement: dict) -> str
 tmark.edit_many(text: str, doc: dict, edits: list[dict]) -> str   # [{"node_id", "replacement"}], disjoint spans or ValueError
 tmark.write(doc: dict, backend: str, options: dict, loader: Loader | None = None, resolved: dict | None = None) -> dict
@@ -68,10 +68,13 @@ tmark.version() -> str; tmark.__version__  # the workspace version
 document's path, relative to which includes and sources load; `file` when
 it is a real path), `bibliography` (`.bib` paths relative to the
 document's directory), `start` (prefix → first value; the previous
-document's `next_start`), `profile`, `levels` (code → `off | hint | info |
-warning | error`; lint rules only, parse and resolve diagnostics are
-facts). An unknown key is a `TypeError`, an unknown code or level a
-`ValueError`.
+document's `next_start`), `numbering` (`backend`, the default, or `all`:
+design 06 §Site-wide resolution), `lang` (label words: `fr`, `de-CH`),
+`book` (the sibling documents' labels: the `book` lists of their own
+`resolve` results, locations relativised by the caller), `profile`,
+`levels` (code → `off | hint | info | warning | error`; lint rules only,
+parse and resolve diagnostics are facts). An unknown key is a
+`TypeError`, an unknown code or level a `ValueError`.
 
 `Loader` is a Python protocol (`tmark.Loader`, runtime-checkable) with
 `load(from_path: str, rel: str) -> str | None`, wrapped into a Rust

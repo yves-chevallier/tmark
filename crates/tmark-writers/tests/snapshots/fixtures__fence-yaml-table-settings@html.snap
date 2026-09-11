@@ -1,0 +1,41 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th style="text-align: right">Q1</th>
+<th style="text-align: right">Q2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Salaries</td>
+<td style="text-align: right">120</td>
+<td style="text-align: right">122</td>
+</tr>
+<tr class="separator double"><td colspan="3"><em>Totals</em></td></tr>
+</tbody>
+<tfoot>
+<tr>
+<td>Total</td>
+<td style="text-align: right">120</td>
+<td style="text-align: right">122</td>
+</tr>
+</tfoot>
+</table>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

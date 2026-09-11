@@ -1,0 +1,35 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{center}
+\begin{tabular}{lllll}
+\toprule
+\multirow{3}{*}{Product} & \multicolumn{4}{c}{2024} \\
+\cmidrule(lr){2-5}
+ & \multicolumn{2}{c}{H1} & \multicolumn{2}{c}{H2} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+ & Q1 & Q2 & Q3 & Q4 \\
+\midrule
+Alpha & \multicolumn{2}{c}{\multirow{2}{*}{Maria}} & 3 & 4 \\
+Beta & \multicolumn{2}{c}{} & 5 & 6 \\
+Gamma & 1 & 2 & \multicolumn{2}{c}{Sum} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+---requires---
+{
+  "packages": [
+    "booktabs",
+    "multirow"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

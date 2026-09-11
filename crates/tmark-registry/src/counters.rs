@@ -9,12 +9,14 @@ use tmark_ir::registry::{self, Scope};
 use tmark_ir::{Code, Diagnostic, Document};
 
 use crate::collect::Labels;
+use crate::Numbering;
 
 /// One series. Spec §Counters, "Fields".
 #[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 pub struct Counter {
     pub prefix: String,
-    /// Label word (`Figure`, `Finding`); none for `gls` and `doi`.
+    /// Label word (`Figure`, `Finding`), in the resolution's language for
+    /// a predeclared series; none for `gls` and `doi`.
     pub name: Option<String>,
     /// Python-style format over `n`, `prefix`, `key`; `None` means `"{n}"`.
     pub format: Option<String>,
@@ -22,7 +24,8 @@ pub struct Counter {
     pub scope: Option<Scope>,
     /// Template of a reference (`"{name} {number}"`, `"{number}"`).
     pub reference: String,
-    /// Numbered by TeXSmith (user series) rather than by the backend.
+    /// Numbered by tmark in this resolution: a user series always, a
+    /// backend series under `Numbering::All`.
     pub tmark_numbered: bool,
     /// Numbers allocated in document order, by key.
     pub numbers: BTreeMap<String, u32>,
@@ -32,7 +35,7 @@ pub struct Counter {
 }
 
 impl Counter {
-    /// The value the next label of a TeXSmith-numbered series takes.
+    /// The value the next label of a tmark-numbered series takes.
     pub fn next(&self) -> u32 {
         self.next
     }
@@ -46,6 +49,18 @@ impl Counter {
             &self.prefix,
             key,
         ))
+    }
+
+    /// The text a reference to a key renders: the `ref` template over
+    /// `{name}` and `{number}` (`Figure 3`, `FW-01`), when this series
+    /// numbers the key.
+    pub fn reference_text(&self, key: &str) -> Option<String> {
+        let number = self.label(key)?;
+        let text = self
+            .reference
+            .replace("{name}", self.name.as_deref().unwrap_or_default())
+            .replace("{number}", &number);
+        Some(text.trim().to_string())
     }
 }
 
@@ -104,26 +119,34 @@ impl Counters {
         self.get(prefix).is_some()
     }
 
-    /// Step 1 of the resolution: predeclared entries, then the front
-    /// matter's declarations (which may override fields of a predeclared
-    /// entry but not shadow a role name).
+    /// Step 1 of the resolution: predeclared entries (their label word in
+    /// `lang`, English when `None`), then the front matter's declarations
+    /// (which may override fields of a predeclared entry but not shadow a
+    /// role name). Under `Numbering::All` every series with a scope is
+    /// tmark-numbered.
     pub fn declare(
         doc: &Document,
         start: &BTreeMap<String, u32>,
+        numbering: Numbering,
+        lang: Option<&str>,
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Self {
         let mut counters = Counters::default();
         for p in registry::PREFIXES {
+            let name = match lang {
+                Some(lang) => registry::prefix_name(p.name, lang),
+                None => p.label,
+            };
             counters.by_prefix.insert(
                 p.name.to_string(),
                 Counter {
                     prefix: p.name.to_string(),
-                    name: p.label.map(str::to_string),
+                    name: name.map(str::to_string),
                     format: None,
                     start: 1,
                     scope: p.scope,
                     reference: p.reference.unwrap_or("{number}").to_string(),
-                    tmark_numbered: false,
+                    tmark_numbered: numbering == Numbering::All && p.scope.is_some(),
                     numbers: BTreeMap::new(),
                     next: 1,
                 },
@@ -201,8 +224,9 @@ impl Counters {
         counters
     }
 
-    /// Step 3: number the labels of the TeXSmith-numbered series in
-    /// document order.
+    /// Step 3: number the labels of the tmark-numbered series in document
+    /// order, continuously (`start` carries a series across documents;
+    /// scopes never reset here).
     pub fn allocate(&mut self, labels: &mut Labels) {
         for label in labels.in_order.iter_mut() {
             let Some(prefix) = &label.prefix else {

@@ -1,0 +1,32 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<figure id="fig:plot">
+<img src="trace.png" alt="Trace of the boot" id="fig:trace" width="60%" />
+<figcaption><span class="caption-label">Figure 2</span> The watchdog fires <strong>twice</strong>.</figcaption>
+</figure>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "trace.png",
+      "node": 2,
+      "attrs": [
+        [
+          "width",
+          "60%"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

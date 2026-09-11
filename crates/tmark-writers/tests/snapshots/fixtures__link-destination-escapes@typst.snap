@@ -1,0 +1,23 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#link("b c")[a] #link("e)f")[d] #link(<h-i>)[g] #box(image("k l.png", height: 1em)) #link("n(o)p")[m]
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "k l.png",
+      "node": 11
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

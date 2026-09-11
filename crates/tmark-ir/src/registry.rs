@@ -254,6 +254,61 @@ pub fn prefix(name: &str) -> Option<&'static Prefix> {
     PREFIXES.iter().find(|p| p.name.eq_ignore_ascii_case(name))
 }
 
+/// The label word of a predeclared prefix in one language: the "Name
+/// (localised)" column of spec Table "Predeclared counter prefixes".
+/// English is `Prefix::label`; this table carries the other languages
+/// (design 06 §Site-wide resolution: the web has no babel to localise
+/// `Figure 3` for it). Words follow babel's `\figurename`, `\tablename`,
+/// `\chaptername`, `\partname`, `\appendixname`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PrefixName {
+    /// The primary language subtag, lowercase (`fr`).
+    pub lang: &'static str,
+    pub prefix: &'static str,
+    pub name: &'static str,
+}
+
+const fn name(lang: &'static str, prefix: &'static str, name: &'static str) -> PrefixName {
+    PrefixName { lang, prefix, name }
+}
+
+pub const PREFIX_NAMES: &[PrefixName] = &[
+    name("fr", "part", "Partie"),
+    name("fr", "chap", "Chapitre"),
+    name("fr", "sec", "Section"),
+    name("fr", "app", "Annexe"),
+    name("fr", "fig", "Figure"),
+    name("fr", "tbl", "Table"),
+    name("fr", "lst", "Listing"),
+    name("fr", "eq", "Équation"),
+    name("fr", "thm", "Théorème"),
+    name("fr", "note", "Note"),
+    name("de", "part", "Teil"),
+    name("de", "chap", "Kapitel"),
+    name("de", "sec", "Abschnitt"),
+    name("de", "app", "Anhang"),
+    name("de", "fig", "Abbildung"),
+    name("de", "tbl", "Tabelle"),
+    name("de", "lst", "Listing"),
+    name("de", "eq", "Gleichung"),
+    name("de", "thm", "Satz"),
+    name("de", "note", "Anmerkung"),
+];
+
+/// The label word of a predeclared prefix in `lang` (a BCP 47 tag, of
+/// which the primary subtag decides: `fr-CH` is `fr`). English, an
+/// unknown language and a prefix that numbers nothing give
+/// `Prefix::label`; an unknown prefix gives `None`.
+pub fn prefix_name(prefix_name: &str, lang: &str) -> Option<&'static str> {
+    let p = prefix(prefix_name)?;
+    let primary = lang.split(['-', '_']).next().unwrap_or(lang);
+    PREFIX_NAMES
+        .iter()
+        .find(|n| n.prefix == p.name && n.lang.eq_ignore_ascii_case(primary))
+        .map(|n| n.name)
+        .or(p.label)
+}
+
 // ---------------------------------------------------------------------------
 // Admonitions
 // ---------------------------------------------------------------------------
@@ -818,6 +873,27 @@ mod tests {
         assert_eq!(prefix("Fig").unwrap().name, "fig");
         assert_eq!(prefix("gls").unwrap().scope, None);
         assert!(prefix("fw").is_none());
+        assert_eq!(prefix_name("fig", "de"), Some("Abbildung"));
+        assert_eq!(prefix_name("Fig", "fr-CH"), Some("Figure"));
+        assert_eq!(prefix_name("tbl", "en"), Some("Table"));
+        assert_eq!(prefix_name("tbl", "xx"), Some("Table"));
+        assert_eq!(prefix_name("gls", "fr"), None);
+        assert_eq!(prefix_name("fw", "fr"), None);
+        for n in PREFIX_NAMES {
+            assert!(
+                prefix(n.prefix).is_some(),
+                "{}: a predeclared prefix",
+                n.prefix
+            );
+        }
+        for lang in ["fr", "de"] {
+            let covered = PREFIX_NAMES.iter().filter(|n| n.lang == lang).count();
+            let numbered = PREFIXES.iter().filter(|p| p.label.is_some()).count();
+            assert_eq!(
+                covered, numbered,
+                "{lang}: every numbered prefix has a word"
+            );
+        }
         for p in PREFIXES {
             assert!(
                 role(p.name).is_none(),

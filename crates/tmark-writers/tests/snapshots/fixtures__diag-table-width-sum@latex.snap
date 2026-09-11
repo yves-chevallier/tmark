@@ -1,0 +1,28 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{\dimexpr 0.6\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.5\linewidth-2\tabcolsep\relax}}
+\toprule
+A & B \\
+\midrule
+1 & 2 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+---requires---
+{
+  "packages": [
+    "booktabs"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

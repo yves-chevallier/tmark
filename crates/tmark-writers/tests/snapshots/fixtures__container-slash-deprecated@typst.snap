@@ -1,0 +1,43 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#figure(
+  image("mozzarella.svg", width: 80%),
+  caption: [Melting behavior of high-moisture cheese
+upon heating],
+) <fig:melting>
+
+#figure(
+  table(
+    columns: 2,
+    align: (left, left,),
+    table.header([Cheese], [Age]),
+    [Comté], [18],
+  ),
+  caption: [Hard cheese samples],
+) <tbl:samples>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "mozzarella.svg",
+      "node": 2,
+      "attrs": [
+        [
+          "width",
+          "80%"
+        ]
+      ]
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
