@@ -19,8 +19,8 @@ pub use tmark_lint::{lint, Config as LintConfig};
 #[cfg(feature = "fs")]
 pub use tmark_registry::FsLoader;
 pub use tmark_registry::{
-    resolve, Host, Label, Loader, MemoryLoader, RefResolution, Resolution, ResolveOptions,
-    Resolved, ResolvedView,
+    resolve, BookLabel, Host, Label, Loader, MemoryLoader, Numbering, RefResolution, Resolution,
+    ResolveOptions, Resolved, ResolvedView,
 };
 pub use tmark_syntax::{parse, parse_strict, Parsed};
 
