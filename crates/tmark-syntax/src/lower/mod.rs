@@ -6,6 +6,7 @@
 //! total: unrecognised input lowers to literal text and a diagnostic.
 
 mod block;
+mod compat;
 mod inline;
 mod table;
 

@@ -67,7 +67,7 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Math `$…$`, `$$…$$`, `\(…\)`, `\[…\]` | §Math | inline/block | Vendored math construct plus the two LaTeX-habit delimiters. |
 | Moustache `{{ key }}` | §Front matter | lowering | Text scan in lowering; produces `Var` inline. Not inside code. |
 | Comment `<!-- -->` | §Comment | block/inline | HTML construct; lowering produces `Comment` for the comment form only, `RawInline`/`RawBlock` with `format = "html"` for other HTML. |
-| Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal. |
+| Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal text plus `compat-unsupported` (`lower/compat.rs`), like tabs, progress bars, wiki links, shortcodes, fancy list markers and `[TOC]` (design 05). |
 | Escapes `\@`, `\#` | §Lexical grammar | inline | Added to the escape construct's character set. |
 
 ### Rule of thumb

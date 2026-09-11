@@ -230,6 +230,10 @@ impl Lowerer {
                             let marker = if n.kind == TmarkMarkKind::Subscript {
                                 "~"
                             } else {
+                                self.compat_unsupported(
+                                    span,
+                                    "`^^…^^` without the `inline.insert` feature",
+                                );
                                 "^^"
                             };
                             out.push(self.literal_text(span, marker));
@@ -368,6 +372,7 @@ impl Lowerer {
         out: &mut Vec<Inline>,
     ) {
         let span = self.span(ctx, position);
+        self.compat_scan_text(value, ctx.slice(position), span);
         let pieces: Vec<&str> = value.split('\n').collect();
         if pieces.len() == 1 {
             if !value.is_empty() {
@@ -496,6 +501,7 @@ impl Lowerer {
             }
             BraceKind::Role(head) => self.lower_role(node, head, nodes, index, ctx, out),
             BraceKind::Literal => {
+                self.compat_scan_brace(&node.value, span);
                 out.push(
                     self.literal_text(span, decode_escapes(ctx.slice(node.position.as_ref()))),
                 );

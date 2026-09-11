@@ -6,3 +6,5 @@
 # everyone who runs the test benefits from these saved cases.
 cc 822b479ee8d689b7b78d3eed07468be5d39736069a10e37376b04fcef3062ac0 # shrinks to text = "a\\[𞺋"
 cc ac908dd8c56fd329f054828f2fd35fd1324b0c66f4ff73dc74809eb4735b87ad # shrinks to text = "{\\(é\n"
+cc d873c3f080eb290b0c23ef5b6e0aaf37034607989191747f4810578544fd1c3c # shrinks to text = "® 𐖌"
+cc 51763e418aa298e037c73ae1f5027351b460f591ae6ab2b8c380cdafcdd3f4d5 # shrinks to text = "é {"

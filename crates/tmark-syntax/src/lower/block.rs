@@ -74,6 +74,7 @@ impl Lowerer {
                 let meta = self.meta(span);
                 let lowered = self.lower_inlines(&p.children, ctx);
                 let mut content = lowered.inlines;
+                self.compat_scan_paragraph(&content, ctx.slice(p.position.as_ref()), span);
                 let lead = self.take_lead(&mut content);
                 if let Some((attrs, attrs_span)) = lowered.tail_attrs {
                     // A paragraph cannot host attributes, except through the

@@ -25,7 +25,7 @@ code: message`; the LSP maps the fields one to one.
 
 | Stage | Examples | Owner |
 | ----- | -------- | ----- |
-| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
+| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing` | `tmark-registry` |
 | Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip` | `tmark-lint` |
 
@@ -122,6 +122,23 @@ spelling is safe, guessing a label for an unresolved reference is not.
   fixes after the first are skipped). The message names the target
   (`` `counters` is deprecated, write `press.declare.counters` ``);
   `frontmatter::deprecated_key_target` is the one table.
+- `compat-unsupported` (warning, parse stage, `tmark-syntax/src/lower/compat.rs`)
+  replaces silence for the PyMdownX spellings milestone 5 will implement:
+  content tabs (`=== "Title"` paragraphs), critic markup (a literal brace
+  group `{--…--}`, `{++…++}`, `{~~…~~}`, `{==…==}`, `{>>…<<}`), progress
+  bars (`[=n% "label"]`), wiki links (`[[…]]`), emoji and icon shortcodes
+  (`:smile:`, `:material-…:`, not inside a word), `^^…^^` without
+  `inline.insert`, lower-case fancy list markers (`a.`, `iv.`, `#.`, `1)`)
+  and `[TOC]` at a paragraph start. It is a new code rather than
+  `strict-x-construct` because these are not X-class deviations under a
+  profile: they are constructs of the compatibility appendix that every
+  profile will accept once implemented, and the strict profile must keep
+  reporting X1/X3 separately. A spelling escaped at its first character
+  (`\[TOC]`, `\:smile:`, a paragraph starting with `\`) is the author's
+  literal text and is not reported. The scans are narrow on purpose (a
+  miss is the old behaviour, a false positive is a wrong warning on
+  prose): upper-case list markers (`I. M. Pei`) and shortcodes glued to a
+  word (`a:b:`) are left alone. Fixture `diag-compat-unsupported`.
 - `deprecated` on `[^key]` / `^[k1,k2]` citations, `/// latex`,
   `/// caption` blocks, `[](gls:term)`, `{index}[…]{b}`, `{index:r}[…]`
   and the `--8<--` fence body all carry the generic node-reprint fix
