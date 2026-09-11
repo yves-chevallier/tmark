@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+# Top
+
+### Skipped
+
+{lead}[Note.] Promoted.
+
+<figure markdown="1" class="ts-table" id="fig:t">
+<figcaption markdown="span"><span class="ts-caption-label">Figure 1:</span> T.</figcaption>
+
+| a   |
+| --- |
+| 1   |
+
+</figure>

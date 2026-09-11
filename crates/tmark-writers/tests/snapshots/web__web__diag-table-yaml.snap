@@ -1,0 +1,8 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+```yaml table
+- not
+- a mapping
+```

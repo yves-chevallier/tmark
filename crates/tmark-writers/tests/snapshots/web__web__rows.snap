@@ -1,0 +1,182 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+title: Firmware review
+lang: en
+press:
+  declare:
+    counters:
+      fw: {name: Finding, format: "FW-{n:02d}"}
+    admonitions:
+      theorem: {name: Theorem, counter: thm}
+    glossary:
+      hal: Hardware abstraction layer
+---
+
+# Findings {#sec:findings}
+
+A finding <span class="ts-counter" id="fw:watchdog" data-counter="fw" data-key="watchdog">FW-01</span> and a silent one below. See [FW-01](#fw:watchdog), [FW-01](#fw:watchdog),
+[FW-01 and FW-02](#fw:watchdog), [Findings](#sec:findings), [Figure 1](#fig:boot), [Figures 2a and 2b](#fig:a), [Figure 2b](#fig:b),
+[Table 1](#tbl:stock), [Listing 1](#lst:hello), [Equation 1](#eq:mass), [Theorem 1](#thm:pyth), see [Figure 1](#fig:boot), left panel,
+[the trace](#fig:boot), <abbr title="Hardware abstraction layer">hal</abbr>, [?nope] and [doi:10.1000/x](https://doi.org/10.1000/x).
+
+Cite (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>), (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>, p. 33; see <a class="ts-cite" href="#ref-ko20">Knuth 2020</a>) and (<a class="ts-cite" href="#ref-ein05">1905</a>).
+
+## Log buffer wiped {#fw:log-wrap}
+
+Firmware review by {{ nobody }}.
+
+<figure markdown="span" id="fig:boot">
+![The boot](boot.png){width=50%}
+<figcaption markdown="span"><span class="ts-caption-label">Figure 1:</span> The *boot* sequence, see [FW-01](#fw:watchdog).</figcaption>
+</figure>
+
+
+
+<figure markdown="span" id="fig:pair" class="ts-subfigures" style="--ts-cols:2">
+![Left](a.png){#fig:a}
+<span class="ts-subcaption">(a)</span>
+![Right](b.png){#fig:b}
+<span class="ts-subcaption">(b)</span>
+<figcaption markdown="span"><span class="ts-caption-label">Figure 2:</span> Two panels.</figcaption>
+</figure>
+
+<figure markdown="1" class="ts-table" id="tbl:stock">
+<figcaption markdown="span"><span class="ts-caption-label">Table 1:</span> Stock.</figcaption>
+
+| Id | Item |
+| --- | ---- |
+| <span class="ts-counter" id="fw:ota" data-counter="fw" data-key="ota">FW-03</span> | A cell with [FW-01](#fw:watchdog) |
+
+</figure>
+
+
+
+
+
+<figure markdown="1" class="ts-table" id="tbl:model">
+<figcaption markdown="span"><span class="ts-caption-label">Table 2:</span> A model.</figcaption>
+
+<table class="ts-table" data-ts-table="1" markdown="block">
+<thead markdown="block">
+<tr markdown="block">
+<th markdown="span" rowspan="2">A</th>
+<th markdown="span" colspan="2">G</th>
+</tr>
+<tr markdown="block">
+<th markdown="span">B</th>
+<th markdown="span">C</th>
+</tr>
+</thead>
+<tbody markdown="block">
+<tr markdown="block">
+<td markdown="span">*one*</td>
+<td markdown="span" colspan="2">==two== [FW-03](#fw:ota)</td>
+</tr>
+<tr markdown="block">
+<td markdown="span"></td>
+<td markdown="span">x</td>
+<td markdown="span">y</td>
+</tr>
+</tbody>
+</table>
+
+</figure>
+
+
+
+<figure markdown="1" class="ts-listing" id="lst:hello">
+
+```py title="hello.py"
+print("hi")
+```
+
+<figcaption markdown="span"><span class="ts-caption-label">Listing 1:</span> Hello.</figcaption>
+</figure>
+
+
+
+<div id="eq:mass" class="ts-equation" markdown="1">
+$$
+E = mc^2
+$$
+</div>
+
+!!! note "As written"
+    Body with [FW-01](#fw:watchdog) stays a `!!!` block.
+
+!!! warning wide "A title"
+    Body with [FW-03](#fw:ota) and a nested callout.
+
+    ??? tip
+        Folded.
+
+<div class="admonition theorem" id="thm:pyth" markdown="1">
+<p class="admonition-title">Theorem 1 (Pythagoras)</p>
+
+In a right triangle, $a^2 + b^2 = c^2$.
+
+</div>
+
+<aside class="ts-aside" data-side="left" markdown="1">
+
+A margin *note* with [FW-03](#fw:ota).
+
+</aside>
+
+Inline <span class="ts-aside" data-side="right">margin note</span> and <span class="ts-index" data-tag="hal" data-tag1="layer"></span>, <span class="ts-index" data-tag="boot" data-main></span>,
+<span class="ts-smallcaps">nasa</span>, <span class="ts-smallcaps">caps</span>, ++ctrl+alt+s++, ==x==, ~~y~~, H~2~O,
+E=mc^2^, `#!py print(1)`, <u>u</u>, <span id="sp" class="c" lang="fr">x</span>,
+<b>raw</b>,,
+and web only.
+
+
+
+<hr class="raw" />
+
+
+
+## Included {#sec:extra}
+
+Included <span class="ts-counter" id="fw:extra" data-counter="fw" data-key="extra">FW-05</span>, see [FW-01](#fw:watchdog) and [Included](#sec:extra).
+
+--8<-- "snippets/x.md"
+
+```mermaid
+graph TD; A-->B;
+```
+
+- A list item with [FW-03](#fw:ota)
+
+  !!! note "Nested"
+      In a list, with [FW-01](#fw:watchdog).
+
+> A quote with <span class="ts-counter" id="fw:quoted" data-counter="fw" data-key="quoted">FW-04</span> and [FW-04](#fw:quoted).
+
+Term
+:   A definition with [FW-03](#fw:ota).
+
+Footnote[^1] and *[HAL]: Hardware abstraction layer.
+
+[^1]: A note with [FW-03](#fw:ota).
+
+::: gadget {x=1}
+Unknown container with [FW-03](#fw:ota).
+:::
+
+---
+
+## References
+
+<ol class="ts-bibliography">
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em>. Annalen der Physik. <a href="https://doi.org/10.1002/andp.19053221004">doi:10.1002/andp.19053221004</a></li>
+<li id="ref-ko20">Ada Knuth, Bob Ritchie. (2020). <em>Systems</em></li>
+</ol>
+---bibliography---
+<ol class="ts-bibliography">
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em>. Annalen der Physik. <a href="https://doi.org/10.1002/andp.19053221004">doi:10.1002/andp.19053221004</a></li>
+<li id="ref-ko20">Ada Knuth, Bob Ritchie. (2020). <em>Systems</em></li>
+</ol>
+---diagnostics---

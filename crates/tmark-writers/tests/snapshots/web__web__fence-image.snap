@@ -1,0 +1,17 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+```python image include="plot.py"
+plt.plot([1, 2, 4, 8])
+```
+
+```mermaid image
+flowchart LR
+  A --> B
+```
+
+```mermaid code
+flowchart LR
+  A --> B
+```

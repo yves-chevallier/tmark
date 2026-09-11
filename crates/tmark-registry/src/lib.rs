@@ -27,7 +27,7 @@ pub use counters::{Counter, Counters};
 pub use inventory::{CrossRefs, Inventory, InventoryEntry};
 #[cfg(feature = "fs")]
 pub use loader::FsLoader;
-pub use loader::{Loader, MemoryLoader};
+pub use loader::{join, Loader, MemoryLoader};
 pub use refs::{RefResolution, Resolution};
 pub use view::{IndexEntryView, LabelView, ResolvedView};
 

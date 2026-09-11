@@ -1,0 +1,7 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<span class="ts-counter" id="rq:one" data-counter="rq" data-key="one">1</span> A requirement with an undeclared series.
+
+![Trace](trace.png){#tbl:trace}

@@ -1,0 +1,10 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+- [ ] open
+- [x] done with [?sec:intro]
+- plain
+
+3. third
+4. fourth

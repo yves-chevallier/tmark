@@ -1,0 +1,12 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+press:
+  sources:
+    bibliography:
+      stock: {type: misc, title: Stock}
+---
+
+<span id="stock">This claim</span> is cited as [?stock].

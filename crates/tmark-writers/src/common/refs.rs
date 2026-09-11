@@ -66,6 +66,34 @@ pub fn number(res: &Resolved, prefix: &str, key: &str) -> Option<String> {
     res.counters.get(prefix).and_then(|c| c.label(key))
 }
 
+/// The minimal built-in citation style (design 07 §Mapping rules):
+/// `Author Year`, the year alone for `-@key`, the key when the
+/// bibliography has no record.
+pub fn author_year(res: &Resolved, key: &str, suppress_author: bool) -> String {
+    let Some(entry) = res.bibliography.get(key) else {
+        return key.to_string();
+    };
+    let year = entry
+        .fields
+        .get("year")
+        .or_else(|| entry.fields.get("date"))
+        .map(|d| d.chars().take(4).collect::<String>());
+    let author = entry.fields.get("author").map(|a| {
+        let first = a.split(" and ").next().unwrap_or(a);
+        match first.split_once(',') {
+            Some((last, _)) => last.trim().to_string(),
+            None => first.rsplit(' ').next().unwrap_or(first).to_string(),
+        }
+    });
+    match (author, year, suppress_author) {
+        (_, Some(year), true) => year,
+        (Some(author), Some(year), false) => format!("{author} {year}"),
+        (Some(author), None, false) => author,
+        (None, Some(year), _) => year,
+        _ => key.to_string(),
+    }
+}
+
 /// The series numbers labels itself (declared counters); `false` for the
 /// predeclared backend-numbered ones.
 pub fn tmark_numbered(res: &Resolved, prefix: &str) -> bool {

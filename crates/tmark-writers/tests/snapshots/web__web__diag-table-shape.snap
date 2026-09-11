@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<table class="ts-table" data-ts-table="1" markdown="block">
+<thead markdown="block">
+<tr markdown="block">
+<th markdown="span">A</th>
+<th markdown="span">B</th>
+</tr>
+</thead>
+<tbody markdown="block">
+<tr markdown="block">
+<td markdown="span">1</td>
+<td markdown="span"></td>
+</tr>
+</tbody>
+</table>

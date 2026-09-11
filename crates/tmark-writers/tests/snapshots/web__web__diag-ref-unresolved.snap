@@ -1,0 +1,7 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+## Intro {#sec:intro}
+
+See [Intro](#sec:intro), [Intro](#sec:intro) and [the intro](#sec:intro), but not [?sec:nope].

@@ -1,0 +1,12 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+\=\=\= "Windows"
+
+A \{--deleted--} word, a bar [=45% "Review"\]{: .thin}, a [[Wiki Page]],
+an emoji :smile: and an icon :material-home:, then \^\^inserted\^\^ text.
+
+a. first fancy item
+
+[TOC]

@@ -1,0 +1,13 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+press:
+  sources:
+    crossrefs: {fwrev: build/fw.refs.json}
+---
+
+{include}(chapters/boot.md)
+
+See [?fwrev:fw:x].

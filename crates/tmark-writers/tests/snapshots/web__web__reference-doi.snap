@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Cite [doi:10.1002/andp.19053221004](https://doi.org/10.1002/andp.19053221004) and [doi:10.1002/andp.19053221004](https://doi.org/10.1002/andp.19053221004).

@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+[a](b "t\\") [c](d "t\"q") [e](f "t\\\"q")

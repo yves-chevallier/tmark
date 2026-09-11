@@ -1,0 +1,21 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+press:
+  declare:
+    counters:
+      fw: {name: Finding, format: "FW-{n:02d}"}
+---
+
+<span class="ts-counter" id="fw:boot" data-counter="fw" data-key="boot">FW-01</span> A finding.
+
+::: texsmith.core.counters
+```
+options:
+  show_source: false
+```
+
+Prose after the directive still refers to [FW-01](#fw:boot).
+:::

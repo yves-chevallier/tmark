@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Bytes <span class="ts-index" data-tag="endianness"></span> and <span class="ts-index" data-tag="byte order" data-tag1="endianness"></span> and <span class="ts-index" data-tag="chocolate" data-main></span>.

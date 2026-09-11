@@ -1,0 +1,10 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+The HTML spec[^1] is maintained by the W3C. <!-- check the year -->
+
+[^1]: The living standard.
+
+*[HTML]: HyperText Markup Language
+*[W3C]: World Wide Web Consortium

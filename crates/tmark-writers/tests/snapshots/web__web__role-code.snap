@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Call `#!py print(1)` or `#!py print(1)` but never `rm -rf`.

@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Small caps <span class="ts-smallcaps">on the label</span> here.

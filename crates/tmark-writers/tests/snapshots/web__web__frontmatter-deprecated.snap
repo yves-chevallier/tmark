@@ -1,0 +1,15 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+title: Notes
+authors: [TeXSmith]
+counters:
+  fw:
+    name: Finding
+press:
+  admonition_style: classic
+---
+
+Text.

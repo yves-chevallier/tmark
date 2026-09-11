@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Relativity <span class="ts-index" data-tag="relativity" data-main></span> and <span class="ts-index" data-tag="Einstein" data-tag1="papers"></span>.
