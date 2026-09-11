@@ -68,6 +68,7 @@ def lint(text: str, file: str = "<memory>", loader: Loader | None = None, option
     `loader` (the file system when `None`) relative to `options["path"]`
     (`file` when it is a real path). `options` accepts `path`,
     `bibliography` (list of `.bib` paths), `start` (prefix -> first value),
+    `numbering` (`backend` or `all`), `lang`, `book` (sibling labels),
     `profile` and `levels` (code -> `off`/`hint`/`info`/`warning`/`error`).
     Each diagnostic is the JSON of `tmark_ir::Diagnostic` (`code` as its
     kebab-case id) plus `stage`, `path`, `line` and `col` (1-based, byte
@@ -100,15 +101,18 @@ def resolve(doc: dict[str, Any], loader: Loader | None = None, options: dict[str
     Build the registries of a parsed document and resolve its references
     (design 06). `doc` is a `parse` result (its `"tmark"` version must
     match); `loader` and `options` are those of `lint` (`path`,
-    `bibliography`, `start`). The result is `schema("resolved")`:
-    `counters` (every series with its `numbers` and `next`), `next_start`
-    (prefix -> the first free value, for the next document of a build),
-    `labels` (in document order, with `formatted` numbers), `refs` (one per
-    reference, `resolution.kind` in `label`, `citation`, `glossary`, `doi`,
-    `external`, `ambiguous`, `unresolved`), `bibliography` (keys), `entries`,
-    `dois` (pending), `glossary`, `index`, `crossrefs`, `included` (files
-    loaded through includes) and `diagnostics`. Pass `text` to get `line`
-    and `col` on the diagnostics of the main file.
+    `bibliography`, `start`, `numbering`, `lang`, `book`). The result is
+    `schema("resolved")`: `numbering` and `lang` as used, `counters` (every
+    series with its `numbers` and `next`), `next_start` (prefix -> the
+    first free value, for the next document of a build), `labels` (in
+    document order, with `formatted` numbers), `book` (this document's
+    labels for its siblings, located at `path#key`), `refs` (one per
+    reference, `resolution.kind` in `label`, `sibling`, `citation`,
+    `glossary`, `doi`, `external`, `ambiguous`, `unresolved`),
+    `bibliography` (keys), `entries`, `dois` (pending), `glossary`, `index`,
+    `crossrefs`, `included` (files loaded through includes) and
+    `diagnostics`. Pass `text` to get `line` and `col` on the diagnostics
+    of the main file.
     """
     ...
 
