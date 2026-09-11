@@ -74,10 +74,11 @@ pub fn sequence(tokenizer: &mut Tokenizer) -> State {
         tokenizer.tokenize_state.size += 1;
         tokenizer.consume();
         State::Next(StateName::TmarkAdmonitionSequence)
-    } else if tokenizer.tokenize_state.size != 3 && tokenizer.tokenize_state.marker != b':' {
-        reset(tokenizer);
-        State::Nok
-    } else if tokenizer.tokenize_state.size < 3 {
+    } else if tokenizer.tokenize_state.size < 3
+        || (tokenizer.tokenize_state.size != 3 && tokenizer.tokenize_state.marker != b':')
+    {
+        // Exactly three markers, except the directive's `:::`, which may be
+        // longer (spec §Lexical grammar: `:{3,}`).
         reset(tokenizer);
         State::Nok
     } else if !tokenizer.tokenize_state.seen
