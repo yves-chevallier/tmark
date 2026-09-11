@@ -117,7 +117,24 @@ impl Lowerer {
                     out.push(Inline::LineBreak(LineBreak { meta }));
                 }
                 Node::Link(n) => {
-                    let meta = self.meta_at(ctx, n.position.as_ref());
+                    let span = self.span(ctx, n.position.as_ref());
+                    let meta = self.meta(span);
+                    // Deprecated `[](gls:term)` glossary reference (Appendix
+                    // "Deprecation schedule", C20): a bare `Ref`.
+                    if n.children.is_empty() && n.url.starts_with("gls:") && n.title.is_none() {
+                        let at = n.position.as_ref().map_or(0, |p| p.start.offset) + 3;
+                        self.deprecated(span, "[](gls:term)", "@gls:term");
+                        out.push(Inline::Ref(Ref {
+                            meta,
+                            items: vec![tmark_ir::RefItem {
+                                key: n.url.clone(),
+                                key_span: SubSpan(self.span_of(ctx, at, at + n.url.len())),
+                                ..Default::default()
+                            }],
+                            bracketed: false,
+                        }));
+                        continue;
+                    }
                     let content = self.lower_inlines(&n.children, ctx).inlines;
                     out.push(Inline::Link(Link {
                         meta,
@@ -566,10 +583,22 @@ impl Lowerer {
                 }
             }
         }
+        // Deprecated `{index}[…]{b}` (main entry) and `{i}` (italic) suffixes
+        // (Appendix "Deprecation schedule", C20): consumed with the role.
+        let mut index_suffix = None;
+        if role.name == "index" {
+            if let Some(Node::TmarkBrace(suffix)) = nodes.get(*index) {
+                if !suffix.moustache && matches!(suffix.value.as_str(), "b" | "i") {
+                    index_suffix = Some((suffix.value.clone(), suffix.position.as_ref()));
+                    *index += 1;
+                }
+            }
+        }
         // The span of the whole role: head to last group, argument or suffix.
         let end = suffix_side
             .as_ref()
             .and_then(|(_, p)| *p)
+            .or_else(|| index_suffix.as_ref().and_then(|(_, p)| *p))
             .or_else(|| groups.last().and_then(|g| g.position.as_ref()))
             .or_else(|| argument.and_then(|a| a.position.as_ref()))
             .map_or(head_span.end, |p| ctx.map.translate(p.end.offset) as u32);
@@ -584,11 +613,20 @@ impl Lowerer {
             );
         }
         if let Some(suffix) = &head.registry_suffix {
+            // On the whole role, so that the fix reprints the node.
             self.deprecated(
-                head_span,
+                span,
                 &format!("{{{}:{suffix}}}", head.name),
                 &format!("{{{} registry={suffix}}}", head.name),
             );
+        }
+        if let Some((suffix, _)) = &index_suffix {
+            let canonical = if suffix == "b" {
+                "{index main=true}[…]"
+            } else {
+                "{index}[*…*]"
+            };
+            self.deprecated(span, &format!("{{index}}[…]{{{suffix}}}"), canonical);
         }
         let key = |name: &str| -> Option<String> {
             head.kv
@@ -671,11 +709,28 @@ impl Lowerer {
                 })
             }
             "index" => {
-                let path = groups.iter().map(|g| group_content(self, g)).collect();
+                let mut path: Vec<Vec<Inline>> =
+                    groups.iter().map(|g| group_content(self, g)).collect();
+                let mut main = key("main").as_deref() == Some("true");
+                match index_suffix.as_ref().map(|(s, _)| s.as_str()) {
+                    Some("b") => main = true,
+                    Some("i") => {
+                        // The rendering hint becomes content markup.
+                        if let Some(last) = path.last_mut() {
+                            let content = std::mem::take(last);
+                            let emph_meta = self.meta(span);
+                            *last = vec![Inline::Emph(Emph {
+                                meta: emph_meta,
+                                content,
+                            })];
+                        }
+                    }
+                    _ => {}
+                }
                 Inline::IndexEntry(IndexEntry {
                     meta,
                     path,
-                    main: key("main").as_deref() == Some("true"),
+                    main,
                     registry: key("registry").or(head.registry_suffix.clone()),
                 })
             }
