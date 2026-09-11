@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<p>The HTML spec<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">1</a></sup> is maintained by the W3C.</p>
+<p>The <abbr title="HyperText Markup Language">HTML</abbr> spec<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">1</a></sup> is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
 <section class="footnotes">
 <ol>
 <li id="fn-1">The living standard. <a href="#fnref-1" class="footnote-backref">↩</a></li>

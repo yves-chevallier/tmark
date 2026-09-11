@@ -17,7 +17,7 @@ use tmark_ir::{
 };
 use tmark_registry::{Resolution, Resolved};
 
-use crate::common::{media, refs, text, zero, Out};
+use crate::common::{abbr, media, refs, text, zero, Out};
 use crate::{Backend, Body, Media, Requires, Writer, WriterOptions};
 
 /// The HTML writer.
@@ -38,6 +38,7 @@ impl Writer for HtmlWriter {
             req: Requires::default(),
             numbers: number_labels(doc, res),
             notes: Vec::new(),
+            abbr_keys: abbr::keys(doc),
         };
         w.blocks(&doc.blocks);
         w.footnotes();
@@ -97,6 +98,8 @@ struct Html<'a> {
     numbers: BTreeMap<String, String>,
     /// Footnotes referenced, in order: label and body.
     notes: Vec<(String, Vec<Block>)>,
+    /// Acronym keys substituted in running text (`common::abbr`).
+    abbr_keys: Vec<String>,
 }
 
 impl Html<'_> {
@@ -689,7 +692,19 @@ impl Html<'_> {
 
     fn inline(&mut self, inline: &Inline) {
         match inline {
-            Inline::Str(s) => self.out.push(&escape::text(&s.text)),
+            Inline::Str(s) => {
+                let keys = std::mem::take(&mut self.abbr_keys);
+                for segment in abbr::split(&s.text, &keys) {
+                    match segment {
+                        abbr::Segment::Text(t) => self.out.push(&escape::text(t)),
+                        abbr::Segment::Abbr(key) => self.abbr(&tmark_ir::Abbr {
+                            meta: s.meta,
+                            text: key.to_string(),
+                        }),
+                    }
+                }
+                self.abbr_keys = keys;
+            }
             Inline::Space(_) => self.out.push(" "),
             Inline::SoftBreak(_) => self.out.push("\n"),
             Inline::LineBreak(_) => self.out.push("<br />\n"),
@@ -753,23 +768,7 @@ impl Html<'_> {
                 self.out
                     .push(&format!("{{{{ {} }}}}", escape::text(&n.path.join("."))));
             }
-            Inline::Abbr(n) => {
-                let expansion = self
-                    .doc
-                    .abbreviations
-                    .iter()
-                    .find(|a| a.key == n.text)
-                    .map(|a| a.expansion.clone())
-                    .or_else(|| self.res.glossary.get(&n.text.to_ascii_lowercase()).cloned());
-                match expansion {
-                    Some(e) => self.out.push(&format!(
-                        "<abbr title=\"{}\">{}</abbr>",
-                        escape::attr(&e),
-                        escape::text(&n.text)
-                    )),
-                    None => self.out.push(&escape::text(&n.text)),
-                }
-            }
+            Inline::Abbr(n) => self.abbr(n),
             Inline::Comment(_) => {}
             Inline::RawInline(n) => {
                 if n.format == "html" {
@@ -1006,6 +1005,25 @@ impl Html<'_> {
         img.push_str(" />");
         self.out.push(&img);
         self.out.end(n.meta.id);
+    }
+
+    /// `<abbr title="expansion">KEY</abbr>` when the term has an expansion.
+    fn abbr(&mut self, n: &tmark_ir::Abbr) {
+        let expansion = self
+            .doc
+            .abbreviations
+            .iter()
+            .find(|a| a.key == n.text)
+            .map(|a| a.expansion.clone())
+            .or_else(|| self.res.glossary.get(&n.text.to_ascii_lowercase()).cloned());
+        match expansion {
+            Some(e) => self.out.push(&format!(
+                "<abbr title=\"{}\">{}</abbr>",
+                escape::attr(&e),
+                escape::text(&n.text)
+            )),
+            None => self.out.push(&escape::text(&n.text)),
+        }
     }
 
     fn keystroke(&mut self, n: &Keystroke) {

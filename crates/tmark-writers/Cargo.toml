@@ -14,10 +14,11 @@ tmark-registry = { path = "../tmark-registry", default-features = false }
 # `Body`, `Requires` and `SourceMap` cross to Python and to `tmark write --map`
 # as JSON (design/07-writers.md, writers-and-passes.md §1).
 serde = { workspace = true }
+# `press.declare.acronyms` is a JSON map in the front matter (common/abbr.rs).
+serde_json = { workspace = true }
 
 [dev-dependencies]
 # Tests parse their inputs.
 tmark-syntax = { path = "../tmark-syntax" }
 # One snapshot per conformance fixture and per backend (design/10-testing.md §4).
 insta = { workspace = true }
-serde_json = { workspace = true }

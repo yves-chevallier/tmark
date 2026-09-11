@@ -3,6 +3,7 @@
 //! key-label tables, slugs. Design 07: "LaTeX and Typst share helpers, not
 //! a base class."
 
+pub mod abbr;
 pub mod fragments;
 pub mod media;
 pub mod out;

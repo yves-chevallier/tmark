@@ -1,0 +1,24 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{description}
+\item[{Term}] Definition, indented continuation lines aligned.
+
+Second paragraph of the definition.
+\item[{Term}] Second definition.
+\item[{Other}] Its definition.
+\end{description}
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

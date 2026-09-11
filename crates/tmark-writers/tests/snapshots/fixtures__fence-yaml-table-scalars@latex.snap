@@ -1,0 +1,30 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+A & B & C \\
+\midrule
+1.10 & +1 & 0x1F \\
+3 & NULL & Yes \\
+\multicolumn{2}{c}{1e3} & on \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+---requires---
+{
+  "packages": [
+    "booktabs"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

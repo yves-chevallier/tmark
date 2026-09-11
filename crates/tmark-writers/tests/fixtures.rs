@@ -14,7 +14,7 @@ use tmark_registry::{resolve, MemoryLoader, ResolveOptions};
 use tmark_writers::{write, Backend, Media, WriterOptions};
 
 /// Backends with a writer; extend as they land.
-const BACKENDS: &[Backend] = &[Backend::Html];
+const BACKENDS: &[Backend] = &[Backend::Html, Backend::Latex];
 
 /// The fenced block under `## canonical`, else the first under `## input`.
 fn source(text: &str) -> Option<String> {
