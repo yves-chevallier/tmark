@@ -88,6 +88,9 @@ pub(crate) struct Lowerer {
     pub definitions: HashMap<String, (String, Option<String>)>,
     /// Lowering the body of a `::: figure`: a free caption is the figure's.
     pub in_figure: bool,
+    /// Captions from a generic `/// caption` block, whose kind the
+    /// neighbouring float decides (`attach_captions`).
+    pub generic_captions: Vec<NodeId>,
 }
 
 pub fn parse(text: &str, file: FileId) -> Parsed {
@@ -115,6 +118,7 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
             .collect(),
         definitions: HashMap::new(),
         in_figure: false,
+        generic_captions: Vec::new(),
     };
     let ctx = Ctx {
         text,

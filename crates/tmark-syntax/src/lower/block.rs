@@ -557,6 +557,9 @@ impl Lowerer {
             );
         }
         if c.marker == b'/' {
+            if let Some(block) = self.lower_slash_block(c, &name, span, ctx, document) {
+                return block;
+            }
             self.deprecated(span, "/// name … ///", "::: name … :::");
         }
         if !c.closed {
@@ -632,6 +635,111 @@ impl Lowerer {
         }
     }
 
+    /// The deprecated `///` blocks that are not containers (Appendix
+    /// "Deprecation schedule", examples-migration item 3): a backend name
+    /// (`/// latex`) is a raw fence, `/// caption`, `/// figure-caption` and
+    /// `/// table-caption` (pymdownx.blocks.caption, with its indented
+    /// `attrs: {id: …}` option line) are a caption line after the float.
+    /// `None` for every other name (a container, as before).
+    fn lower_slash_block(
+        &mut self,
+        c: &tmark_markdown::mdast::TmarkContainer,
+        name: &str,
+        span: Span,
+        ctx: &Ctx,
+        document: &mut Document,
+    ) -> Option<Block> {
+        let kind = match name {
+            "latex" | "typst" | "html" => {
+                self.deprecated(
+                    span,
+                    &format!("/// {name} … ///"),
+                    &format!("a ```{name} raw fence"),
+                );
+                return Some(Block::RawBlock(RawBlock {
+                    meta: self.meta(span),
+                    format: name.to_string(),
+                    text: c.value.trim_end_matches('\n').to_string(),
+                }));
+            }
+            "caption" => None,
+            "figure-caption" => Some(CaptionKind::Figure),
+            "table-caption" => Some(CaptionKind::Table),
+            _ => return None,
+        };
+        // pymdownx.blocks options: indented `key: value` lines right after
+        // the opening fence, YAML.
+        let mut options_len = 0;
+        let mut yaml = String::new();
+        for line in c.value.split_inclusive('\n') {
+            let is_option = (line.starts_with("    ") || line.starts_with('\t'))
+                && line.trim_start().split_once(':').is_some_and(|(k, _)| {
+                    !k.is_empty()
+                        && k.bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                });
+            if !is_option {
+                break;
+            }
+            yaml.push_str(line.trim_start());
+            options_len += line.len();
+        }
+        let mut attrs = Attrs::new();
+        if let Ok(serde_yaml_ng::Value::Mapping(options)) =
+            serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&yaml)
+        {
+            if let Some(serde_yaml_ng::Value::Mapping(list)) = options.get("attrs") {
+                for (k, v) in list {
+                    let (Some(k), Some(v)) = (k.as_str(), v.as_str()) else {
+                        continue;
+                    };
+                    match k {
+                        "id" => attrs.id = Some(v.to_string()),
+                        "class" => attrs
+                            .classes
+                            .extend(v.split_whitespace().map(str::to_string)),
+                        _ => attrs.kv.push((k.to_string(), v.to_string())),
+                    }
+                }
+            }
+        }
+        let stops = shift_stops(&c.stops, options_len);
+        let body = self.lower_content(&c.value[options_len..], &stops, ctx, document);
+        let mut content = Vec::new();
+        for block in body {
+            let inlines = match block {
+                Block::Para(p) => p.content,
+                Block::Plain(p) => p.content,
+                _ => continue,
+            };
+            if !content.is_empty() {
+                content.push(Inline::SoftBreak(tmark_ir::SoftBreak {
+                    meta: self.meta(span),
+                }));
+            }
+            content.extend(inlines);
+        }
+        self.deprecated(
+            span,
+            &format!("/// {name} … ///"),
+            &format!(
+                "a `{}: … {{#id}}` line after the float",
+                kind.map_or("Figure", CaptionKind::word)
+            ),
+        );
+        let meta = self.meta(span);
+        if kind.is_none() {
+            self.generic_captions.push(meta.id);
+        }
+        Some(Block::Caption(Caption {
+            meta,
+            kind: kind.unwrap_or(CaptionKind::Figure),
+            content,
+            attrs,
+            position: CaptionPosition::After,
+        }))
+    }
+
     /// Pair `:   definition` items with the paragraph before them; a run of
     /// terms and definitions is one list.
     fn pair_definitions(&mut self, items: Vec<Item>) -> Vec<Block> {
@@ -702,6 +810,21 @@ impl Lowerer {
                 },
                 _ => unreachable!(),
             };
+            // A generic `/// caption` takes the kind of its float.
+            if self.generic_captions.contains(&caption.meta.id) {
+                let host = if previous_is_host {
+                    out.last()
+                } else if next_is_host {
+                    iter.peek()
+                } else {
+                    None
+                };
+                caption.kind = match host {
+                    Some(Block::Table(_) | Block::TableConfig(_)) => CaptionKind::Table,
+                    Some(Block::CodeBlock(_)) => CaptionKind::Listing,
+                    _ => CaptionKind::Figure,
+                };
+            }
             if previous_is_host {
                 caption.position = CaptionPosition::After;
                 // A `yaml table-config` fence belongs right after its table,
@@ -856,6 +979,19 @@ fn take_partial_task(content: &mut [Block]) -> Option<Task> {
     let rest = s.text.strip_prefix("[.] ")?;
     s.text = rest.to_string();
     Some(Task::Partial)
+}
+
+/// The `stops` of a collected body whose first `skip` bytes are dropped.
+fn shift_stops(stops: &[(usize, usize)], skip: usize) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (i, (local, source)) in stops.iter().enumerate() {
+        if *local >= skip {
+            out.push((local - skip, *source));
+        } else if !stops.get(i + 1).is_some_and(|next| next.0 <= skip) {
+            out.push((0, source + (skip - local)));
+        }
+    }
+    out
 }
 
 /// The canonical text of an attribute list, for literal fallbacks.
