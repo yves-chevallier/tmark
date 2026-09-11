@@ -8,11 +8,19 @@ use crate::out::Out;
 
 /// The value of `key=value`, quoted when it has to be.
 pub fn value(v: &str) -> String {
-    if v.is_empty() || v.contains(|c: char| c.is_whitespace() || matches!(c, '}' | '"' | '=')) {
-        format!("\"{}\"", v.replace('"', "\\\""))
+    if v.is_empty()
+        || v.contains(|c: char| c.is_whitespace() || matches!(c, '}' | '"' | '=' | '\\'))
+    {
+        quoted(v)
     } else {
         v.to_string()
     }
+}
+
+/// `"…"` with `\` and `"` escaped (spec §Lexical grammar: a quoted value
+/// is `"(?:[^"\\]|\\.)*"`, the parser decodes `\"` and `\\`).
+pub fn quoted(v: &str) -> String {
+    format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// The items of an attribute list, without the braces; empty for no attrs.
@@ -59,5 +67,7 @@ mod tests {
         );
         assert_eq!(value(""), "\"\"");
         assert_eq!(value("60%"), "60%");
+        assert_eq!(value(r#"a "b" c"#), r#""a \"b\" c""#);
+        assert_eq!(value(r"p\q"), r#""p\\q""#);
     }
 }

@@ -11,8 +11,10 @@ use crate::out::Out;
 pub fn inlines(out: &mut Out, inlines: &[Inline], ctx: Context) {
     for (i, inline) in inlines.iter().enumerate() {
         let next = inlines.get(i + 1).and_then(first_char);
+        let after_index = i > 0 && matches!(inlines[i - 1], Inline::IndexEntry(_));
         let ctx = Context {
             block_start: ctx.block_start && i == 0,
+            after_index,
             ..ctx
         };
         one(out, inline, ctx, next);
@@ -106,7 +108,7 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
                 out.push(&group_verbatim(&n.text));
                 out.push("]");
             }
-            None => code_span(out, &n.text),
+            None => code_span(out, &n.text, ctx.in_cell),
         },
         Inline::Math(n) => {
             let fence = if n.display { "$$" } else { "$" };
@@ -152,7 +154,7 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
                 },
             );
             out.push("](");
-            out.push(&n.src);
+            out.push(&destination(&n.src));
             out.push(")");
             attrs::write(out, &n.attrs, "");
         }
@@ -284,8 +286,10 @@ fn group_verbatim(text: &str) -> String {
 }
 
 /// A code span with a backtick run longer than any inside, padded when the
-/// text starts or ends with a backtick.
-pub fn code_span(out: &mut Out, text: &str) {
+/// text starts or ends with a backtick. In a pipe-table cell a `|` is
+/// written `\|` (GFM splits cells on it even inside code, and decodes the
+/// escape).
+pub fn code_span(out: &mut Out, text: &str, in_cell: bool) {
     let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
     let fence = "`".repeat(longest + 1);
     let pad = text.starts_with('`')
@@ -295,7 +299,11 @@ pub fn code_span(out: &mut Out, text: &str) {
     if pad {
         out.push(" ");
     }
-    out.push(text);
+    if in_cell {
+        out.push(&text.replace('|', "\\|"));
+    } else {
+        out.push(text);
+    }
     if pad {
         out.push(" ");
     }
@@ -306,10 +314,9 @@ fn link(out: &mut Out, n: &tmark_ir::Link, ctx: Context) {
     // Autolink literals print bare when the text is the address.
     if let Target::Url(url) = &n.target {
         if let [Inline::Str(s)] = n.content.as_slice() {
-            let bare = url == &s.text
-                && (url.starts_with("http://")
-                    || url.starts_with("https://")
-                    || url.starts_with("www."));
+            let bare = (url == &s.text
+                && (url.starts_with("http://") || url.starts_with("https://")))
+                || (s.text.starts_with("www.") && *url == format!("http://{}", s.text));
             let mail = url.strip_prefix("mailto:") == Some(s.text.as_str());
             if bare || mail {
                 out.push(&s.text);
@@ -329,18 +336,45 @@ fn link(out: &mut Out, n: &tmark_ir::Link, ctx: Context) {
     );
     out.push("](");
     match &n.target {
-        Target::Url(u) | Target::Document(u) => out.push(u),
-        Target::Anchor(a) => {
-            out.push("#");
-            out.push(a);
-        }
+        Target::Url(u) | Target::Document(u) => out.push(&destination(u)),
+        Target::Anchor(a) => out.push(&destination(&format!("#{a}"))),
     }
     if let Some(title) = &n.title {
         out.push(" \"");
-        out.push(&title.replace('"', "\\\""));
+        out.push(&title.replace('\\', "\\\\").replace('"', "\\\""));
         out.push("\"");
     }
     out.push(")");
+}
+
+/// A link destination as CommonMark reads it back: bare when it is one
+/// run of non-space characters with balanced parentheses, else `<…>` with
+/// `<`, `>` (and a line break) escaped.
+pub fn destination(u: &str) -> String {
+    let mut depth = 0i32;
+    let balanced = u.chars().all(|c| {
+        match c {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            _ => {}
+        }
+        depth >= 0
+    }) && depth == 0;
+    let simple = !u.is_empty()
+        && balanced
+        && !u.contains(|c: char| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>'))
+        && !u.starts_with('<');
+    if simple {
+        u.to_string()
+    } else {
+        format!(
+            "<{}>",
+            u.replace('\\', "\\\\")
+                .replace('<', "\\<")
+                .replace('>', "\\>")
+                .replace('\n', "%0A")
+        )
+    }
 }
 
 /// `@key` when one plain item; `@[…]` otherwise (spec §Ref).

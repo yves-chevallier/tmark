@@ -27,6 +27,9 @@ pub struct Context {
     pub in_cell: bool,
     /// Inside a role's bracket group: unbalanced brackets would end it.
     pub in_group: bool,
+    /// Right after an `IndexEntry`: a `[` would open one more group of
+    /// `{index}[…][…]`.
+    pub after_index: bool,
 }
 
 /// Writes `text` escaped for its position. `next` is the character that
@@ -44,6 +47,7 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     // Index of a character a line-start rule decided to escape later on the
     // line (the `.` of `1.`, the `:` of `Table:`).
     let mut pending: Option<usize> = None;
+    let forced = autolink_escapes(&chars);
     for (i, &c) in chars.iter().enumerate() {
         let next_c = chars.get(i + 1).copied().or(next);
         if c == '\n' {
@@ -53,7 +57,10 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
             pending = None;
             continue;
         }
-        let mut esc = pending == Some(i);
+        let mut esc = pending == Some(i) || forced.contains(&i);
+        if i == 0 && c == '[' && ctx.after_index {
+            esc = true;
+        }
         if line_start {
             let (now, later) = line_start_escape(&chars, i, next, ctx.block_start && i == 0);
             esc |= now;
@@ -68,6 +75,52 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
         line_start = false;
     }
     out.push(&buf);
+}
+
+/// Positions to escape so that GFM autolink literals do not fire: the `:`
+/// of `http://`, `https://`, `mailto:`, `xmpp:`, the `.` of `www.`, both at
+/// a word start, and the `@` of an e-mail address (`user@host.tld`). The
+/// parser decodes `\:`, `\.` and `\@` back to the literal text.
+fn autolink_escapes(chars: &[char]) -> Vec<usize> {
+    let mut out = Vec::new();
+    let word_start = |i: usize| i == 0 || !(chars[i - 1].is_alphanumeric() || chars[i - 1] == '_');
+    let starts_with = |i: usize, s: &str| {
+        let pat: Vec<char> = s.chars().collect();
+        chars.len() >= i + pat.len() && chars[i..i + pat.len()] == pat[..]
+    };
+    let mut i = 0;
+    while i < chars.len() {
+        if word_start(i) {
+            for (scheme, colon) in [
+                ("http://", 4),
+                ("https://", 5),
+                ("mailto:", 6),
+                ("xmpp:", 4),
+            ] {
+                if starts_with(i, scheme) {
+                    out.push(i + colon);
+                }
+            }
+            if starts_with(i, "www.") && chars.get(i + 4).is_some_and(|c| c.is_alphanumeric()) {
+                out.push(i + 3);
+            }
+        }
+        if chars[i] == '@' && i > 0 && chars[i - 1].is_alphanumeric() {
+            // `user@host.tld`: a dot after the `@`, inside the host.
+            let host: String = chars[i + 1..]
+                .iter()
+                .take_while(|c| c.is_alphanumeric() || matches!(c, '-' | '.' | '_'))
+                .collect();
+            if host.contains('.')
+                && !host.ends_with('.')
+                && host.starts_with(|c: char| c.is_alphanumeric())
+            {
+                out.push(i);
+            }
+        }
+        i += 1;
+    }
+    out
 }
 
 fn is_ws(c: Option<char>) -> bool {
@@ -209,7 +262,6 @@ mod tests {
 
     #[test]
     fn sigils_are_escaped_only_where_they_would_fire() {
-        assert_eq!(esc("mail me@example.com"), "mail me@example.com");
         assert_eq!(esc("an @handle here"), "an \\@handle here");
         assert_eq!(esc("a #tag, #[x] and #(y)"), "a #tag, \\#[x] and \\#(y)");
         assert_eq!(esc("price 5 * 3 and a_b"), "price 5 * 3 and a_b");
@@ -233,6 +285,17 @@ mod tests {
         assert_eq!(esc("Tableau: fine"), "Tableau: fine");
         assert_eq!(esc(":   def"), "\\:   def");
         assert_eq!(esc("[ ] task"), "\\[ ] task");
+    }
+
+    #[test]
+    fn autolink_literals_are_defused() {
+        assert_eq!(
+            esc("see http://x.y and www.x.y/z"),
+            "see http\\://x.y and www\\.x.y/z"
+        );
+        assert_eq!(esc("mailto:me@x.y"), "mailto\\:me\\@x.y");
+        assert_eq!(esc("mail me@example.com"), "mail me\\@example.com");
+        assert_eq!(esc("a@b and ftp://x"), "a@b and ftp://x");
     }
 
     #[test]

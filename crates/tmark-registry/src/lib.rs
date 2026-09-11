@@ -53,6 +53,9 @@ pub struct Resolved {
     pub refs: Vec<RefResolution>,
     /// Files parsed through includes: their id and path.
     pub files: Vec<(FileId, PathBuf)>,
+    /// The included documents themselves (their labels are in `labels`,
+    /// their references in `refs`; an editor reads their nodes for hover).
+    pub included: Vec<(FileId, Document)>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -70,6 +73,7 @@ pub fn resolve(doc: &Document, loader: &dyn Loader, options: &ResolveOptions) ->
     resolved.labels = collector.labels;
     resolved.index = collector.index;
     resolved.files = collector.files;
+    resolved.included = collector.documents;
     resolved.diagnostics.extend(collector.diagnostics);
 
     // 3. Allocate numbers of the TeXSmith-numbered series.
@@ -86,7 +90,12 @@ pub fn resolve(doc: &Document, loader: &dyn Loader, options: &ResolveOptions) ->
     resolved.glossary = collect::glossary(doc);
     resolved.crossrefs = inventory::load(doc, loader, &base, &mut resolved.diagnostics);
 
-    // 5. Resolve every reference.
+    // 5. Resolve every reference, in the document and in its includes.
     refs::resolve_all(doc, &mut resolved);
+    let included = std::mem::take(&mut resolved.included);
+    for (_, included_doc) in &included {
+        refs::resolve_all(included_doc, &mut resolved);
+    }
+    resolved.included = included;
     resolved
 }

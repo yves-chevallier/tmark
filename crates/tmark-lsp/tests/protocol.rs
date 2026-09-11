@@ -524,9 +524,13 @@ fn code_actions_fix_deprecated_spellings() {
 fn included_files_get_their_own_diagnostics() {
     let dir = std::env::temp_dir().join(format!("tmark-lsp-inc-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    // A parse diagnostic: references inside included files are not
-    // resolved yet (the collector keeps labels only; see 13-handoff.md).
-    std::fs::write(dir.join("part.md"), "## Part\n\nA {unknown}[x] here.\n").unwrap();
+    // A parse diagnostic and an unresolved reference, both inside the
+    // included file.
+    std::fs::write(
+        dir.join("part.md"),
+        "## Part\n\nA {unknown}[x] here, see @fig:nowhere.\n",
+    )
+    .unwrap();
     std::fs::write(dir.join("tmark.toml"), "[press]\nschema = \"press.json\"\n").unwrap();
     std::fs::write(
         dir.join("press.json"),
@@ -548,6 +552,10 @@ fn included_files_get_their_own_diagnostics() {
     assert_eq!(version, None);
     assert_eq!(part_diags[0]["code"], "role-unknown", "{part_diags:?}");
     assert_eq!(part_diags[0]["range"]["start"]["line"], 2);
+    assert!(
+        part_diags.iter().any(|d| d["code"] == "ref-unresolved"),
+        "{part_diags:?}"
+    );
     // The external press schema completes under `press:`.
     let items = client.request(
         "textDocument/completion",

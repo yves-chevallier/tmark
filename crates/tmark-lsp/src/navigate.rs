@@ -251,11 +251,17 @@ fn host_word(host: Host) -> &'static str {
 }
 
 /// The text a label's host shows: a heading or caption's content.
-fn host_text(doc: &Document, label: &Label) -> Option<String> {
-    if label.span.file != doc.file {
-        // An included file's node: not in this document's tree.
-        return None;
-    }
+fn host_text(doc: &Document, resolved: &Resolved, label: &Label) -> Option<String> {
+    let doc = if label.span.file == doc.file {
+        doc
+    } else {
+        // An included file's node: in the included document.
+        &resolved
+            .included
+            .iter()
+            .find(|(id, _)| *id == label.span.file)?
+            .1
+    };
     match find(doc, label.node)? {
         tmark::ir::NodeRef::Block(Block::Header(h)) => Some(plain_text(&h.content)),
         tmark::ir::NodeRef::Block(Block::Caption(c)) => Some(plain_text(&c.content)),
@@ -283,7 +289,7 @@ pub fn hover(view: &View, offset: u32) -> Option<Hover> {
                 if let Some(n) = number {
                     s.push_str(&format!(" · {n}"));
                 }
-                if let Some(text) = host_text(view.doc, label).filter(|t| !t.is_empty()) {
+                if let Some(text) = host_text(view.doc, resolved, label).filter(|t| !t.is_empty()) {
                     s.push_str(&format!("\n\n{text}"));
                 }
                 s

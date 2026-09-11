@@ -5,7 +5,9 @@
 use tmark_ir::{Attrs, RefItem, SubSpan};
 use tmark_markdown::tmark::{is_ident_byte, is_ident_start};
 
-/// Splits `s` into whitespace-separated tokens, keeping `"…"` values whole.
+/// Splits `s` into whitespace-separated tokens, keeping `"…"` values
+/// whole; inside quotes a backslash protects the next character (spec
+/// §Lexical grammar: `"(?:[^"\\]|\\.)*"`).
 fn tokens(s: &str) -> Vec<&str> {
     let bytes = s.as_bytes();
     let mut out = Vec::new();
@@ -20,6 +22,10 @@ fn tokens(s: &str) -> Vec<&str> {
         let start = i;
         let mut quoted = false;
         while i < bytes.len() && (quoted || !bytes[i].is_ascii_whitespace()) {
+            if quoted && bytes[i] == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
             if bytes[i] == b'"' {
                 quoted = !quoted;
             }
@@ -39,9 +45,28 @@ fn is_key(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(is_ident_byte)
 }
 
+/// A quoted value without its quotes, `\"` and `\\` decoded; a bare value
+/// as is.
 fn unquote(value: &str) -> String {
     if value.len() >= 2 && value.starts_with('"') && value.ends_with('"') {
-        value[1..value.len() - 1].to_string()
+        let inner = &value[1..value.len() - 1];
+        let mut out = String::with_capacity(inner.len());
+        let mut chars = inner.chars();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                match chars.next() {
+                    Some(n @ ('"' | '\\')) => out.push(n),
+                    Some(n) => {
+                        out.push('\\');
+                        out.push(n);
+                    }
+                    None => out.push('\\'),
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out
     } else {
         value.to_string()
     }
@@ -303,6 +328,11 @@ mod tests {
         assert_eq!(attrs.classes, vec!["draft"]);
         assert_eq!(attrs.get("lang"), Some("en"));
         assert_eq!(attrs.get("title"), Some("a b"));
+        let attrs = parse_attrs(r#"k="a \"b\" c" j="x}y" l="p\\q" m="\n""#).unwrap();
+        assert_eq!(attrs.get("k"), Some(r#"a "b" c"#));
+        assert_eq!(attrs.get("j"), Some("x}y"));
+        assert_eq!(attrs.get("l"), Some(r"p\q"));
+        assert_eq!(attrs.get("m"), Some(r"\n"), "only `\\\"` and `\\\\` decode");
         assert!(parse_attrs("collapsed").is_none(), "no bare words");
         assert!(parse_attrs("").is_none());
         assert!(parse_attrs("aside side=left").is_none());

@@ -89,6 +89,8 @@ pub struct Collector<'a> {
     pub labels: Labels,
     pub index: IndexTable,
     pub files: Vec<(FileId, PathBuf)>,
+    /// The included documents, parsed: their references resolve too.
+    pub documents: Vec<(FileId, Document)>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -102,6 +104,7 @@ impl<'a> Collector<'a> {
             labels: Labels::default(),
             index: IndexTable::default(),
             files: Vec::new(),
+            documents: Vec::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -131,6 +134,7 @@ impl<'a> Collector<'a> {
                     let parsed = tmark_syntax::parse(&text, id);
                     self.diagnostics.extend(parsed.diagnostics);
                     self.collect(&parsed.document, &target);
+                    self.documents.push((id, parsed.document));
                 }
                 None => self.diagnostics.push(Diagnostic::new(
                     Code::IncludeMissing,

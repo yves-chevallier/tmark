@@ -55,15 +55,32 @@ fn separate(out: &mut Out) {
 
 /// Writes blocks separated by blank lines.
 pub fn blocks(out: &mut Out, blocks: &[Block]) {
+    // Two lists of the same kind in a row would merge on re-parse: the
+    // second alternates its marker (`*` / `)`), the third goes back.
+    let mut alternate = false;
     for (i, b) in blocks.iter().enumerate() {
+        let same_list = i > 0
+            && matches!(
+                (&blocks[i - 1], b),
+                (Block::BulletList(_), Block::BulletList(_))
+                    | (Block::OrderedList(_), Block::OrderedList(_))
+            );
+        alternate = same_list && !alternate;
         if i > 0 {
             out.blank_line();
         }
-        block(out, b);
+        block_with(out, b, alternate);
     }
 }
 
+/// One block, on its own.
 pub fn block(out: &mut Out, b: &Block) {
+    block_with(out, b, false);
+}
+
+/// `alternate`: a list right after a list of the same kind takes the
+/// other marker so that the two do not merge on re-parse.
+fn block_with(out: &mut Out, b: &Block, alternate: bool) {
     match b {
         Block::Para(p) => {
             if let Some(fenced) = generated_image(&p.content) {
@@ -143,7 +160,7 @@ pub fn block(out: &mut Out, b: &Block) {
             for (k, v) in &c.options.kv {
                 info.push(' ');
                 info.push_str(k);
-                info.push_str(&format!("=\"{}\"", v.replace('"', "\\\"")));
+                info.push_str(&format!("={}", fence_option(v)));
             }
             fence(out, info.trim(), &c.text);
         }
@@ -161,8 +178,8 @@ pub fn block(out: &mut Out, b: &Block) {
             out.pop_prefix();
             out.ensure_newline();
         }
-        Block::BulletList(l) => list(out, &l.items, None),
-        Block::OrderedList(l) => list(out, &l.items, Some(l.start)),
+        Block::BulletList(l) => list(out, &l.items, None, alternate),
+        Block::OrderedList(l) => list(out, &l.items, Some(l.start), alternate),
         Block::DefinitionList(d) => {
             for (i, (term, definitions)) in d.items.iter().enumerate() {
                 if i > 0 {
@@ -311,7 +328,7 @@ fn items_depth(items: &[ListItem]) -> usize {
         .unwrap_or(0)
 }
 
-fn list(out: &mut Out, items: &[ListItem], start: Option<u32>) {
+fn list(out: &mut Out, items: &[ListItem], start: Option<u32>, alternate: bool) {
     let loose = items.iter().any(|i| i.content.len() > 1);
     for (i, item) in items.iter().enumerate() {
         if i > 0 {
@@ -321,9 +338,11 @@ fn list(out: &mut Out, items: &[ListItem], start: Option<u32>) {
                 out.ensure_newline();
             }
         }
-        let marker = match start {
-            Some(start) => format!("{}. ", start + i as u32),
-            None => "- ".to_string(),
+        let marker = match (start, alternate) {
+            (Some(start), false) => format!("{}. ", start + i as u32),
+            (Some(start), true) => format!("{}) ", start + i as u32),
+            (None, false) => "- ".to_string(),
+            (None, true) => "* ".to_string(),
         };
         out.push(&marker);
         out.push_prefix(&" ".repeat(marker.len()));
@@ -360,9 +379,16 @@ fn fenced_image(out: &mut Out, image: &tmark_ir::Image) {
         }
         info.push(' ');
         info.push_str(k);
-        info.push_str(&format!("=\"{}\"", v.replace('"', "\\\"")));
+        info.push_str(&format!("={}", fence_option(v)));
     }
     fence(out, &info, code);
+}
+
+/// A quoted fence option. CommonMark processes backslash escapes in an
+/// info string before TMark reads it, so the backslashes of `attrs::quoted`
+/// are doubled: `\\"` reaches the option parser as `\"`.
+fn fence_option(v: &str) -> String {
+    attrs::quoted(v).replace('\\', "\\\\")
 }
 
 // -------------------------------------------------------------------- tables
@@ -379,6 +405,11 @@ fn table(out: &mut Out, t: &Table) {
 }
 
 fn is_plain(model: &TableModel) -> bool {
+    let breaks = |content: &[Inline]| {
+        content
+            .iter()
+            .any(|i| matches!(i, Inline::SoftBreak(_) | Inline::LineBreak(_)))
+    };
     model.settings == TableSettings::default()
         && model.footer.is_empty()
         && model.columns.iter().all(|c| match c {
@@ -388,9 +419,13 @@ fn is_plain(model: &TableModel) -> bool {
         && model.rows.iter().all(|r| match r {
             Row::Data(d) => {
                 !d.named
-                    && d.cells
-                        .iter()
-                        .all(|c| c.rows == 1 && c.cols == 1 && !c.absorbed && c.align.is_none())
+                    && d.cells.iter().all(|c| {
+                        c.rows == 1
+                            && c.cols == 1
+                            && !c.absorbed
+                            && c.align.is_none()
+                            && !breaks(&c.content)
+                    })
             }
             Row::Separator(_) => false,
         })
@@ -414,7 +449,19 @@ fn pipe_table(out: &mut Out, model: &TableModel) {
     let mut delimiters = Vec::new();
     for column in &model.columns {
         if let Column::Leaf(leaf) = column {
-            header.push(leaf.name.clone().unwrap_or_default());
+            // Names are plain strings: escape them like cell text.
+            let name = leaf.name.clone().unwrap_or_default();
+            let mut buf = Out::new();
+            crate::escape::text(
+                &mut buf,
+                &name,
+                Context {
+                    in_cell: true,
+                    ..Context::default()
+                },
+                None,
+            );
+            header.push(buf.finish().trim_end().to_string());
             delimiters.push(match leaf.config.align {
                 Some(Align::Left) => ":--".to_string(),
                 Some(Align::Center) => ":-:".to_string(),
@@ -521,11 +568,57 @@ fn yaml_scalar(s: &str) -> String {
                 | "True"
                 | "False"
         );
-    if plain {
+    if plain && !looks_typed(s) {
         s.to_string()
     } else {
-        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+        )
     }
+}
+
+/// Scalars YAML would read back as something else than the text: floats,
+/// exponents, signed and prefixed integers, the null and boolean words in
+/// any case. Plain integers survive (`3` reads back as `3`).
+fn looks_typed(s: &str) -> bool {
+    let lower = s.to_ascii_lowercase();
+    if matches!(
+        lower.as_str(),
+        "null"
+            | "true"
+            | "false"
+            | "yes"
+            | "no"
+            | "on"
+            | "off"
+            | "y"
+            | "n"
+            | "~"
+            | ".inf"
+            | "-.inf"
+            | ".nan"
+    ) {
+        return true;
+    }
+    let body = s.strip_prefix(['+', '-']).unwrap_or(s);
+    if s.starts_with('+') && body.starts_with(|c: char| c.is_ascii_digit()) {
+        return true;
+    }
+    if ["0x", "0o", "0b"].iter().any(|p| body.starts_with(p))
+        && body.len() > 2
+        && body[2..].chars().all(|c| c.is_ascii_alphanumeric())
+    {
+        return true;
+    }
+    let numeric = !body.is_empty()
+        && body
+            .chars()
+            .all(|c| c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '_'))
+        && body.chars().any(|c| c.is_ascii_digit());
+    numeric && body.contains(['.', 'e', 'E', '_'])
 }
 
 fn yaml_config(config: &ColumnConfig) -> Vec<String> {

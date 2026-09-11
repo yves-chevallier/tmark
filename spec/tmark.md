@@ -355,15 +355,18 @@ Attribute list (family 1), after a host element, on its line or at end of
 line:
 
 ```text
-\{(?:\s*(?:#(?<id>[\w:.-]+)|\.(?<class>[\w-]+)|(?<key>[\w-]+)=(?<value>"[^"]*"|\S+)))+\s*\}
+\{(?:\s*(?:#(?<id>[\w:.-]+)|\.(?<class>[\w-]+)|(?<key>[\w-]+)=(?<value>"(?:[^"\\]|\\.)*"|\S+)))+\s*\}
 ```
+
+Inside a quoted value `\"` stands for a quote and `\\` for a backslash;
+any other backslash is literal. A bare value ends at whitespace or `}`.
 
 Role (family 2); the head must be followed immediately by bracketed
 content (one group, or several for `index`) or by a parenthesised verbatim
 argument (balanced parentheses allowed inside):
 
 ```text
-\{(?<name>[A-Za-z][\w-]*)(?:\s+(?<positional>[^\s=}]+))?(?:\s+(?<key>[\w-]+)=(?<value>"[^"]*"|\S+))*\}
+\{(?<name>[A-Za-z][\w-]*)(?:\s+(?<positional>[^\s=}]+))?(?:\s+(?<key>[\w-]+)=(?<value>"(?:[^"\\]|\\.)*"|\S+))*\}
 (?:(?:\[(?<content>(?:[^\[\]\\]|\\.)*)\])+|\((?<argument>(?:[^()]|\((?&argument)\))*)\))
 ```
 
@@ -386,7 +389,7 @@ Container fence (family 3), opening and closing lines:
 Data directive info string (family 4), on the opening code fence:
 
 ```text
-^(?<lang>[\w+-]+)(?:\s+(?<node>code|table|table-config|image|raw))?(?<attrs>(?:\s+[\w-]+=(?:"[^"]*"|\S+))*)\s*$
+^(?<lang>[\w+-]+)(?:\s+(?<node>code|table|table-config|image|raw))?(?<attrs>(?:\s+[\w-]+=(?:"(?:[^"\\]|\\.)*"|\S+))*)\s*$
 ```
 
 Bare reference or citation (`@` refers). The look-behind is the X4 guard:
