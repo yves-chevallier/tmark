@@ -1,11 +1,296 @@
-# 13 — Handoff notes (end of the milestone 3 round and migration wave 1, 2026-09-11)
+# 13 — Handoff notes
+
+Two handoffs, newest first. Read `AGENTS.md`, then this file, then
+`11-roadmap.md`, then `design/reviews/`. Everything below is opinion from
+the inside of the work: verify it, do not trust it.
+
+## End of the TeXSmith-migration waves (2026-09-11)
+
+Written by the agent that coordinated the waves of the TeXSmith migration
+on branch `texsmith-migration`, for whoever takes over. The previous
+handoff (end of M3 and migration wave 1, same date) follows below; its
+pitfalls still apply.
+
+### State of the branch
+
+- Branch `texsmith-migration`, about sixty commits ahead of `main`, **not
+  merged**. `main` is at `9017bda` (end of the M3 round). The next step
+  is a pull request from `texsmith-migration` to `main`, after the
+  reviews listed at the end of this handoff. Every wave was developed in
+  a worktree (`wt/fixes`, `wt/tables`, `wt/registry`, `wt/writers`,
+  `wt/py`, `wt/webresolve`, `wt/spec`, `wt/web`) and merged here; the
+  eleven merge commits are in the log.
+- Workspace green on this branch: `cargo test --workspace`, `cargo clippy
+  --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`,
+  the generated artifacts current (`schema`, `registries` examples). New
+  since `main`: `.github/workflows/ci.yml` (the three cargo checks, the
+  generated-artifact diff, `maturin develop` plus the pytest suite of
+  `tmark-py`; runs on pushes to `main` and `texsmith-migration` and on
+  pull requests) and `.github/workflows/wheels.yml` (abi3 wheels on a
+  `v*` tag). Neither has run on a tag yet; nothing is published.
+- The companion branch is TeXSmith's `tmark-migration` (`~/texsmith`).
+  Its plan is `specs/tmark-migration.md`, the settled choices
+  `specs/migration/decisions.md` (X1–X12 and the wave list), the measured
+  state `specs/migration/status.md`: the `docs/` corpus renders through
+  `--reader tmark` on both backends; 31 / 32 LaTeX and 24 / 26 Typst
+  examples build. Its CI checks this branch out at `vendor/tmark`.
+- `11-roadmap.md` is the authority on what is done: M1 is closed, M4 is
+  open on the Typst preview and the parity triage, M5 on the three
+  compatibility spellings, the releases and TeXSmith's phases 4 and 5.
+
+### What each wave did
+
+**Registry** (`wt/registry`, first to land): the `FRAGMENTS` table
+(fragment contracts: name, `provides`, `packages`, `shell_escape`) and
+`KEY_LABELS` (keystroke labels) in `tmark_ir::registry`, serialisable
+registry tables and `schema("diagnostic")`, every diagnostic code
+documented and staged (`Code::doc()`, `Code::stage()`), the `Resolved`
+view (`ResolvedView`, `next_start`, `schema("resolved")`), `edit_many` in
+`tmark-fmt`, `lint --fix --stdout|--diff`, and `Profile::Mkdocs` as a
+real spelling table (`04-printer.md`) with a snapshot test over the
+fixtures and the D0 gate (the `Mkdocs` text re-parses to the canonical
+IR). The facade gained versioned document JSON (`"tmark"` at the root),
+`schema_hash`, `apply_fixes`.
+
+**Fixes** (`wt/fixes`): TeXSmith's `examples-migration.md` items, so that
+`tmark lint --fix` migrates a real document: `[^key]` / `^[k1,k2]`
+citations to `Ref` with a fix (X7, tokenizer rule in
+`tmark_reference.rs`), `/// latex` and `/// caption` blocks, attribute
+lists on fence info strings (C28), string authors, the front-matter
+line-edit fix (`yaml_edit::move_key`), the C20 rows, the `--8<--` fence
+body, digit-initial keys printed bracketed (C27), and
+`compat-unsupported` in place of silence. Details in the previous
+handoff's wave-1 section.
+
+**Tables** (`wt/tables`, decision X9): the `yaml table` model mirrors
+TeXSmith's `schema.py` field for field (`tmark-ir/src/table.rs`),
+lowering is a port of `parse_table` and `build_matrix`
+(`lower/table_yaml.rs`) with the parse codes `table-yaml`,
+`table-unknown-key`, `table-columns`, `table-align`, `table-shape`,
+`table-row-width`, `table-span`, `table-column-unknown` and the lint
+codes `table-placement`, `table-width`, `table-width-sum`; a rejected
+fence keeps its `source` and prints back as typed; the printer writes the
+Python row shapes; a proptest round-trips generated models and TeXSmith's
+table corpus is a fixed point. Where the Python validator contradicts its
+own documentation the documented rule won and the Python reading is a
+fallback (C30).
+
+**Writers** (`wt/writers`, three merges): `crates/tmark-writers` from the
+skeleton (`Writer`, `WriterOptions`, `Body`, `Requires`, `SourceMap`,
+escapers) to the HTML writer (CommonMark comparison with a golden list),
+the LaTeX writer over the whole migration catalogue
+(`writers-and-passes.md` §2), the Typst writer (`mitex` math, the
+`texsmith.typ` contract names, `assets/texsmith.typ` shipped as
+`TEXSMITH_TYP`), `tmark write`, fixture snapshots per backend, the
+`Requires` read from `FRAGMENTS`, then the C31–C42 constructs (tabs,
+progress bars, TeX logos, heading classes, referenced implicit labels),
+inline icons (`\tsicon`) and `adjustbox` around converted diagrams. The
+decisions taken without a note are listed in `07-writers.md`
+§Implementation notes (milestone 4).
+
+**Py** (`wt/py`): `crates/tmark-py` from the skeleton to the module
+`tmark._tmark`, the package `tmark`, the generated stub, the pytest
+suite, the `Loader` wrapper (GIL released around the Rust stages), the
+`Resolved` handle shared between `resolve` and `write`, `edit_many`,
+`fragments`, `key_labels` in `registries()`, and the wheel workflow. One
+commit untracked the `.so` `maturin develop` drops into the package.
+
+**Webresolve** (`wt/webresolve`): site-wide resolution in
+`tmark-registry` (`06-registries.md` §Site-wide resolution):
+`Numbering::All`, `ResolveOptions::book` and `Resolution::Sibling`,
+`ResolveOptions::lang` with the localised label words of the predeclared
+prefixes (`PREFIX_NAMES`), the options exposed to Python, challenge C29;
+`tests/book.rs` covers what fixtures cannot express.
+
+**Spec and parser** (`wt/spec`): the twelve open constructs of the
+migration audit decided in the spec (C31–C42, each written into its
+section in the same commit) and implemented end to end: the IR
+(`ProgressBar`, `CONTAINERS`, `TEX_LOGOS`, the `gemoji` table), the
+tokenizer (tab and foreign-directive heads, the attribute colon, exactly
+three markers except the directive's colons), the lowering (tabs, layout
+containers, foreign directives, `md_in_html`, progress bars, shortcodes,
+`^^x^^`), the printer (HTML as typed, tabs and div sugar under `mkdocs`),
+the lint hints `icon-web-only`, `directive-foreign`, `feature-off`,
+implicit heading ids by GitHub's slug rule in the registry, the writers,
+and the fixture IR blocks. `compat-unsupported` shrank to critic markup,
+wiki links and fancy list markers.
+
+**Web** (`wt/web`, last): `lower_web` in `tmark-writers/src/mkdocs.rs`
+(`07-writers.md` §Web lowering, TeXSmith `web-profile.md`): the MkDocs
+page lowering as local splices through `edit_many`, every byte outside a
+recognised construct untouched; `tmark lower FILE --to web`; the Python
+`lower_web`; then the foreign-directive rule (C40: an unclosed
+`::: pkg.mod` keeps its bytes, the prose after it is lowered) after the
+merge with the spec wave.
+
+### The cross-repository contract now in force
+
+TeXSmith's `tmark-migration` branch depends on these; changing one is a
+two-repository change (R14 of its plan):
+
+- **The IR JSON and its schema hash.** Documents cross as JSON with
+  `"tmark": "<version>"` first and `"diagnostics"` last; TeXSmith
+  generates `texsmith/ir/model.py` from `tmark.schema("ir")`, records
+  `tmark.schema_hash()` (FNV-1a of the schema, 16 hex digits) and its CI
+  fails when the committed models drift. A field added to a node is a
+  regeneration on their side; a renamed one breaks their passes.
+- **`Requires` and `FRAGMENTS`.** A writer names the contracts it used
+  in `Requires.fragments` and the structural packages in
+  `Requires.packages`; TeXSmith's fragment loader reads
+  `tmark.fragments()` to activate the `ts-*` fragments and checks a
+  replacement fragment against `provides`. The macro names (`\tskeys`,
+  `tscode`, `\tsdivider`, `\tslogo`, `tsdiv`, `\tsicon`, …) are the API
+  between the LaTeX writer and the fragments; `KEY_LABELS` spells the
+  keystrokes on both sides.
+- **`texsmith.typ`.** The Typst writer emits `#ts-…` calls;
+  `tmark_writers::TEXSMITH_TYP` is the default definition TeXSmith writes
+  next to the `.typ`; a template redefines what it restyles.
+- **The `Resolved` capsule.** `resolve()` returns the view of
+  `schema("resolved")` plus an opaque handle; TeXSmith calls `resolve`
+  once per document and `write` once per slot body with the same handle,
+  chains `next_start` into the next document's `start`, and feeds
+  `book` from the other pages' `book` lists. Numbers, label words and
+  `Resolution` kinds are the registry's, never recomputed in Python (D4).
+- **The `lower_web` shapes the MkDocs plugin relies on**: the return
+  `{text, diagnostics, bibliography}`; the wrappers Material's extensions
+  read (`<figure markdown="span">`, `<figure markdown="1"
+  class="ts-table">`, `<table data-ts-table="1" markdown="block">`,
+  `<div class="ts-equation" markdown="1">`, `<aside class="ts-aside">`,
+  `<span class="ts-counter" id data-counter data-key>`, `<span
+  class="ts-index">`, `<abbr>`), the reference spellings
+  (`[FW-10](#fw:x)`, `[title](#sec:x)`, `[label](location)` for a
+  sibling, `[?key]`), the `!!!`/`???` callouts, the `## References` list
+  and the `ts-` prefix (`css_prefix`). The plugin's CSS and its
+  `on_page_markdown` hook are written against these strings.
+- **Diagnostics**: `{code, severity, span, message, fix, related}` plus
+  `stage`, `path`, `line`, `col` (1-based, byte column, X10); the
+  catalogue from `tmark.codes()`.
+
+### How TeXSmith consumes the crate
+
+- `~/texsmith/vendor/tmark` is a symlink to `../../tmark` (this
+  checkout); `pyproject.toml` declares `tmark` as a dependency with a
+  `[tool.uv.sources]` path entry `vendor/tmark/crates/tmark-py`
+  (editable), so `uv sync` builds the wheel through maturin against
+  whatever this working tree holds — including uncommitted changes and
+  the branch that happens to be checked out. Switch branches here and
+  TeXSmith's next `uv sync` follows.
+- TeXSmith's CI (`.github/workflows/ci.yml`) checks this repository out
+  at `ref: texsmith-migration`, `path: vendor/tmark`, installs Rust, and
+  runs `uv sync --all-groups --frozen`. When this branch merges, that
+  `ref` must move to `main` (or a tag) in the same change, or their CI
+  builds a stale branch.
+- The version handshake: `tmark.version()` is the workspace version; the
+  IR root carries it; `resolve` and `edit` refuse a document from another
+  version. There is no PyPI release; the compatible-release pin of their
+  plan (D8) is not in force yet.
+
+### Pitfalls learned this round
+
+- **Merge conflicts between waves on `diagnostic.rs`.** Every wave that
+  added a code touched the same three tables in
+  `tmark-ir/src/diagnostic.rs` (the enum, `stage()`, `doc()`) and the
+  `codes` fixture. Merging two waves conflicted there repeatedly;
+  resolve by keeping both sides in the order the enum lists them, then
+  regenerate `schema("diagnostic")` (`cargo run -p tmark-ir --example
+  schema`) and run the `codes` tests. Landing the code-adding wave first
+  and rebasing the others is cheaper than merging.
+- **The `PENDING` list of `tmark-fmt/tests/mkdocs.rs`.** The D0 gate
+  lists fixtures whose `Mkdocs` spelling the parser cannot read back yet
+  and *requires them to fail*; when a parser wave lands the spelling,
+  the test fails with "now passing, remove from PENDING". The list is
+  empty today. Do not put a fixture there to silence a real regression.
+- **MSRV 1.80.** `Cargo.toml` pins `rust-version = "1.80"`;
+  `Option::is_none_or` (1.82) crept into the `Mkdocs` profile and was
+  reverted (`34dec57`). Clippy on a newer toolchain suggests it; refuse
+  the suggestion or raise the MSRV deliberately.
+- **Snapshots after every parser change.** `tmark-writers/tests/` holds
+  349 insta snapshots (`fixtures.rs`, `web.rs`), `tmark-fmt/tests/mkdocs.rs`
+  more. Any lowering change moves several of them; review with `cargo
+  insta review` (or read the diff of `INSTA_UPDATE=always`), never accept
+  blindly. A new fixture needs one `INSTA_UPDATE=always` run, then a
+  reading of the three new files. The fixture `ir` blocks are regenerated
+  with `scripts/fixture-ir.py` after the `dump` example is built.
+- **`__pycache__` files ended up tracked** by the first `py` commit and
+  had to be untracked (`9bf13d1`), with the `.so` `maturin develop` drops
+  into `python/tmark`. `.gitignore` now lists both; check `git status`
+  after a `maturin develop` before committing anyway.
+- **The snap `typst` binary cannot read `/tmp`.** A body written to
+  `/tmp` and compiled with the snap `typst` fails on the file, not on
+  the body; compile from a directory under `/home` (the scratchpad of
+  an agent is under `/tmp`). TeXSmith's `status.md` notes the same for
+  its examples.
+- **The rate limit kills parallel agents.** The waves ran as parallel
+  agents, one worktree each, and the session rate limit killed some of
+  them mid-task (this handoff itself was restarted after one); a killed
+  agent leaves a dirty worktree that the next one must inspect before
+  building on it. Run at most two or three waves at a time, commit
+  small, and write the design note of a wave before its last commit
+  rather than after.
+- The previous round's pitfalls (`rtk proxy`, `cargo` on `PATH`, `cargo
+  fmt` moving patch anchors, `preserve_order`, `lsp_types::Uri`, node
+  ids restarting per file) all held again.
+
+### Review mandates before merging to `main`
+
+Run these as separate reviewer agents (two at a time, see the rate-limit
+pitfall), each writing `design/reviews/07-…` and following incrementally;
+act on the findings before the pull request.
+
+1. **Spec conformance pass over C27–C42**: the wording written into
+   `spec/tmark.md` (§Tabs, §Div, §TeX logos, §Emoji and icon shortcodes,
+   §ProgressBar, §HorizontalRule, §Raw, §Header, §Inline text, §Foreign
+   directive, the lexical grammar additions, the C27/C28/C30 rows) against
+   the code that implements it (`lower/sugar.rs`, `lower/table_yaml.rs`,
+   `md_in_html`, `is_foreign_directive`, `Label::implicit`, the
+   `deprecated` fixes) and the fixtures. The rows were written by the
+   same agents that wrote the code, in the same commits.
+2. **Writers review against TeXSmith's legacy `.tex`** on the parity
+   corpus (`~/texsmith/tests/parity/corpus.yml`, `scripts/parity.py diff`):
+   every difference is either on the allow-list with a reason
+   (`\tsdivider`, contract macros, blank-line runs, zero-width collapse)
+   or a bug in one of the two paths. The escapers, the table layout
+   (`\tabcolsep` discount, `longtable`), captions (`\label` after
+   `\caption`, short captions) and the Greek subscript table (a legacy
+   bug reproduced on purpose) deserve a line each.
+3. **API review of `tmark-py`**: the surface of `_tmark.pyi` against
+   `09-bindings.md` (the `options` dicts, the `TypeError` / `ValueError`
+   split, `Resolved` as a frozen handle, `lower_web`'s return, the
+   `Loader` exception path, GIL release), what TeXSmith's passes call in
+   practice, and what a second consumer (Zensical, the LSP preview) would
+   need. Decide the console script and the PyPI name before the first
+   tag.
+4. Smaller, if capacity remains: the `Mkdocs` profile's fallback rules
+   against a Material site (every "falls back to canonical" row of
+   `04-printer.md` shows the canonical spelling literally on the web);
+   the `lower_web` wrappers against the plugin's CSS; `03-ir.md`
+   §Identity versus X6.
+
+### Commands
+
+```sh
+export PATH=$HOME/.cargo/bin:$PATH
+cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check
+cargo run -q -p tmark-ir --example schema && cargo run -q -p tmark-ir --example registries && git diff --exit-code
+cargo insta review                                                             # after a parser or writer change
+cargo build -p tmark-syntax --example dump && python3 scripts/fixture-ir.py    # then review the diff
+cargo run -q -p tmark-cli -- write FILE --to latex --map                       # Body as JSON
+cargo run -q -p tmark-cli -- lower FILE --to web --bib refs.bib                # the MkDocs page
+cargo run -q -p tmark-cli -- lint --fix --diff FILE
+uv venv && . .venv/bin/activate && uv pip install maturin pytest && maturin develop -m crates/tmark-py/Cargo.toml && pytest crates/tmark-py/tests
+python crates/tmark-py/scripts/gen_stubs.py                                    # after a signature or docstring change
+(cd ~/texsmith && uv sync --all-groups && uv run scripts/parity.py render --reader tmark)
+```
+
+## Previous handoff: end of the milestone 3 round and migration wave 1 (2026-09-11)
+
 
 Written by the agent that implemented most of M3 on top of M1–M2, for the
 agent that takes over. Read `AGENTS.md`, then this file, then
 `11-roadmap.md`, then `design/reviews/`. Everything below is opinion from
 the inside of the work: verify it, do not trust it.
 
-## State of the repository
+### State of the repository
 
 - `main`, workspace green: `cargo test --workspace`, `cargo clippy
   --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`,
@@ -27,7 +312,7 @@ the inside of the work: verify it, do not trust it.
   the implementing agent after the reviewer agents died on usage limits
   (twice for the parser one). What was acted on is listed below.
 
-## What the reviews said and what was done
+### What the reviews said and what was done
 
 From `04-ir-review.md` (all five changes landed): C1–C3 sub-spans, C4
 `structural_json` + `SUGAR_FIELDS`, C5 `LineIndex` fixes (snap inside a
@@ -71,7 +356,7 @@ ranking for M3 is the to-do list of the next pass; C18–C24 were added to
 undeclared prefix do not resolve) is the spec's lookup rule, not a bug —
 now C24.
 
-## What M3 still lacks (against `11-roadmap.md` §M3 and `08-lsp.md`)
+### What M3 still lacks (against `11-roadmap.md` §M3 and `08-lsp.md`)
 
 Done since the first pass: the `press` schema merge, diagnostics of
 included files under their own URI, references inside included files
@@ -108,7 +393,7 @@ U10, U11.
    file is not seen by the analysis (it reads the disk); hover on a label
    of an included file shows its heading text, definition jumps there.
 
-## Migration wave 1, worktree `fixes` (2026-09-11)
+### Migration wave 1, worktree `fixes` (2026-09-11)
 
 Implemented items 1–6, 8 and 9 of TeXSmith's
 `specs/migration/examples-migration.md` §4 (decisions X7; challenges C27,
@@ -153,7 +438,7 @@ it); a fixture whose sugar hugs a word (`tutor.^[key]`) cannot share the
 IR with its canonical (the printer inserts a space), so the fixture input
 carries the space and a printer test covers the hugging case.
 
-## Plan of attack for M4 (writers and preview)
+### Plan of attack for M4 (writers and preview)
 
 Design: `07-writers.md`, with the architecture review's C4 amendment
 (no CommonMark writer: `Profile::Mkdocs` in `tmark-fmt`; `tmark-writers`
@@ -165,7 +450,7 @@ TeXSmith's output on its docs, then Typst with the in-process preview
 fixed point, `04-printer.md`); the HTML writer can reuse the CommonMark
 suite's expectations. Keep the corpus loop of §Commands as the M4 gate.
 
-## Pitfalls learned this pass
+### Pitfalls learned this pass
 
 - **The shell.** `cargo` is not on `PATH` in the agent's non-interactive
   shell: `export PATH=$HOME/.cargo/bin:$PATH`. zsh expands a bare `=====`
@@ -197,7 +482,7 @@ suite's expectations. Keep the corpus loop of §Commands as the M4 gate.
   second attempt. Launch them two at a time, and write the report file
   early and incrementally so a kill loses less.
 
-## Commands
+### Commands
 
 ```sh
 export PATH=$HOME/.cargo/bin:$PATH
