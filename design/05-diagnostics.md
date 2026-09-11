@@ -37,10 +37,10 @@ neither.
 
 | Stage | Examples | Owner |
 | ----- | -------- | ----- |
-| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
+| Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `container-orphan` (a `tab` outside `tabs`, hint), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error), `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` (the `yaml table` schema) | `tmark-syntax` |
-| Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing` | `tmark-registry` |
-| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum` | `tmark-lint` |
+| Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing`, `ref-implicit-id` (hint: a reference to a heading's implicit id) | `tmark-registry` |
+| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum`, `directive-foreign`, `icon-web-only`, `feature-off` (hints) | `tmark-lint` |
 
 Parse and resolve diagnostics are not optional; they are facts about the
 document. Lint rules are a catalogue the user can enable, disable and
@@ -185,3 +185,27 @@ IR can hold the offending shape (design 03 §Tables):
 - Diagnostics are reported on the whole fence: the YAML reader has no
   positions. A per-row span is a candidate once the LSP shows the need.
 
+
+## Implementation notes (C31–C42 wave)
+
+- `compat-unsupported` now covers only what is still unimplemented:
+  critic markup, wiki links and fancy list markers (`lower/compat.rs`;
+  fixture `diag-compat-unsupported`). Content tabs, progress bars, emoji
+  and icon shortcodes, `^^x^^` and `[TOC]` left it with their constructs.
+- `deprecated` for the attribute colon `{: …}` and the progress fraction
+  `[=a/b "…"]` carries its own text fix (`Lowerer::deprecated_with_fix`):
+  their spans are not a node's (the brace on a host, the head before the
+  bar's attributes), so the generic node-reprint fix of `tmark::fixes`
+  could not find them. On a fence info string the whole fence is the span
+  and the reprint is the fix.
+- `container-orphan` (parse, hint): the orphan `tab` is wrapped in a
+  `tabs` of its own, so the document still renders; consecutive orphans
+  form one set.
+- `ref-implicit-id` (resolve, hint) is reported on the whole reference
+  (the `@key` or the link), not on the key token, and only when the label
+  it resolved to is implicit.
+- `directive-foreign` (lint, hint) fires per dotted directive on the
+  `RawBlock{format=markdown}`; `[TOC]` is the same node and silent.
+  `icon-web-only` fires per icon span. `feature-off` fires per `^^x^^` run
+  found in a `Str` whose text is its source byte for byte: the escaped
+  spelling the printer writes back (`\^\^x\^\^`) is literal on purpose.

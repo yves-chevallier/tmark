@@ -193,8 +193,13 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
 | `Div` dispatch (`epigraph`, `code`, `tsdiv`) | done | done | done |
 | `Include`, `\tsdivider` | done | done | done |
 | Scripts, emoji (`\tsscript`, `\tsemoji`) | done, untested on a corpus | done | plain spans |
-| Progress bars | not started (no IR node) | — | — |
-| `multicolumn`/`tab` containers | via `tsdiv` | via `#ts-div` | `<div>` |
+| Progress bars (`\tsprogress[thin]{0.45}{label}`) | done | done (`#ts-progress`) | done (`<progress>` in a `.progress` span) |
+| `multicolumn`/`div` containers | via `tsdiv` | via `#ts-div` | `<div class="multicolumn">`, `<div class="…">` |
+| Tabs (`tsdiv{tab}[title=…]` in sequence) | done | done | done (`tabbed-set` / `tabbed-labels` / `tabbed-block`) |
+| TeX logos (`typography.tex-logos`) | done (`\LaTeX{}`, `\tslogo{…}`) | done (`#ts-logo`) | done (`<span class="tex-logo">`) |
+| `.unnumbered` / `.unlisted` headings | done (`\section*`, `\addcontentsline` kept for unnumbered only) | done (`numbering: none`, `outlined: false`) | classes |
+| Implicit heading ids | `\label` only when referenced | same | none (the site slugs) |
+| Foreign directives, icon spans | dropped | dropped | dropped / `<span class="icon">` |
 
 ### Decisions taken here (not in the notes)
 
@@ -287,3 +292,25 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   environment inline, which LaTeX accepts.
 - The fixture snapshot names are `<fixture>@<backend>`; a new fixture
   needs `INSTA_UPDATE=always` once, then review the three new files.
+
+### Decisions of the C31–C42 wave
+
+- `Div{tabs}` is transparent on the paged backends: its `tab` children
+  render in sequence through the generic `tsdiv` / `#ts-div` contract,
+  `title=` forwarded as a key (spec §Tabs: "the title in bold, then the
+  content" is the fragment's default). The HTML writer mirrors Material's
+  `tabbed` markup without the radio inputs.
+- TeX logos are a split of `Str` runs like the acronym substitution
+  (`common/logos.rs`), so code, math, raw text, destinations and attribute
+  values never see them. `\TeX{}`, `\LaTeX{}` and `\LaTeXe{}` are the
+  kernel's; the other words are `\tslogo{Name}`, a new macro of the
+  `ts-typesetting` contract (`FRAGMENTS`), `#ts-logo("Name")` in Typst.
+  The feature is read from the document's front matter, not from
+  `WriterOptions`.
+- A heading without `{#id}` gets a `\label` / `<label>` only when a
+  reference of the document resolves to its implicit id
+  (`common::refs::referenced_implicit_id`); the earlier unconditional
+  `\label{slug}` is gone, so unreferenced headings carry no label. HTML
+  keeps writing ids only when explicit: the site's slugifier owns the rest.
+- `ProgressBar` values are fractions with at most four decimals
+  (`text::trim_float`); the label defaults to the percentage.

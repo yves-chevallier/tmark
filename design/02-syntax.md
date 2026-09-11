@@ -175,13 +175,23 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
   characters followed by text on the same paragraph; `{lead}[…]` at the
   start of a paragraph reaches the same field because the role lowers to a
   `Strong` first.
-- Not implemented yet, decided by spec challenges C31–C42: tabs, the
-  layout containers, foreign directives, HTML as typed and `<tag markdown>`,
-  progress bars, emoji and icon shortcodes, the `{: ` attribute colon,
-  heading implicit ids and classes, `^^x^^`, TeX logos. Their fixtures
-  carry a `TODO` in place of the `ir` block until the parser wave fills it.
+- Implemented by the C31–C42 wave (one fixture each): tabs (`=== "Title"`
+  and `::: tab` are the admonition-shaped construct plus `group_tabs`;
+  the direct body of `::: tabs` is not regrouped, `in_tabs`), the layout
+  containers (`registry::CONTAINERS`), foreign directives (the dotted
+  `:::` head is read by the admonition construct, guarded by
+  `util::tmark::is_foreign_directive`, before the container fence; `[TOC]`
+  in `compat_paragraph`), HTML as typed and `<tag markdown>`
+  (`md_in_html`: the body runs over the siblings up to the `</tag>` block,
+  since CommonMark ends an HTML block at a blank line), progress bars and
+  shortcodes (`lower/sugar.rs`, a scan of each `Str` line; `[=…]{…}`
+  arrives as a `TmarkSpan` and is taken there), the `{: ` colon
+  (`looks_like_attributes` and `parse_attrs`; every host reports
+  `deprecated` with the canonical list as a text fix), heading classes
+  (attrs only) and `^^x^^` (literal when off; the lint hints). TeX logos
+  and implicit ids are not the parser's.
 - Not implemented yet, deliberately: grid tables (listing with lang
-  `grid table`), critic markup, progress bars, wiki links, inline footnotes
+  `grid table`), critic markup, wiki links, inline footnotes
   `^[…]` (the spelling is still the deprecated citation group; a `^[…]`
   that is not a key list is literal text), fancy list styles (milestone
   5), and `Space` nodes (see 03).
