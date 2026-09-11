@@ -6,21 +6,33 @@
 #![forbid(unsafe_code)]
 
 mod config;
+mod json;
 
 pub use config::Config;
+pub use json::{from_json, schema_hash, to_json, VERSION};
 pub use tmark_fmt::{
     edit, edit_many, format, print_node, print_node_with, EditError, NodeEdit, Profile, Replacement,
 };
 pub use tmark_ir as ir;
-pub use tmark_ir::schema;
 pub use tmark_ir::{Diagnostic, Document, FileId};
 pub use tmark_lint::{lint, Config as LintConfig};
 #[cfg(feature = "fs")]
 pub use tmark_registry::FsLoader;
 pub use tmark_registry::{
-    resolve, Host, Label, Loader, MemoryLoader, RefResolution, Resolution, ResolveOptions, Resolved,
+    resolve, Host, Label, Loader, MemoryLoader, RefResolution, Resolution, ResolveOptions,
+    Resolved, ResolvedView,
 };
 pub use tmark_syntax::{parse, parse_strict, Parsed};
+
+/// The JSON schema of a public shape, by name: the ones of `tmark_ir::schema`
+/// (`"ir"`, `"frontmatter"`, `"diagnostic"`) plus `"resolved"` (the
+/// [`ResolvedView`] `resolve` produces).
+pub fn schema(name: &str) -> Option<serde_json::Value> {
+    match name {
+        "resolved" => serde_json::to_value(schemars::schema_for!(ResolvedView)).ok(),
+        other => tmark_ir::schema(other),
+    }
+}
 
 /// Parse for a profile: the strict profile switches the X-class
 /// constructs off at parse time (spec §Conformance and deviations); the
@@ -72,6 +84,34 @@ pub fn fixes(doc: &Document, diagnostics: &mut [Diagnostic]) {
             });
         }
     }
+}
+
+/// Splice every fix of the main file into `text`, last first so that
+/// earlier spans stay valid; a fix overlapping one already applied is
+/// skipped. Returns the new text and the number of fixes applied: what
+/// `tmark lint --fix` writes.
+pub fn apply_fixes(text: &str, file: FileId, diagnostics: &[Diagnostic]) -> (String, usize) {
+    let mut fixes: Vec<&ir::Fix> = diagnostics
+        .iter()
+        .filter_map(|d| d.fix.as_ref())
+        .filter(|f| f.span.file == file)
+        .collect();
+    fixes.sort_by_key(|f| std::cmp::Reverse(f.span.start));
+    let mut out = text.to_string();
+    let mut applied = 0;
+    let mut limit = text.len() as u32;
+    for fix in fixes {
+        if fix.span.end > limit {
+            continue;
+        }
+        out.replace_range(
+            fix.span.start as usize..fix.span.end as usize,
+            &fix.replacement,
+        );
+        limit = fix.span.start;
+        applied += 1;
+    }
+    (out, applied)
 }
 
 /// Every diagnostic of a file: parse, resolve and lint, in that order,

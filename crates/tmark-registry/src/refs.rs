@@ -1,11 +1,16 @@
 //! Step 5: what every reference refers to (spec §Registries (lookup),
 //! §Ref, §Cite, §Glossary reference, §Cross-document references).
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use tmark_ir::{walk, Code, Diagnostic, Inline, NodeId, NodeRef, Span, Target};
 
 use crate::Resolved;
 
-#[derive(Clone, Debug, PartialEq)]
+/// What a key refers to. Serialises with a `kind` tag (`label`, `citation`,
+/// `glossary`, `doi`, `external`, `ambiguous`, `unresolved`).
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Resolution {
     /// A label or counter item of this document (or an include).
     Label {
@@ -33,7 +38,7 @@ pub enum Resolution {
     Unresolved,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 pub struct RefResolution {
     pub node: NodeId,
     /// The key token (the whole node for an anchor link, or when the item

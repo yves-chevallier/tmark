@@ -118,6 +118,17 @@ Crates: `tmark-writers` (LaTeX, Typst, HTML, CommonMark profiles), the
   the IR path for PDF, and its MkDocs/Zensical companion emits the `Mkdocs`
   profile.
 
+Status (2026-09-11): `tmark-py` pulled forward for the TeXSmith migration.
+The native module `tmark._tmark` and the package `tmark` exist with
+`parse`, `format`, `lint`, `fixes`, `resolve`, `edit`, `schema`,
+`schema_hash`, `codes`, `fragments`, `registries` (design 09 §Python, the
+API as built); the Python `Loader` protocol is wrapped at the boundary;
+`maturin develop` and `maturin build` work, the pytest suite under
+`crates/tmark-py/tests` is green, `.github/workflows/wheels.yml` builds the
+abi3 wheels. `write` raises `NotImplementedError` until the writers land
+(M4) and `fragments()` is empty until `FRAGMENTS` merges. Not started: the
+wheel on PyPI, `tmark-wasm`, the PyMdownX profile, dialect import.
+
 ## Out of scope for all milestones
 
 Templates, fonts, PDF compilation, DOI resolution, executed fences, site

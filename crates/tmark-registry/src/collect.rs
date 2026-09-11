@@ -4,6 +4,8 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use tmark_ir::{
     plain_text, walk, Attrs, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline,
     NodeId, NodeRef, Span,
@@ -13,7 +15,8 @@ use crate::counters::Counters;
 use crate::loader::{join, Loader};
 
 /// What an anchor sits on; the host decides the counter (spec §Anchor).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Host {
     Header,
     Table,
@@ -43,7 +46,7 @@ impl Host {
 }
 
 /// A defined label: an `#id`, a counter item, a captioned float.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 pub struct Label {
     /// The id as written (`sec:intro`, `fw:boot-loop`, `stock`).
     pub id: String,
@@ -57,8 +60,10 @@ pub struct Label {
     pub span: Span,
     /// The id token alone, when the parser recorded it (design 03
     /// §Identity and spans): what rename and go-to-definition select.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id_span: Option<Span>,
     /// Position in the series (TeXSmith-numbered series only).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub number: Option<u32>,
 }
 

@@ -1,4 +1,4 @@
-//! Writes the JSON schemas of the IR and of the front matter keys to
+//! Writes the JSON schemas of the IR, the front matter keys and a diagnostic to
 //! `crates/tmark-ir/schema/`. Run with `cargo run -p tmark-ir --example schema`
 //! and commit the output (design `03-ir.md` §Serialization).
 
@@ -6,7 +6,7 @@ use std::path::Path;
 
 use schemars::schema::RootSchema;
 use schemars::schema_for;
-use tmark_ir::{Document, Keys};
+use tmark_ir::{Diagnostic, Document, Keys};
 
 fn write(dir: &Path, name: &str, mut schema: RootSchema) {
     let own = schema
@@ -29,4 +29,5 @@ fn main() {
     std::fs::create_dir_all(&dir).expect("schema directory");
     write(&dir, "ir.json", schema_for!(Document));
     write(&dir, "frontmatter.json", schema_for!(Keys));
+    write(&dir, "diagnostic.json", schema_for!(Diagnostic));
 }

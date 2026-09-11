@@ -5,11 +5,13 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use tmark_ir::{Code, Diagnostic, Document};
 
 use crate::loader::Loader;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
 pub struct BibEntry {
     pub key: String,
     /// `article`, `misc`, …; `doi` for a front-matter DOI shorthand whose

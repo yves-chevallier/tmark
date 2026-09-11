@@ -5,11 +5,24 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-
-[dependencies]
-# The facade with `fs`: the wheel ships the CLI's loader.
-tmark = { path = "../tmark" }
+description = "PyO3 native module tmark._tmark: the TMark facade for Python"
+publish = false
 
 [lib]
 name = "_tmark"
 crate-type = ["cdylib"]
+# An extension module has no Python to link against as a test binary; the
+# Rust logic lives (and is tested) in the facade, the pytest suite under
+# `tests/` covers the binding (design/09-bindings.md).
+test = false
+doctest = false
+
+[dependencies]
+# The facade with `fs`: the wheel ships the CLI's loader.
+tmark = { path = "../tmark" }
+# The binding itself: abi3 wheels from Python 3.10 up, one build per platform.
+pyo3 = { workspace = true, features = ["abi3-py310"] }
+# serde_json::Value <-> Python objects; the API is JSON-shaped (ADR 0003).
+pythonize = "0.22"
+serde = { workspace = true }
+serde_json = { workspace = true }

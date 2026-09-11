@@ -117,6 +117,18 @@ pub enum Code {
     HeadingSkip,
 }
 
+/// The pipeline stage that emits a code. Design `05-diagnostics.md` §Who
+/// emits what.
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Stage {
+    Parse,
+    Resolve,
+    Lint,
+}
+
 impl Code {
     /// Every code, in catalogue order.
     pub const ALL: &'static [Code] = &[
@@ -223,6 +235,100 @@ impl Code {
             | Code::HeadingSkip => Severity::Hint,
         }
     }
+
+    /// The stage that emits the code (the catalogue order of [`Code::ALL`]).
+    pub fn stage(self) -> Stage {
+        match self {
+            Code::AttrNoHost
+            | Code::RoleDanglingHead
+            | Code::RoleUnknown
+            | Code::CaptionNoHost
+            | Code::IncludeInline
+            | Code::ContainerUnclosed
+            | Code::ContainerUnknown
+            | Code::FenceUnknownNodeWord
+            | Code::FrontmatterYaml
+            | Code::FrontmatterUnknownKey
+            | Code::Deprecated
+            | Code::ParseInternal => Stage::Parse,
+            Code::RefUnresolved
+            | Code::RefAmbiguous
+            | Code::PrefixUnknown
+            | Code::PrefixHostMismatch
+            | Code::LabelDuplicate
+            | Code::CitationShadowedByFootnote
+            | Code::CrossrefInventoryMissing
+            | Code::CrossrefInventoryStale
+            | Code::IncludeMissing => Stage::Resolve,
+            Code::HardcodedNumber
+            | Code::PositionWord
+            | Code::CaptionIdOffConvention
+            | Code::StrictXConstruct
+            | Code::DeprecatedFrontmatterKey
+            | Code::LeadPromotion
+            | Code::HeadingSkip => Stage::Lint,
+        }
+    }
+
+    /// One sentence on what the code reports, with the spec section it
+    /// implements: the doc comment of the variant, for tools that list the
+    /// catalogue (`tmark.codes()` in Python, editor settings).
+    pub fn doc(self) -> &'static str {
+        match self {
+            Code::AttrNoHost => "Spec §Roles: an attribute list with no host element",
+            Code::RoleDanglingHead => "Spec §Roles: a role head not followed by `[` or `(`",
+            Code::RoleUnknown => {
+                "Design C4: a brace group followed by `[` or `(` whose name is not a role"
+            }
+            Code::CaptionNoHost => "Design C7: a `Kind:` line with no float to attach to",
+            Code::IncludeInline => {
+                "Design C10: `{include}(…)` inside a paragraph; only the block form exists"
+            }
+            Code::ContainerUnclosed => {
+                "Spec §Container directives: a `:::` fence without its closing line"
+            }
+            Code::ContainerUnknown => "Spec §Div: a `::: name` whose name is unknown",
+            Code::FenceUnknownNodeWord => {
+                "Spec §Data directives: an info string whose second word is not a node word"
+            }
+            Code::FrontmatterYaml => "Spec §Front matter: the YAML island does not parse",
+            Code::FrontmatterUnknownKey => {
+                "Spec §Front matter: an unknown key under a validated namespace"
+            }
+            Code::Deprecated => "Appendix \"Deprecation schedule\": a deprecated spelling",
+            Code::ParseInternal => {
+                "The tokenizer failed on the file (a bug in it): the document is one paragraph"
+            }
+            Code::RefUnresolved => "Spec §Ref: a key found in no registry",
+            Code::RefAmbiguous => "Spec §Cite: a key present in two registries",
+            Code::PrefixUnknown => "Spec §CounterItem: an undeclared counter prefix",
+            Code::PrefixHostMismatch => "Spec §Anchor: a prefix that disagrees with its host",
+            Code::LabelDuplicate => "Spec §Counters: the same label defined twice",
+            Code::CitationShadowedByFootnote => {
+                "Spec §Cite: a `[^key]` citation shadowed by a real footnote"
+            }
+            Code::CrossrefInventoryMissing => {
+                "Spec §Cross-document references: an inventory that cannot be loaded"
+            }
+            Code::CrossrefInventoryStale => {
+                "Design 06-registries: an inventory whose hash no longer matches"
+            }
+            Code::IncludeMissing => "Spec §Includes: an included file that cannot be loaded",
+            Code::HardcodedNumber => "Spec §Ref: \"Figure 3\" typed in prose",
+            Code::PositionWord => "Spec §Ref: \"above\" or \"below\" used as a reference",
+            Code::CaptionIdOffConvention => {
+                "Spec §Anchor: a caption id without the recommended prefix"
+            }
+            Code::StrictXConstruct => {
+                "Spec §Conformance and deviations: an X-class construct under the strict profile"
+            }
+            Code::DeprecatedFrontmatterKey => {
+                "Appendix \"Deprecation schedule\": a deprecated front-matter key"
+            }
+            Code::LeadPromotion => "Spec §Para: a leading strong span promoted to a lead-in",
+            Code::HeadingSkip => "Spec §Header: a heading level skipped",
+        }
+    }
 }
 
 /// A text edit the LSP can apply: replace `span` with `replacement`.
@@ -278,6 +384,22 @@ mod tests {
             let json = serde_json::to_string(&code).unwrap();
             assert_eq!(json, format!("\"{}\"", code.id()));
         }
+    }
+
+    #[test]
+    fn every_code_is_documented_and_staged() {
+        let mut stage = Stage::Parse;
+        for code in Code::ALL {
+            assert!(!code.doc().is_empty(), "{}: no doc", code.id());
+            assert!(
+                code.stage() >= stage,
+                "{}: out of catalogue order",
+                code.id()
+            );
+            stage = code.stage();
+        }
+        assert_eq!(Code::from_id("heading-skip"), Some(Code::HeadingSkip));
+        assert_eq!(Code::from_id("nope"), None);
     }
 
     #[test]

@@ -12,6 +12,7 @@ mod counters;
 mod inventory;
 mod loader;
 mod refs;
+mod view;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -26,6 +27,7 @@ pub use inventory::{CrossRefs, Inventory, InventoryEntry};
 pub use loader::FsLoader;
 pub use loader::{Loader, MemoryLoader};
 pub use refs::{RefResolution, Resolution};
+pub use view::{IndexEntryView, LabelView, ResolvedView};
 
 /// Inputs of a resolution that are not in the document.
 #[derive(Clone, Debug, Default)]
@@ -57,6 +59,25 @@ pub struct Resolved {
     /// their references in `refs`; an editor reads their nodes for hover).
     pub included: Vec<(FileId, Document)>,
     pub diagnostics: Vec<Diagnostic>,
+}
+
+impl Resolved {
+    /// The first free value of every TeXSmith-numbered series: what the
+    /// next document of a build passes as [`ResolveOptions::start`] so
+    /// that numbering continues across documents.
+    pub fn next_start(&self) -> BTreeMap<String, u32> {
+        self.counters
+            .by_prefix
+            .values()
+            .filter(|c| c.tmark_numbered)
+            .map(|c| (c.prefix.clone(), c.next()))
+            .collect()
+    }
+
+    /// The JSON-shaped view of the resolution (design 09 §Python).
+    pub fn view(&self) -> ResolvedView {
+        ResolvedView::new(self)
+    }
 }
 
 /// Build the registries of `doc` and resolve its references.

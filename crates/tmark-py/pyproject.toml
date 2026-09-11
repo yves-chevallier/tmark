@@ -1,0 +1,33 @@
+# The `tmark` wheel: the native module `tmark._tmark` (PyO3, abi3 from
+# Python 3.10) under the Python package in `python/tmark`. Built by maturin
+# from this crate inside the workspace (design/09-bindings.md §Python).
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "tmark"
+description = "TMark: parse, format, lint and resolve TeXSmith Markdown"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+
+[project.urls]
+Repository = "https://github.com/yves-chevallier/tmark"
+
+[tool.maturin]
+python-source = "python"
+module-name = "tmark._tmark"
+features = ["pyo3/extension-module"]
+# The wheel carries the stub and the marker so that pyright sees the API.
+include = ["python/tmark/py.typed", "python/tmark/_tmark.pyi"]
+exclude = ["python/**/__pycache__/**"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
