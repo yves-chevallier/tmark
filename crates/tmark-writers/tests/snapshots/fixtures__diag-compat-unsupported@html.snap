@@ -2,11 +2,8 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<p>=== &quot;Windows&quot;</p>
-<p>A {--deleted--} word, a bar [=45% &quot;Review&quot;]{: .thin}, a [[Wiki Page]],
-an emoji :smile: and an icon :material-home:, then ^^inserted^^ text.</p>
+<p>A {--deleted--} word, a [[Wiki Page]].</p>
 <p>a. first fancy item</p>
-<p>[TOC]</p>
 
 ---requires---
 {

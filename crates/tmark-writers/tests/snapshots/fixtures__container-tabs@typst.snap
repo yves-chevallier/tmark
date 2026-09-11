@@ -1,0 +1,33 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#ts-div("tab", title: "Windows")[
+Windows is a Microsoft operating system.
+]
+
+#ts-div("tab", title: "Linux")[
+Linux is an open-source operating system.
+]
+
+---requires---
+{
+  "packages": [
+    "epigraph",
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "xcolor"
+  ],
+  "fragments": [
+    "ts-typesetting"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

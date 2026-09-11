@@ -81,13 +81,24 @@ pub fn start(tokenizer: &mut Tokenizer) -> State {
             );
             State::Retry(StateName::MdxExpressionFlowStart)
         }
-        // TMark: `:::` containers, then `:   ` definitions.
+        // TMark: `::: a.b` foreign directives, then `:::` containers, then
+        // `:   ` definitions.
         Some(b':') => {
             tokenizer.attempt(
                 State::Next(StateName::FlowAfter),
-                State::Next(StateName::FlowBeforeTmarkDefinition),
+                State::Next(StateName::FlowBeforeTmarkContainerColon),
             );
-            State::Retry(StateName::TmarkContainerStart)
+            State::Retry(StateName::TmarkAdmonitionStart)
+        }
+        // TMark: `=== "Title"` content tabs (the admonition shape); a bare
+        // `===` is a setext underline, which the construct declines and
+        // the usual chain then reads.
+        Some(b'=') => {
+            tokenizer.attempt(
+                State::Next(StateName::FlowAfter),
+                State::Next(StateName::FlowBlankLineBefore),
+            );
+            State::Retry(StateName::TmarkAdmonitionStart)
         }
         // TMark: `///` blocks (deprecated).
         Some(b'/') => {
@@ -159,6 +170,15 @@ pub fn before_tmark_container(tokenizer: &mut Tokenizer) -> State {
     tokenizer.attempt(
         State::Next(StateName::FlowAfter),
         State::Next(StateName::FlowBeforeHtml),
+    );
+    State::Retry(StateName::TmarkContainerStart)
+}
+
+/// Before TMark container (`:::`), after a foreign directive failed.
+pub fn before_tmark_container_colon(tokenizer: &mut Tokenizer) -> State {
+    tokenizer.attempt(
+        State::Next(StateName::FlowAfter),
+        State::Next(StateName::FlowBeforeTmarkDefinition),
     );
     State::Retry(StateName::TmarkContainerStart)
 }

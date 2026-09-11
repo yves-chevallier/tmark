@@ -1,0 +1,11 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+[TOC]
+
+::: texsmith.core.config
+    options:
+      members: true
+
+Next paragraph.

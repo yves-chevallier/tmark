@@ -14,8 +14,8 @@
 use std::collections::BTreeSet;
 
 use tmark_ir::{
-    registry, walk, Admonition, Aside, Block, Caption, CaptionKind, CounterItem, Document, Include,
-    IndexEntry, Inline, NodeRef, RawBlock, RawInline, RefItem,
+    registry, walk, Admonition, Aside, Block, Caption, CaptionKind, CounterItem, Div, Document,
+    Include, IndexEntry, Inline, NodeRef, RawBlock, RawInline, RefItem,
 };
 
 use crate::escape::Context;
@@ -346,6 +346,8 @@ pub fn raw_inline(out: &mut Out, n: &RawInline) -> bool {
     if !matches!(n.format.as_str(), "latex" | "typst" | "html")
         || n.text.contains(['[', ']', '\n'])
         || n.text.ends_with('\\')
+        // An HTML tag prints as typed in every profile (spec §Raw).
+        || (n.format == "html" && crate::inline::is_html_tag(&n.text))
     {
         return false;
     }
@@ -491,6 +493,75 @@ pub fn raw_block(out: &mut Out, r: &RawBlock) -> bool {
         out.push("\n");
     }
     out.push("///\n");
+    true
+}
+
+/// `=== "Title"` per tab, the body indented by four spaces (pymdownx.tabbed,
+/// spec §Tabs). Every child must be a `tab` whose only attribute is a
+/// title without a quote or a line break, and have content; anything else
+/// (an id, a class, an empty tab) keeps the `:::: tabs` spelling.
+pub fn tabs(out: &mut Out, d: &Div) -> bool {
+    if !d.attrs.is_empty() || d.content.is_empty() {
+        return false;
+    }
+    let mut titles = Vec::new();
+    for block in &d.content {
+        let Block::Div(tab) = block else { return false };
+        let title = tab.attrs.get("title").unwrap_or_default();
+        if tab.name != "tab"
+            || tab.attrs.id.is_some()
+            || !tab.attrs.classes.is_empty()
+            || tab.attrs.kv.len() != 1
+            || tab.content.is_empty()
+            || title.is_empty()
+            || title != title.trim()
+            || title.contains(['"', '\n'])
+        {
+            return false;
+        }
+        titles.push(title);
+    }
+    for (i, block) in d.content.iter().enumerate() {
+        let Block::Div(tab) = block else {
+            unreachable!()
+        };
+        if i > 0 {
+            out.blank_line();
+        }
+        out.push("=== \"");
+        out.push(titles[i]);
+        out.push("\"\n");
+        out.blank_line();
+        out.push_prefix("    ");
+        crate::block::blocks(out, &tab.content);
+        out.pop_prefix();
+        out.ensure_newline();
+    }
+    true
+}
+
+/// `<div class="x" markdown>` … `</div>` (Python-Markdown `md_in_html`,
+/// spec §Div: the only container spelling a Python-Markdown site renders).
+/// An attribute other than the id and the classes has no HTML-safe
+/// spelling here and keeps `::: div`.
+pub fn div_markdown(out: &mut Out, d: &Div) -> bool {
+    if !d.attrs.kv.is_empty()
+        || d.attrs.id.as_deref().is_some_and(|id| !bare(id))
+        || !d.attrs.classes.iter().all(|c| bare(c))
+    {
+        return false;
+    }
+    out.push("<div");
+    if let Some(id) = &d.attrs.id {
+        out.push(&format!(" id=\"{id}\""));
+    }
+    if !d.attrs.classes.is_empty() {
+        out.push(&format!(" class=\"{}\"", d.attrs.classes.join(" ")));
+    }
+    out.push(" markdown>\n");
+    crate::block::blocks(out, &d.content);
+    out.ensure_newline();
+    out.push("</div>\n");
     true
 }
 

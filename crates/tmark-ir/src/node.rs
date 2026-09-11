@@ -570,7 +570,51 @@ pub struct Comment {
     pub text: String,
 }
 
-/// `{raw latex}(…)`. Spec §Raw passthrough.
+/// `[=45% "Review"]{.thin}`. Spec §ProgressBar: an inline bar with a
+/// `value` from 0 to 100 (clamped) and an optional `label` (the
+/// percentage when absent); `.thin` and the other classes are attributes.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ProgressBar {
+    #[serde(flatten)]
+    pub meta: Meta,
+    /// Percentage, 0 to 100.
+    pub value: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Attrs::is_empty")]
+    pub attrs: Attrs,
+}
+
+impl ProgressBar {
+    /// The canonical spelling without the attribute list, `[=45% "label"]`
+    /// (spec §ProgressBar: PyMdownX's percentage form). Shared by the
+    /// printer and the parser's fix for the fraction form; a `"` inside
+    /// the label, which the recogniser cannot hold, is dropped.
+    pub fn head_text(&self) -> String {
+        let mut out = format!("[={}%", self.value_text());
+        if let Some(label) = &self.label {
+            out.push_str(&format!(" \"{}\"", label.replace('"', "")));
+        }
+        out.push(']');
+        out
+    }
+
+    /// The value as the canonical spelling writes it: an integer when it
+    /// is one, else at most two decimals (`45`, `33.33`).
+    pub fn value_text(&self) -> String {
+        let value = self.value.clamp(0.0, 100.0);
+        let rounded = (value * 100.0).round() / 100.0;
+        if rounded.fract() == 0.0 {
+            format!("{}", rounded as u32)
+        } else {
+            let text = format!("{rounded:.2}");
+            text.trim_end_matches('0').to_string()
+        }
+    }
+}
+
+/// `{raw latex}(…)`. Spec §Raw passthrough. `format=html` is a tag or an
+/// HTML block kept as typed.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct RawInline {
     #[serde(flatten)]
@@ -611,6 +655,7 @@ pub enum Inline {
     Abbr(Abbr),
     Comment(Comment),
     RawInline(RawInline),
+    ProgressBar(ProgressBar),
 }
 
 impl Inline {
@@ -644,6 +689,7 @@ impl Inline {
             Inline::Abbr(n) => &n.meta,
             Inline::Comment(n) => &n.meta,
             Inline::RawInline(n) => &n.meta,
+            Inline::ProgressBar(n) => &n.meta,
         }
     }
 
@@ -677,6 +723,7 @@ impl Inline {
             Inline::Abbr(n) => &mut n.meta,
             Inline::Comment(n) => &mut n.meta,
             Inline::RawInline(n) => &mut n.meta,
+            Inline::ProgressBar(n) => &mut n.meta,
         }
     }
 }
@@ -857,7 +904,10 @@ pub struct Admonition {
     pub attrs: Attrs,
 }
 
-/// Any other `::: name` container. Spec §Div.
+/// Any other `::: name` container. Spec §Div: the names of the closed
+/// registry (`registry::CONTAINERS`: `tabs`, `tab`, `multicolumn`, `div`)
+/// and, with a `container-unknown` diagnostic, any other name, kept so the
+/// printer round-trips it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Div {
     #[serde(flatten)]
@@ -879,7 +929,11 @@ pub struct MathBlock {
     pub attrs: Attrs,
 }
 
-/// `latex raw` fence. Spec §Raw passthrough.
+/// `latex raw` fence. Spec §Raw passthrough. `format=html` is an HTML
+/// block kept as typed; `format=markdown` is a foreign directive (spec
+/// §Foreign directive: `[TOC]`, a dotted `::: a.b` line with its indented
+/// continuation) kept verbatim, printed as typed and rendered by no other
+/// writer.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct RawBlock {
     #[serde(flatten)]

@@ -21,12 +21,16 @@ pub fn is_ident_byte(byte: u8) -> bool {
 }
 
 /// Whether `bytes[index]` is a `{` that starts an attribute list: after
-/// optional blanks comes `#x`, `.x`, or `key=` (spec §Attributes).
+/// an optional `:` (the deprecated Python-Markdown `attr_list` colon, spec
+/// §Attributes) and optional blanks comes `#x`, `.x`, or `key=`.
 pub fn looks_like_attributes(bytes: &[u8], index: usize) -> bool {
     if bytes.get(index) != Some(&b'{') {
         return false;
     }
     let mut i = index + 1;
+    if bytes.get(i) == Some(&b':') {
+        i += 1;
+    }
     while matches!(bytes.get(i), Some(b' ' | b'\t')) {
         i += 1;
     }
@@ -43,6 +47,45 @@ pub fn looks_like_attributes(bytes: &[u8], index: usize) -> bool {
         }
         _ => false,
     }
+}
+
+/// Whether the line at `index` (its first non-blank byte) is a foreign
+/// directive head (spec §Foreign directive): three or more `:`, optional
+/// blanks, a dotted name `ident(.ident)+`, optional blanks, then the end of
+/// the line. Shared by the tokenizer (which takes the line plus its
+/// indented body) and `tmark-syntax`.
+pub fn is_foreign_directive(bytes: &[u8], index: usize) -> bool {
+    let mut i = index;
+    let mut colons = 0;
+    while bytes.get(i) == Some(&b':') {
+        i += 1;
+        colons += 1;
+    }
+    if colons < 3 {
+        return false;
+    }
+    while matches!(bytes.get(i), Some(b' ' | b'\t')) {
+        i += 1;
+    }
+    let mut dots = 0;
+    loop {
+        if !bytes.get(i).is_some_and(|b| is_ident_start(*b)) {
+            return false;
+        }
+        while bytes.get(i).is_some_and(|b| is_ident_byte(*b)) {
+            i += 1;
+        }
+        if bytes.get(i) == Some(&b'.') {
+            dots += 1;
+            i += 1;
+            continue;
+        }
+        break;
+    }
+    while matches!(bytes.get(i), Some(b' ' | b'\t')) {
+        i += 1;
+    }
+    dots > 0 && matches!(bytes.get(i), None | Some(b'\n'))
 }
 
 /// Index of the end of the current line: the `\n`, or the end of input.

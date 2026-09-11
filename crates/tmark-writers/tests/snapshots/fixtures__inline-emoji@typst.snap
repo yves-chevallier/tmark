@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+Ship it 🚀 😄 at 12:30:45.
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

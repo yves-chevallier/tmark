@@ -229,6 +229,12 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push("]");
         }
         Inline::Span(n) => {
+            if let Some(shortcode) = icon_shortcode(n) {
+                // `Span{.icon media=web}` prints as the shortcode it holds
+                // (spec §Emoji and icon shortcodes).
+                out.push(shortcode);
+                return;
+            }
             out.push("[");
             inlines(
                 out,
@@ -253,14 +259,63 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push(&n.text);
             out.push("-->");
         }
-        Inline::RawInline(n) => {
-            out.push("{raw ");
-            out.push(&attrs::value(&n.format));
-            out.push("}(");
-            out.push(&n.text);
-            out.push(")");
-        }
+        Inline::RawInline(n) => raw_inline(out, n),
+        Inline::ProgressBar(n) => progress_bar(out, n),
     }
+}
+
+/// `[=45% "label"]{.thin}` (spec §ProgressBar: the PyMdownX percentage
+/// spelling is canonical; the label is quoted, quotes inside it are what
+/// the recogniser cannot hold, so they are dropped).
+pub fn progress_bar(out: &mut Out, n: &tmark_ir::ProgressBar) {
+    out.push(&n.head_text());
+    attrs::write(out, &n.attrs, "");
+}
+
+/// A raw inline: HTML that CommonMark reads as a tag prints as typed
+/// (spec §Raw passthrough: "a raw HTML node whose text CommonMark
+/// recognises as HTML prints as typed"); anything else is the role.
+fn raw_inline(out: &mut Out, n: &tmark_ir::RawInline) {
+    if n.format == "html" && is_html_tag(&n.text) {
+        out.push(&n.text);
+        return;
+    }
+    out.push("{raw ");
+    out.push(&attrs::value(&n.format));
+    out.push("}(");
+    out.push(&n.text);
+    out.push(")");
+}
+
+/// Whether `text` is one inline HTML construct as CommonMark's `html_text`
+/// reads it: an open tag, a closing tag, a comment, a processing
+/// instruction, a declaration or a CDATA section, nothing around it.
+pub fn is_html_tag(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() < 3 || bytes[0] != b'<' || bytes[bytes.len() - 1] != b'>' {
+        return false;
+    }
+    let inner = &text[1..text.len() - 1];
+    if inner.starts_with("!--") {
+        return inner.ends_with("--") && !inner[3..inner.len() - 2].contains("--");
+    }
+    if inner.starts_with('?') || inner.starts_with('!') {
+        return !inner[1..].contains('>');
+    }
+    let name = inner.strip_prefix('/').unwrap_or(inner);
+    let name_len = name
+        .bytes()
+        .take_while(|b| b.is_ascii_alphanumeric() || *b == b'-')
+        .count();
+    if name_len == 0 || !name.as_bytes()[0].is_ascii_alphabetic() {
+        return false;
+    }
+    let rest = &name[name_len..];
+    if inner.starts_with('/') {
+        return rest.trim().is_empty();
+    }
+    // Attributes: no `>` or newline-broken quote; the tokenizer accepted it.
+    !rest.trim_end_matches('/').contains(['>', '<'])
 }
 
 /// The MkDocs spelling of an inline, when the table has one for it
@@ -288,6 +343,24 @@ fn mkdocs_inline(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char
         Inline::RawInline(n) => mkdocs::raw_inline(out, n),
         _ => false,
     }
+}
+
+/// The shortcode of an icon span: exactly `.icon media=web` around one
+/// `Str` of the form `:material-…:` (one of the four Material sets).
+pub fn icon_shortcode(n: &tmark_ir::SpanNode) -> Option<&str> {
+    let [Inline::Str(s)] = n.content.as_slice() else {
+        return None;
+    };
+    let name = s.text.strip_prefix(':')?.strip_suffix(':')?;
+    let well_formed = !name.is_empty()
+        && name.bytes().all(|b| {
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'_' | b'-' | b'+')
+        });
+    let attrs = &n.attrs;
+    let icon_only = attrs.id.is_none()
+        && attrs.classes == ["icon"]
+        && attrs.kv == [("media".to_string(), "web".to_string())];
+    (well_formed && icon_only && tmark_ir::emoji::is_icon(name)).then_some(s.text.as_str())
 }
 
 /// The inlines of a paragraph-like block, for content that must print on one

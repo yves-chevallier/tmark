@@ -86,13 +86,26 @@ fn offset_in(s: &str, token: &str) -> u32 {
     (token.as_ptr() as usize - s.as_ptr() as usize) as u32
 }
 
-/// Parses the inside of an attribute list (`#id .class key=value`).
-/// `None` when a token is not an attribute: the group is not an attribute
-/// list (spec: "there are no bare-word attributes"). `id_span` is relative
-/// to `s`; the caller relocates it (`Lowerer::relocate_attrs`) or drops it.
+/// Whether the inside of an attribute list starts with the deprecated
+/// Python-Markdown colon (`{: .cls}`, spec §Attributes; Appendix
+/// "Deprecation schedule").
+pub fn has_attr_colon(s: &str) -> bool {
+    s.trim_start().starts_with(':')
+}
+
+/// Parses the inside of an attribute list (`#id .class key=value`), with
+/// or without the deprecated leading colon (`: #id .class`, spec §Lexical
+/// grammar: `\{:?` in place of `\{`). `None` when a token is not an
+/// attribute: the group is not an attribute list (spec: "there are no
+/// bare-word attributes"). `id_span` is relative to `s`; the caller
+/// relocates it (`Lowerer::relocate_attrs`) or drops it.
 pub fn parse_attrs(s: &str) -> Option<Attrs> {
     let mut attrs = Attrs::new();
-    let list = tokens(s);
+    let body = match s.trim_start().strip_prefix(':') {
+        Some(rest) => rest,
+        None => s,
+    };
+    let list = tokens(body);
     if list.is_empty() {
         return None;
     }
@@ -124,6 +137,34 @@ pub fn parse_attrs(s: &str) -> Option<Attrs> {
         }
     }
     Some(attrs)
+}
+
+/// The canonical text of an attribute list, braces included: `#id`, then
+/// the classes, then the keys in source order, a value quoted when it
+/// holds whitespace, `}`, `"`, `=`, `\` or is empty (the printer's rule,
+/// `tmark-fmt::attrs`). For the fix of the deprecated colon form and for
+/// literal fallbacks.
+pub fn attrs_text(attrs: &Attrs) -> String {
+    let mut parts = Vec::new();
+    if let Some(id) = &attrs.id {
+        parts.push(format!("#{id}"));
+    }
+    for class in &attrs.classes {
+        parts.push(format!(".{class}"));
+    }
+    for (k, v) in &attrs.kv {
+        let quoted = v.is_empty()
+            || v.contains(|c: char| c.is_whitespace() || matches!(c, '}' | '"' | '=' | '\\'));
+        if quoted {
+            parts.push(format!(
+                "{k}=\"{}\"",
+                v.replace('\\', "\\\\").replace('"', "\\\"")
+            ));
+        } else {
+            parts.push(format!("{k}={v}"));
+        }
+    }
+    format!("{{{}}}", parts.join(" "))
 }
 
 /// A parsed role head: `{name positional key=value}`.
@@ -354,6 +395,17 @@ mod tests {
         assert_eq!(attrs.get("l"), Some(r"p\q"));
         assert_eq!(attrs.get("m"), Some(r"\n"), "only `\\\"` and `\\\\` decode");
         assert!(parse_attrs("collapsed").is_none(), "no bare words");
+        // The deprecated Python-Markdown colon (spec §Attributes).
+        let attrs = parse_attrs(": #sec:boot .draft").unwrap();
+        assert_eq!(attrs.id.as_deref(), Some("sec:boot"));
+        assert_eq!(attrs.classes, vec!["draft"]);
+        assert_eq!(parse_attrs(":.thin").unwrap().classes, vec!["thin"]);
+        assert!(has_attr_colon(": .thin") && !has_attr_colon(".thin"));
+        assert!(parse_attrs(":").is_none());
+        assert_eq!(attrs_text(&attrs), "{#sec:boot .draft}");
+        let mut attrs = Attrs::new();
+        attrs.kv.push(("title".into(), "a \"b\"".into()));
+        assert_eq!(attrs_text(&attrs), "{title=\"a \\\"b\\\"\"}");
         assert!(parse_attrs("").is_none());
         assert!(parse_attrs("aside side=left").is_none());
     }
@@ -411,6 +463,9 @@ mod tests {
         let attrs = parse_attrs(" .draft #sec:intro lang=en").unwrap();
         let span = attrs.id_span.unwrap().0;
         assert_eq!((span.start, span.end), (9, 18));
+        let attrs = parse_attrs(": #id").unwrap();
+        let span = attrs.id_span.unwrap().0;
+        assert_eq!((span.start, span.end), (3, 5), "relative to the whole text");
     }
 
     #[test]

@@ -9,7 +9,7 @@ use tmark_registry::Resolution;
 use super::escape;
 use super::math;
 use super::Typst;
-use crate::common::{abbr, media, refs, text, zero};
+use crate::common::{abbr, logos, media, refs, text, zero};
 use crate::Media;
 
 /// Zero-width inlines (spec §Attributes).
@@ -46,7 +46,7 @@ impl Typst<'_> {
                 let keys = std::mem::take(&mut self.abbr_keys);
                 for segment in abbr::split(&s.text, &keys) {
                     match segment {
-                        abbr::Segment::Text(t) => self.out.push(&escape::markup(t)),
+                        abbr::Segment::Text(t) => self.prose(t),
                         abbr::Segment::Abbr(key) => self.abbr(&Abbr {
                             meta: s.meta,
                             text: key.to_string(),
@@ -137,7 +137,54 @@ impl Typst<'_> {
                     self.out.push(&n.text);
                 }
             }
+            Inline::ProgressBar(n) => self.progress_bar(n),
         }
+    }
+
+    /// Prose with the TeX logo words as `#ts-logo("Name")` under
+    /// `typography.tex-logos` (spec §TeX logos).
+    fn prose(&mut self, text: &str) {
+        if !self.tex_logos {
+            self.out.push(&escape::markup(text));
+            return;
+        }
+        for segment in logos::split(text) {
+            match segment {
+                logos::Segment::Text(t) => self.out.push(&escape::markup(t)),
+                logos::Segment::Logo(name) => {
+                    self.req.fragment("ts-typesetting");
+                    self.out.push(&format!("#ts-logo(\"{name}\")"));
+                }
+            }
+        }
+    }
+
+    /// `#ts-progress(0.45, label: "…", thin: true)` (spec §ProgressBar):
+    /// the value as a fraction; `thin` when the class is set, the other
+    /// classes as `class: ("a", "b")`.
+    fn progress_bar(&mut self, n: &tmark_ir::ProgressBar) {
+        self.req.fragment("ts-typesetting");
+        let value = n.value.clamp(0.0, 100.0) / 100.0;
+        let mut args = vec![crate::common::text::trim_float(value)];
+        let label = n
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("{}%", n.value_text()));
+        args.push(format!("label: \"{}\"", escape::string(&label)));
+        if n.attrs.has_class("thin") {
+            args.push("thin: true".to_string());
+        }
+        let classes: Vec<String> = n
+            .attrs
+            .classes
+            .iter()
+            .filter(|c| *c != "thin")
+            .map(|c| format!("\"{}\"", escape::string(c)))
+            .collect();
+        if !classes.is_empty() {
+            args.push(format!("class: ({},)", classes.join(", ")));
+        }
+        self.out.push(&format!("#ts-progress({})", args.join(", ")));
     }
 
     /// `#link("url")[text]`; an anchor through the textual template with

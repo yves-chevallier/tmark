@@ -17,7 +17,7 @@ use tmark_ir::{
 };
 use tmark_registry::{Resolution, Resolved};
 
-use crate::common::{abbr, media, refs, text, zero, Out};
+use crate::common::{abbr, logos, media, refs, text, zero, Out};
 use crate::{Backend, Body, Media, Requires, Writer, WriterOptions};
 
 /// The HTML writer.
@@ -39,6 +39,7 @@ impl Writer for HtmlWriter {
             numbers: number_labels(doc, res),
             notes: Vec::new(),
             abbr_keys: abbr::keys(doc),
+            tex_logos: logos::enabled(doc),
         };
         w.blocks(&doc.blocks);
         w.footnotes();
@@ -101,6 +102,8 @@ struct Html<'a> {
     notes: Vec<(String, Vec<Block>)>,
     /// Acronym keys substituted in running text (`common::abbr`).
     abbr_keys: Vec<String>,
+    /// Feature `typography.tex-logos` (spec §TeX logos).
+    pub(crate) tex_logos: bool,
 }
 
 impl Html<'_> {
@@ -499,15 +502,68 @@ impl Html<'_> {
         self.out.push(&format!("</{tag}>\n"));
     }
 
+    /// Prose with the TeX logo words as `<span class="tex-logo">` under
+    /// `typography.tex-logos` (spec §TeX logos).
+    fn prose(&mut self, text: &str) {
+        if !self.tex_logos {
+            self.out.push(&escape::text(text));
+            return;
+        }
+        for segment in logos::split(text) {
+            match segment {
+                logos::Segment::Text(t) => self.out.push(&escape::text(t)),
+                logos::Segment::Logo(name) => self.out.push(&logos::html(name)),
+            }
+        }
+    }
+
+    /// A tab set (spec §Tabs) in the shape of Material's `tabbed` output:
+    /// the labels, then one `tabbed-block` per tab.
+    fn tabs(&mut self, d: &Div) {
+        self.out.push(&format!(
+            "<div{}{}>\n<div class=\"tabbed-labels\">",
+            self.attrs(&d.attrs, &["tabbed-set"]),
+            self.src(&d.meta)
+        ));
+        for block in &d.content {
+            if let Block::Div(tab) = block {
+                let title = tab.attrs.get("title").unwrap_or_default();
+                self.out
+                    .push(&format!("<label>{}</label>", escape::text(title)));
+            }
+        }
+        self.out.push("</div>\n<div class=\"tabbed-content\">\n");
+        for block in &d.content {
+            let Block::Div(tab) = block else { continue };
+            let mut attrs = tab.attrs.clone();
+            attrs.kv.retain(|(k, _)| k != "title");
+            self.out.push(&format!(
+                "<div{}{}>\n",
+                self.attrs(&attrs, &["tabbed-block"]),
+                self.src(&tab.meta)
+            ));
+            self.blocks(&tab.content);
+            self.out.push("</div>\n");
+        }
+        self.out.push("</div>\n</div>\n");
+    }
+
     fn div(&mut self, d: &Div) {
         if d.name == "code" {
             // The LaTeX highlight contract (decisions.md X3): nothing to show
             // here, the web highlights natively.
             return;
         }
+        if d.name == "tabs" {
+            self.tabs(d);
+            return;
+        }
+        // `<div class="name …">` (spec §Div); the `div` container is the
+        // hook for classes and an id alone, so its name is not a class.
+        let classes: &[&str] = if d.name == "div" { &[] } else { &[&d.name] };
         self.out.push(&format!(
             "<div{}{}>\n",
-            self.attrs(&d.attrs, &[&d.name]),
+            self.attrs(&d.attrs, classes),
             self.src(&d.meta)
         ));
         self.blocks(&d.content);
@@ -697,7 +753,7 @@ impl Html<'_> {
                 let keys = std::mem::take(&mut self.abbr_keys);
                 for segment in abbr::split(&s.text, &keys) {
                     match segment {
-                        abbr::Segment::Text(t) => self.out.push(&escape::text(t)),
+                        abbr::Segment::Text(t) => self.prose(t),
                         abbr::Segment::Abbr(key) => self.abbr(&tmark_ir::Abbr {
                             meta: s.meta,
                             text: key.to_string(),
@@ -776,7 +832,28 @@ impl Html<'_> {
                     self.out.push(&n.text);
                 }
             }
+            Inline::ProgressBar(n) => self.progress_bar(n),
         }
+    }
+
+    /// `<span class="progress thin"><progress value="45" max="100">…
+    /// </progress><span class="progress-label">label</span></span>` (spec
+    /// §ProgressBar: `<div class="progress">` is PyMdownX's block; the node
+    /// is inline, so a span carries the classes).
+    fn progress_bar(&mut self, n: &tmark_ir::ProgressBar) {
+        let mut attrs = n.attrs.clone();
+        attrs.classes.insert(0, "progress".to_string());
+        let label = n
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("{}%", n.value_text()));
+        self.out.push(&format!(
+            "<span{}><progress value=\"{}\" max=\"100\">{}</progress><span class=\"progress-label\">{}</span></span>",
+            self.attrs(&attrs, &[]),
+            n.value_text(),
+            escape::text(&label),
+            escape::text(&label)
+        ));
     }
 
     fn link(&mut self, n: &Link) {

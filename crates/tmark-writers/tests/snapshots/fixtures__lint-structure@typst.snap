@@ -2,9 +2,9 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-= Top <top>
+= Top
 
-=== Skipped <skipped>
+=== Skipped
 
 #ts-lead[Note.] Promoted.
 

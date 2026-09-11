@@ -140,10 +140,17 @@
           ]
         },
         {
-          "description": "Appendix \"PyMdownX compatibility profile\": a spelling of the profile the parser recognises but does not implement yet (milestone 5), so it is literal text: content tabs, critic markup, progress bars, wiki links, fancy list markers, `^^x^^` without `inline.insert`, emoji and icon shortcodes, `[TOC]`. Loud rather than silent (P4).",
+          "description": "Appendix \"PyMdownX compatibility profile\": a spelling of the profile the parser recognises but does not implement yet (milestone 5), so it is literal text: critic markup, wiki links, fancy list markers. Loud rather than silent (P4).",
           "type": "string",
           "enum": [
             "compat-unsupported"
+          ]
+        },
+        {
+          "description": "Spec §Tabs: a `::: tab` outside `::: tabs`; wrapped in a `tabs` of one.",
+          "type": "string",
+          "enum": [
+            "container-orphan"
           ]
         },
         {
@@ -266,6 +273,13 @@
           ]
         },
         {
+          "description": "Spec §Header: a reference to a heading's implicit id, which changes whenever the title is edited; write `{#id}`.",
+          "type": "string",
+          "enum": [
+            "ref-implicit-id"
+          ]
+        },
+        {
           "description": "Spec §Ref: \"Figure 3\" typed in prose.",
           "type": "string",
           "enum": [
@@ -333,6 +347,27 @@
           "type": "string",
           "enum": [
             "table-width-sum"
+          ]
+        },
+        {
+          "description": "Spec §Foreign directive: a dotted `::: a.b` directive, which the HTML and paged writers drop.",
+          "type": "string",
+          "enum": [
+            "directive-foreign"
+          ]
+        },
+        {
+          "description": "Spec §Emoji and icon shortcodes: a Material icon shortcode, which print drops.",
+          "type": "string",
+          "enum": [
+            "icon-web-only"
+          ]
+        },
+        {
+          "description": "Spec §Feature registry: a spelling gated on a feature that is off (`^^x^^` without `inline.insert`), literal text.",
+          "type": "string",
+          "enum": [
+            "feature-off"
           ]
         }
       ]

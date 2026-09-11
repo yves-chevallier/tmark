@@ -1,8 +1,11 @@
 //! One file per rule; `RULES` is the catalogue (design 05 §Rules).
 
 mod caption_id;
+mod directive_foreign;
+mod feature_off;
 mod hardcoded_number;
 mod heading_skip;
+mod icon_web_only;
 mod lead_promotion;
 mod position_word;
 mod table_placement;
@@ -20,6 +23,9 @@ pub const RULES: &[&dyn Rule] = &[
     &table_placement::TablePlacement,
     &table_width::TableWidth,
     &table_width_sum::TableWidthSum,
+    &directive_foreign::DirectiveForeign,
+    &icon_web_only::IconWebOnly,
+    &feature_off::FeatureOff,
 ];
 
 /// Walk every `Str` of the document with its span.

@@ -1,0 +1,24 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<div class="multicolumn">
+<ul>
+<li>alpha</li>
+<li>beta</li>
+<li>gamma</li>
+</ul>
+</div>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

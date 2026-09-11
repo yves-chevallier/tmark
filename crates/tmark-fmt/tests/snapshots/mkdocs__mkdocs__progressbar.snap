@@ -1,0 +1,6 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+[=25% "Research"]
+[=45% "Review"]{.thin}

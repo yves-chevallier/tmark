@@ -1,0 +1,20 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\subsection{Boot sequence}\label{boot-sequence}
+
+See \ref{boot-sequence} and Section~\ref{boot-sequence}.
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

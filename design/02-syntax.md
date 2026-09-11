@@ -69,6 +69,16 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Comment `<!-- -->` | §Comment | block/inline | HTML construct; lowering produces `Comment` for the comment form only, `RawInline`/`RawBlock` with `format = "html"` for other HTML. |
 | Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal text plus `compat-unsupported` (`lower/compat.rs`), like tabs, progress bars, wiki links, shortcodes, fancy list markers and `[TOC]` (design 05). |
 | Escapes `\@`, `\#` | §Lexical grammar | inline | Added to the escape construct's character set. |
+| Tabs `=== "Title"` | §Tabs | block | New construct: the line plus its four-space-indented body; consecutive tab lines lower to one `Div{name=tabs}` of `Div{name=tab, title}`, the same nodes as `:::: tabs` / `::: tab`. |
+| Layout containers `multicolumn`, `div`, `tabs`, `tab` | §Div | block | Names of the container registry: no `container-unknown`. An HTML block whose opening tag carries `markdown` lowers to `Div{name=tag}` with `id`/`class` as attrs and its body parsed as Markdown (`markdown="span"`: inlines). |
+| Foreign directive: `[TOC]`, dotted `::: a.b` | §Foreign directive | block/lowering | New block construct for the dotted line plus its indented continuation (closed by dedent); `[TOC]` is recognised from a finished paragraph in lowering. Both `RawBlock{format=markdown}`. |
+| HTML other than comments | §Raw | block/inline | Kept as typed: `RawInline`/`RawBlock{format=html}`. The printer prints HTML-shaped text as typed, any other payload as `{raw html}(…)` / `html raw`. |
+| Progress bar `[=45% "x"]` | §ProgressBar | inline | New construct with the PyMdownX recogniser; fraction sugar normalised to a percentage (`deprecated`). |
+| Emoji `:smile:`, icons `:material-…:` | §Emoji and icon shortcodes | lowering | Text scan of `Str` against the bundled `gemoji` table: the character; the four Material icon prefixes: `Span{.icon media=web}`. |
+| `{: .cls}` attribute list | §Attributes | inline | The attribute construct with an optional colon after the brace; diagnostic `deprecated`. |
+| Heading `.unnumbered` / `.unlisted`, implicit id | §Header | resolution | No parse change: classes stay attrs and writers branch; the resolver registers the GitHub slug as a label when `attrs.id` is absent (hint `ref-implicit-id` on use). |
+| `^^x^^` | §Inline text | inline | Attention-like construct gated on `inline.insert`; off: literal text plus lint `feature-off`. |
+| TeX logos | §TeX logos | writer | No construct: writers apply `typography.tex-logos` to `Str` text. |
 
 ### Rule of thumb
 
@@ -165,8 +175,23 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
   characters followed by text on the same paragraph; `{lead}[…]` at the
   start of a paragraph reaches the same field because the role lowers to a
   `Strong` first.
+- Implemented by the C31–C42 wave (one fixture each): tabs (`=== "Title"`
+  and `::: tab` are the admonition-shaped construct plus `group_tabs`;
+  the direct body of `::: tabs` is not regrouped, `in_tabs`), the layout
+  containers (`registry::CONTAINERS`), foreign directives (the dotted
+  `:::` head is read by the admonition construct, guarded by
+  `util::tmark::is_foreign_directive`, before the container fence; `[TOC]`
+  in `compat_paragraph`), HTML as typed and `<tag markdown>`
+  (`md_in_html`: the body runs over the siblings up to the `</tag>` block,
+  since CommonMark ends an HTML block at a blank line), progress bars and
+  shortcodes (`lower/sugar.rs`, a scan of each `Str` line; `[=…]{…}`
+  arrives as a `TmarkSpan` and is taken there), the `{: ` colon
+  (`looks_like_attributes` and `parse_attrs`; every host reports
+  `deprecated` with the canonical list as a text fix), heading classes
+  (attrs only) and `^^x^^` (literal when off; the lint hints). TeX logos
+  and implicit ids are not the parser's.
 - Not implemented yet, deliberately: grid tables (listing with lang
-  `grid table`), critic markup, progress bars, wiki links, inline footnotes
+  `grid table`), critic markup, wiki links, inline footnotes
   `^[…]` (the spelling is still the deprecated citation group; a `^[…]`
   that is not a key list is literal text), fancy list styles (milestone
   5), and `Space` nodes (see 03).

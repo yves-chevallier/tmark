@@ -59,7 +59,8 @@ pub struct RefResolution {
 }
 
 pub fn resolve_all(doc: &tmark_ir::Document, resolved: &mut Resolved) {
-    let mut found: Vec<(NodeId, Span, String)> = Vec::new();
+    // (node, key span, node span, key)
+    let mut found: Vec<(NodeId, Span, Span, String)> = Vec::new();
     walk(doc, &mut |node: NodeRef| {
         if let NodeRef::Inline(inline) = node {
             match inline {
@@ -70,19 +71,19 @@ pub fn resolve_all(doc: &tmark_ir::Document, resolved: &mut Resolved) {
                         } else {
                             item.key_span.0
                         };
-                        found.push((r.meta.id, span, item.key.clone()));
+                        found.push((r.meta.id, span, r.meta.span, item.key.clone()));
                     }
                 }
                 Inline::Link(l) => {
                     if let Target::Anchor(id) = &l.target {
-                        found.push((l.meta.id, l.meta.span, id.clone()));
+                        found.push((l.meta.id, l.meta.span, l.meta.span, id.clone()));
                     }
                 }
                 _ => {}
             }
         }
     });
-    for (node, span, key) in found {
+    for (node, span, node_span, key) in found {
         let resolution = resolve_one(&key, span, resolved);
         if resolution == Resolution::Unresolved {
             resolved.diagnostics.push(Diagnostic::new(
@@ -90,6 +91,21 @@ pub fn resolve_all(doc: &tmark_ir::Document, resolved: &mut Resolved) {
                 span,
                 format!("`@{key}` does not resolve to a label, a citation key, a glossary term or an inventory"),
             ));
+        }
+        // Spec §Header: an implicit id changes with the title; suggest an
+        // explicit one.
+        if let Resolution::Label { target, .. } = &resolution {
+            if resolved
+                .labels
+                .get(&key)
+                .is_some_and(|l| l.implicit && l.node == *target)
+            {
+                resolved.diagnostics.push(Diagnostic::new(
+                    Code::RefImplicitId,
+                    node_span,
+                    format!("`{key}` is the heading's implicit id, which changes with its title; give the heading `{{#{key}}}`"),
+                ));
+            }
         }
         resolved.refs.push(RefResolution {
             node,

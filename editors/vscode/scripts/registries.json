@@ -131,6 +131,14 @@
     "definition",
     "proof"
   ],
+  "containers": [
+    "figure",
+    "aside",
+    "tabs",
+    "tab",
+    "multicolumn",
+    "div"
+  ],
   "fragments": [
     {
       "name": "ts-typesetting",
@@ -142,6 +150,7 @@
         "\\tsaside",
         "\\tsprogress",
         "\\tsicon",
+        "\\tslogo",
         "tsdiv"
       ],
       "packages": [
@@ -153,7 +162,7 @@
         "graphicx"
       ],
       "shell_escape": false,
-      "description": "lead-ins, highlight, divider, epigraph, asides, progress bars, generic containers"
+      "description": "lead-ins, highlight, divider, epigraph, asides, progress bars, TeX logos, generic containers"
     },
     {
       "name": "ts-callouts",

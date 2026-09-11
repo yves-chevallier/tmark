@@ -127,11 +127,11 @@ implements them. Every TeXSmith example except `tables` (X9, worktree
 ## M5 — Bindings, compatibility, polish
 
 - `tmark-py` wheel and `tmark-wasm`; TeXSmith depends on the wheel.
-- PyMdownX compatibility profile completed (critic markup, progress bars,
-  wiki links, smart symbols as the spec lists them). Each spelling is
-  reported as `compat-unsupported` today (`lower/compat.rs`); implementing
-  one means replacing its scan with the construct and updating fixture
-  `diag-compat-unsupported`.
+- PyMdownX compatibility profile completed (critic markup, wiki links,
+  fancy list markers, smart symbols as the spec lists them). Each spelling
+  is reported as `compat-unsupported` today (`lower/compat.rs`);
+  implementing one means replacing its scan with the construct and
+  updating fixture `diag-compat-unsupported`.
 - Dialect import (`tmark fmt` on GFM/MyST/Pandoc admonitions and crossrefs).
 - Done when: TeXSmith's Python-Markdown extensions are deleted in favour of
   the IR path for PDF, and its MkDocs/Zensical companion emits the `Mkdocs`
@@ -148,6 +148,18 @@ abi3 wheels; `write` renders through `tmark::write` against a shared
 `Resolved` handle and `fragments()` serves the `FRAGMENTS` table. Not
 started: the wheel on PyPI, `tmark-wasm`, the PyMdownX profile, dialect
 import.
+
+Status (2026-09-11, C31–C42 wave, worktree `spec`): the twelve open
+migration constructs are implemented end to end with a fixture each:
+tabs (`:::: tabs` / `::: tab`, `=== "Title"` sugar), the layout containers
+`multicolumn` and `div` with the `tsdiv` contract, `<div markdown>`, HTML
+as typed, foreign directives (`[TOC]`, dotted `:::`), progress bars with
+the fraction and `{: ` colon deprecations and their fixes, emoji and icon
+shortcodes, implicit heading ids and `.unnumbered` / `.unlisted`, `^^x^^`
+under `inline.insert`, TeX logos in the writers. `compat-unsupported`
+keeps critic markup, wiki links and fancy list markers. TeXSmith's
+`examples/markdown/features.md` and `examples/progressbar/progressbar.md`
+pass `check --strict` after `lint --fix`.
 
 ## Out of scope for all milestones
 

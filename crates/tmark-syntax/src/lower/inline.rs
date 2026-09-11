@@ -5,14 +5,17 @@
 use tmark_ir::{
     registry::{self, ArgStyle},
     Aside, Attrs, Block, Code, CodeInline, Comment, CounterItem, Emph, Highlight, Image,
-    IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, RawInline, Ref, Side,
-    SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong, SubSpan, Subscript, Superscript,
-    Target, Underline, Var,
+    IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, ProgressBar, RawInline, Ref,
+    Side, SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong, SubSpan, Subscript,
+    Superscript, Target, Underline, Var,
 };
 use tmark_markdown::mdast::{Node, TmarkMarkKind};
 use tmark_markdown::tmark::looks_like_attributes;
 
-use super::head::{parse_attrs, parse_ref_items, parse_role_head, RoleHead};
+use super::head::{
+    attrs_text, has_attr_colon, parse_attrs, parse_ref_items, parse_role_head, RoleHead,
+};
+use super::sugar::{self, Shortcode};
 use super::{decode_escapes, plain_text, Ctx, Lowerer};
 
 /// What a brace group is, decided by its text (spec §Roles: "a parser
@@ -225,15 +228,13 @@ impl Lowerer {
                                 .collect();
                             out.push(Inline::Keystroke(Keystroke { meta, keys }));
                         }
-                        // Off: the markers are literal text around the content.
+                        // Off: the markers are literal text around the content
+                        // (`^^x^^` without `inline.insert` is the lint hint
+                        // `feature-off`, spec §Inline text).
                         TmarkMarkKind::Subscript | TmarkMarkKind::Insert => {
                             let marker = if n.kind == TmarkMarkKind::Subscript {
                                 "~"
                             } else {
-                                self.compat_unsupported(
-                                    span,
-                                    "`^^…^^` without the `inline.insert` feature",
-                                );
                                 "^^"
                             };
                             out.push(self.literal_text(span, marker));
@@ -312,9 +313,18 @@ impl Lowerer {
                 }
                 Node::TmarkSpan(n) => {
                     let span = self.span(ctx, n.position.as_ref());
+                    // `[=45% "x"]{.thin}`: the tokenizer reads a bracket group
+                    // hugging an attribute list as a span; the bar wins when
+                    // the group is exactly its spelling (spec §ProgressBar).
+                    let source = ctx.slice(n.position.as_ref());
+                    let bar = sugar::progress_bar(source).filter(|p| p.len == source.len());
                     let (attrs, attrs_end) =
                         self.take_adjacent_attrs(nodes, &mut index, n.position.as_ref(), ctx);
                     let meta = self.meta(self.host_span(ctx, span, attrs_end));
+                    if let Some(bar) = bar {
+                        out.push(self.progress_bar(bar, span, meta, attrs));
+                        continue;
+                    }
                     let content = self.lower_inlines(&n.children, ctx).inlines;
                     out.push(Inline::Span(SpanNode {
                         meta,
@@ -372,14 +382,13 @@ impl Lowerer {
         out: &mut Vec<Inline>,
     ) {
         let span = self.span(ctx, position);
-        self.compat_scan_text(value, ctx.slice(position), span);
+        let source = ctx.slice(position);
+        self.compat_scan_text(value, source, span);
         let pieces: Vec<&str> = value.split('\n').collect();
         if pieces.len() == 1 {
             if !value.is_empty() {
-                out.push(Inline::Str(Str {
-                    meta: self.meta(span),
-                    text: value.to_string(),
-                }));
+                let exact = value == source;
+                self.text_pieces(value, span, exact, source, out);
             }
             return;
         }
@@ -410,18 +419,139 @@ impl Lowerer {
             if piece.is_empty() {
                 continue;
             }
-            let piece_span = if aligned {
+            let (piece_span, exact) = if aligned {
                 let (from, to) = lines[i];
                 // Continuation indent is stripped from the value.
                 let skip = source[from..to].len() - source[from..to].trim_start().len();
-                self.span_of(ctx, base + from + skip, base + to)
+                (
+                    self.span_of(ctx, base + from + skip, base + to),
+                    &source[from + skip..to] == *piece,
+                )
+            } else {
+                (span, false)
+            };
+            self.text_pieces(piece, piece_span, exact, source, out);
+        }
+    }
+
+    /// One line of text as `Str` runs with the inline sugar found in it
+    /// turned into nodes: progress bars, emoji (a `Str` holding the
+    /// character), icon shortcodes (`Span{.icon media=web}`). `exact`: the
+    /// text is its source byte for byte, so sub-spans are precise;
+    /// otherwise every node takes `span`. A spelling escaped at its first
+    /// character in `source` (`\:smile:`, `\[=1%]`) is the author's literal
+    /// text: only checked when the text is not exact, since an exact text
+    /// holds no backslash escape.
+    fn text_pieces(
+        &mut self,
+        text: &str,
+        span: Span,
+        exact: bool,
+        source: &str,
+        out: &mut Vec<Inline>,
+    ) {
+        let sub = |this: &Self, start: usize, end: usize| {
+            if exact {
+                Span::new(
+                    this.file,
+                    span.start + start as u32,
+                    span.start + end as u32,
+                )
             } else {
                 span
-            };
-            out.push(Inline::Str(Str {
-                meta: self.meta(piece_span),
-                text: (*piece).to_string(),
-            }));
+            }
+        };
+        let escaped = |first: char| !exact && source.contains(&format!("\\{first}"));
+        let mut buffer = String::new();
+        let mut buffer_start = 0;
+        let mut i = 0;
+        let flush = |this: &mut Self,
+                     buffer: &mut String,
+                     start: usize,
+                     end: usize,
+                     out: &mut Vec<Inline>| {
+            if !buffer.is_empty() {
+                out.push(Inline::Str(Str {
+                    meta: this.meta(sub(this, start, end)),
+                    text: std::mem::take(buffer),
+                }));
+            }
+        };
+        while i < text.len() {
+            let rest = &text[i..];
+            if rest.starts_with("[=") && !escaped('[') {
+                if let Some(bar) = sugar::progress_bar(rest) {
+                    flush(self, &mut buffer, buffer_start, i, out);
+                    let len = bar.len;
+                    let at = sub(self, i, i + len);
+                    let meta = self.meta(at);
+                    let node = self.progress_bar(bar, at, meta, Attrs::new());
+                    out.push(node);
+                    i += len;
+                    buffer_start = i;
+                    continue;
+                }
+            }
+            if rest.starts_with(':') && !escaped(':') {
+                if let Some((len, kind)) = sugar::shortcode(text, i) {
+                    match kind {
+                        Shortcode::Emoji(character) => buffer.push_str(character),
+                        Shortcode::Icon => {
+                            flush(self, &mut buffer, buffer_start, i, out);
+                            let at = sub(self, i, i + len);
+                            let meta = self.meta(at);
+                            let content = vec![self.literal_text(at, &text[i..i + len])];
+                            let mut attrs = Attrs::new();
+                            attrs.classes.push("icon".to_string());
+                            attrs.kv.push(("media".to_string(), "web".to_string()));
+                            out.push(Inline::Span(SpanNode {
+                                meta,
+                                content,
+                                attrs,
+                            }));
+                            buffer_start = i + len;
+                        }
+                    }
+                    i += len;
+                    continue;
+                }
+            }
+            let c = rest.chars().next().expect("in bounds");
+            buffer.push(c);
+            i += c.len_utf8();
+        }
+        flush(self, &mut buffer, buffer_start, text.len(), out);
+    }
+
+    /// A `ProgressBar` from a recognised spelling at `span`; the fraction
+    /// form is deprecated, with the canonical head as its fix (spec
+    /// §ProgressBar, Appendix "Deprecation schedule").
+    fn progress_bar(
+        &mut self,
+        bar: sugar::Progress,
+        span: Span,
+        meta: tmark_ir::Meta,
+        attrs: Attrs,
+    ) -> Inline {
+        let node = ProgressBar {
+            meta,
+            value: bar.value,
+            label: bar.label,
+            attrs,
+        };
+        if bar.fraction {
+            let replacement = node.head_text();
+            self.deprecated_with_fix(span, "[=a/b \"…\"]", "[=NN% \"…\"]", replacement);
+        }
+        Inline::ProgressBar(node)
+    }
+
+    /// The deprecated `{: …}` attribute colon (spec §Attributes): a
+    /// `deprecated` diagnostic on the brace with the canonical list as its
+    /// fix.
+    pub(crate) fn attrs_colon(&mut self, value: &str, attrs: &Attrs, span: Span) {
+        if has_attr_colon(value) {
+            self.deprecated_with_fix(span, "{: …}", "{…}", attrs_text(attrs));
         }
     }
 
@@ -446,6 +576,8 @@ impl Lowerer {
                     if let Some(p) = brace.position.as_ref() {
                         self.relocate_attrs(ctx, &mut attrs, p.start.offset + 1);
                     }
+                    let span = self.span(ctx, brace.position.as_ref());
+                    self.attrs_colon(&brace.value, &attrs, span);
                     return (attrs, brace.position.as_ref().map(|p| p.end.offset));
                 }
             }
@@ -485,6 +617,16 @@ impl Lowerer {
                 // when adjacent, else the block when last, else nowhere.
                 if let Some(p) = node.position.as_ref() {
                     self.relocate_attrs(ctx, &mut attrs, p.start.offset + 1);
+                }
+                self.attrs_colon(&node.value, &attrs, span);
+                // A progress bar the text scan produced, hugging the list:
+                // the list is the bar's (spec §ProgressBar).
+                if let Some(Inline::ProgressBar(bar)) = out.last_mut() {
+                    if bar.meta.span.end == span.start {
+                        bar.attrs = attrs;
+                        bar.meta.span = bar.meta.span.join(span);
+                        return None;
+                    }
                 }
                 if last {
                     trim_trailing_space(out);

@@ -1,0 +1,9 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+::: multicolumn {cols=2}
+- alpha
+- beta
+- gamma
+:::

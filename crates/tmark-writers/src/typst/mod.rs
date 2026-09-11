@@ -11,13 +11,13 @@ mod table;
 use std::collections::BTreeMap;
 
 use tmark_ir::{
-    plain_text, Admonition, Attrs, Block, BlockQuote, Caption, CaptionKind, CodeBlock,
-    DefinitionList, Div, Document, Figure, Header, Image, Inline, ListItem, ListStyle, MathBlock,
-    OrderedList, Para, RawBlock, Task,
+    Admonition, Attrs, Block, BlockQuote, Caption, CaptionKind, CodeBlock, DefinitionList, Div,
+    Document, Figure, Header, Image, Inline, ListItem, ListStyle, MathBlock, OrderedList, Para,
+    RawBlock, Task,
 };
 use tmark_registry::Resolved;
 
-use crate::common::{abbr, media, Out};
+use crate::common::{abbr, logos, media, refs, Out};
 use crate::{Backend, Body, Media, Requires, Writer, WriterOptions};
 
 /// The Typst writer.
@@ -38,6 +38,7 @@ impl Writer for TypstWriter {
             req: Requires::default(),
             acronyms: BTreeMap::new(),
             abbr_keys: abbr::keys(doc),
+            tex_logos: logos::enabled(doc),
         };
         w.blocks(&doc.blocks);
         w.req.close();
@@ -59,6 +60,8 @@ pub(crate) struct Typst<'a> {
     /// Acronym term → `#ts-acr` key, first seen first (same rule as LaTeX).
     acronyms: BTreeMap<String, String>,
     abbr_keys: Vec<String>,
+    /// Feature `typography.tex-logos` (spec §TeX logos).
+    pub(crate) tex_logos: bool,
 }
 
 impl Typst<'_> {
@@ -175,24 +178,34 @@ impl Typst<'_> {
         self.out.ensure_newline();
     }
 
-    /// `= Title <id>`; `#heading(numbering: none, …)` when not numbered.
+    /// `= Title <id>`; `#heading(numbering: none, …)` when not numbered,
+    /// per document or per heading (`.unnumbered` keeps the outline entry,
+    /// `.unlisted` drops it: spec §Header); the label is the explicit id,
+    /// or the implicit id when a reference targets it.
     fn header(&mut self, h: &Header) {
         let level = (i32::from(h.level) + i32::from(self.opts.headings.base_level) - 1).max(1);
         let title = self.render_inlines(&h.content);
         let title = title.split_whitespace().collect::<Vec<_>>().join(" ");
         let label = match h.attrs.id() {
-            Some(id) => escape::label(id),
-            None => crate::common::text::slugify(&plain_text(&h.content)),
+            Some(id) => Some(escape::label(id)),
+            None => refs::referenced_implicit_id(self.res, h.meta.id).map(escape::label),
         };
-        if self.opts.headings.numbered {
+        let unlisted = h.attrs.has_class("unlisted");
+        let unnumbered = unlisted || h.attrs.has_class("unnumbered");
+        if self.opts.headings.numbered && !unnumbered {
             self.out
                 .push(&format!("{} {title}", "=".repeat(level as usize)));
         } else {
+            let outlined = if unlisted || !self.opts.headings.numbered {
+                ", outlined: false"
+            } else {
+                ""
+            };
             self.out.push(&format!(
-                "#heading(level: {level}, numbering: none, outlined: false)[{title}]"
+                "#heading(level: {level}, numbering: none{outlined})[{title}]"
             ));
         }
-        if !label.is_empty() {
+        if let Some(label) = label.filter(|l| !l.is_empty()) {
             self.out.push(&format!(" <{label}>"));
         }
         self.out.ensure_newline();
@@ -422,6 +435,8 @@ impl Typst<'_> {
                     }
                 }
             }
+            // Print has no interaction: the tabs follow each other (spec §Tabs).
+            "tabs" => self.blocks(&d.content),
             name => {
                 self.req.fragment("ts-typesetting");
                 let mut args = vec![format!("\"{}\"", escape::string(name))];
