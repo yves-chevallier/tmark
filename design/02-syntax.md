@@ -69,6 +69,16 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Comment `<!-- -->` | §Comment | block/inline | HTML construct; lowering produces `Comment` for the comment form only, `RawInline`/`RawBlock` with `format = "html"` for other HTML. |
 | Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal text plus `compat-unsupported` (`lower/compat.rs`), like tabs, progress bars, wiki links, shortcodes, fancy list markers and `[TOC]` (design 05). |
 | Escapes `\@`, `\#` | §Lexical grammar | inline | Added to the escape construct's character set. |
+| Tabs `=== "Title"` | §Tabs | block | New construct: the line plus its four-space-indented body; consecutive tab lines lower to one `Div{name=tabs}` of `Div{name=tab, title}`, the same nodes as `:::: tabs` / `::: tab`. |
+| Layout containers `multicolumn`, `div`, `tabs`, `tab` | §Div | block | Names of the container registry: no `container-unknown`. An HTML block whose opening tag carries `markdown` lowers to `Div{name=tag}` with `id`/`class` as attrs and its body parsed as Markdown (`markdown="span"`: inlines). |
+| Foreign directive: `[TOC]`, dotted `::: a.b` | §Foreign directive | block/lowering | New block construct for the dotted line plus its indented continuation (closed by dedent); `[TOC]` is recognised from a finished paragraph in lowering. Both `RawBlock{format=markdown}`. |
+| HTML other than comments | §Raw | block/inline | Kept as typed: `RawInline`/`RawBlock{format=html}`. The printer prints HTML-shaped text as typed, any other payload as `{raw html}(…)` / `html raw`. |
+| Progress bar `[=45% "x"]` | §ProgressBar | inline | New construct with the PyMdownX recogniser; fraction sugar normalised to a percentage (`deprecated`). |
+| Emoji `:smile:`, icons `:material-…:` | §Emoji and icon shortcodes | lowering | Text scan of `Str` against the bundled `gemoji` table: the character; the four Material icon prefixes: `Span{.icon media=web}`. |
+| `{: .cls}` attribute list | §Attributes | inline | The attribute construct with an optional colon after the brace; diagnostic `deprecated`. |
+| Heading `.unnumbered` / `.unlisted`, implicit id | §Header | resolution | No parse change: classes stay attrs and writers branch; the resolver registers the GitHub slug as a label when `attrs.id` is absent (hint `ref-implicit-id` on use). |
+| `^^x^^` | §Inline text | inline | Attention-like construct gated on `inline.insert`; off: literal text plus lint `feature-off`. |
+| TeX logos | §TeX logos | writer | No construct: writers apply `typography.tex-logos` to `Str` text. |
 
 ### Rule of thumb
 
@@ -165,6 +175,11 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
   characters followed by text on the same paragraph; `{lead}[…]` at the
   start of a paragraph reaches the same field because the role lowers to a
   `Strong` first.
+- Not implemented yet, decided by spec challenges C31–C42: tabs, the
+  layout containers, foreign directives, HTML as typed and `<tag markdown>`,
+  progress bars, emoji and icon shortcodes, the `{: ` attribute colon,
+  heading implicit ids and classes, `^^x^^`, TeX logos. Their fixtures
+  carry a `TODO` in place of the `ir` block until the parser wave fills it.
 - Not implemented yet, deliberately: grid tables (listing with lang
   `grid table`), critic markup, progress bars, wiki links, inline footnotes
   `^[…]` (the spelling is still the deprecated citation group; a `^[…]`

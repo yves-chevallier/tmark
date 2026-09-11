@@ -175,7 +175,10 @@ Grammar: `{` followed by any number of `#id`, `.class`, `key=value` items
 separated by spaces, then `}`. Values containing spaces are double-quoted.
 There are no bare-word attributes: `{collapsed}` is not an attribute list
 (write `{collapsed=true}`). This restriction is what makes attributes and
-roles disjoint grammars (see below).
+roles disjoint grammars (see below). Python-Markdown's `attr_list` puts a
+colon right after the brace (`{: .thin #id}`); that spelling is accepted on
+every host as sugar and deprecated (Appendix @[app:deprecations]), and the
+printer drops the colon.
 
 #### Roles
 
@@ -359,7 +362,9 @@ line:
 ```
 
 Inside a quoted value `\"` stands for a quote and `\\` for a backslash;
-any other backslash is literal. A bare value ends at whitespace or `}`.
+any other backslash is literal. A bare value ends at whitespace or `}`. The
+deprecated Python-Markdown form is the same pattern with `\{:?` in place of
+`\{`.
 
 Role (family 2); the head must be followed immediately by bracketed
 content (one group, or several for `index`) or by a parenthesised verbatim
@@ -384,6 +389,14 @@ Container fence (family 3), opening and closing lines:
 ```text
 ^(?<fence>:{3,})\s*(?<name>[A-Za-z][\w-]*)(?:\s+(?<attrs>\{[^}]*\}))?\s*$
 ^(?<fence>:{3,})\s*$
+```
+
+A dotted name is not a container but a foreign directive
+(§@[sec:structure]); it has no closing line and its body is the indented
+lines that follow:
+
+```text
+^:{3,}\s*(?<directive>[A-Za-z][\w-]*(?:\.[\w-]+)+)\s*$
 ```
 
 Data directive info string (family 4), on the opening code fence:
@@ -452,7 +465,7 @@ Table: The standard extension set that defines class E. {#tbl:extensions}
 
 | Package | Extensions | Constructs |
 | ------- | ---------- | ---------- |
-| Python-Markdown | `extra` (`abbr`, `attr_list`, `def_list`, `fenced_code`, `footnotes`, `md_in_html`, `tables`), `admonition`, `toc` | acronyms, attributes, definition lists, footnotes, pipe tables, `!!!` callouts |
+| Python-Markdown | `extra` (`abbr`, `attr_list`, `def_list`, `fenced_code`, `footnotes`, `md_in_html`, `tables`), `admonition`, `toc` | acronyms, attributes, definition lists, footnotes, pipe tables, `!!!` callouts, `<div markdown>`, `[TOC]` |
 | PyMdownX | `superfences`, `highlight`, `inlinehilite`, `snippets`, `arithmatex` | nested fences, code options, `#!lang` inline code, includes, math |
 | PyMdownX | `caret`, `tilde`, `mark`, `keys`, `betterem`, `smartsymbols`, `emoji`, `magiclink`, `critic` | `^x^`, `~x~`, `==x==`, `++ctrl+s++`, smart symbols, emoji, bare URLs, critic markup |
 | PyMdownX | `details`, `tasklist`, `fancylists`, `progressbar`, `tabbed` | `???` callouts, task items, list markers, progress bars, tabs |
@@ -462,7 +475,7 @@ Table: Class X deviations from GFM. {#tbl:deviations}
 | # | Syntax | GFM meaning | TMark meaning | Rationale |
 | - | ------ | ----------- | ------------- | --------- |
 | X1 | `__text__` | bold | small caps | `__` duplicates `**`; academic writing needs small caps far more than a second bold. Visible, not silent: small caps look nothing like bold. Disabled by the `strict` profile. |
-| X2 | `---` (thematic break) | horizontal rule | page break (paged media) | See §@[sec:structure]. Semantically it stays a divider; paged templates map it to `\clearpage` by default. Disabled by the `strict` profile. |
+| X2 | `---` (thematic break) | horizontal rule | page break (paged media) | See §@[sec:structure]. Semantically it stays a divider; the paged writers emit `\tsdivider` / `#ts-divider()`, a page break unless the template redefines it; the web shows `<hr>`. Disabled by the `strict` profile. |
 | X3 | `~x~` | strikethrough (single tilde) | subscript | PyMdownX tilde, long-established in the MkDocs world; the only class-E construct GFM assigns a different meaning to. |
 | X4 | `@word` | literal | reference or citation | Guarded: never fires inside e-mails, URLs, or code; `\@` escapes. Identical to Pandoc's behaviour with `--citeproc`. |
 | X5 | `#[…]`, `#(…)` | literal | index entry, counter item | `#[` or `#(` followed by a non-space never occurs in prose; `\#` escapes. No further guard is needed now that `#{…}` is gone. |
@@ -576,6 +589,34 @@ unless `title:` is declared (`title: null` or `--no-promote-title` opt out).
 That machinery is a processing concern, not syntax. Backends: `\section` and
 friends, `= Heading`, `<h1>`.
 
+Two classes are recognised on a heading, both Pandoc's: `.unnumbered` takes
+the heading out of the numbering sequence (`\section*`, `numbering: none`,
+`class="unnumbered"`), and `.unlisted` additionally keeps it out of the
+table of contents. Each applies to its own heading only; the document-level
+default is `press.numbered` (`true` by default), which a class overrides one
+heading at a time. Pandoc's `{-}` shorthand is not an attribute list (there
+are no bare-word attributes, §@[sec:families]) and stays literal text; the
+Pandoc importer rewrites it. Class E.
+
+A heading with no `{#id}` has an *implicit id*, so that the empty-link and
+textual forms of §@[sec:references] (`[](#boot-sequence)`,
+`[the boot sequence](#boot-sequence)`) resolve to it, as they do on GitHub
+and on every Python-Markdown site. The rule is GitHub's: the plain text of
+the heading (inline markup and code reduced to their text, zero-width nodes
+and the attribute list removed), NFC-normalised and lower-cased, every
+character that is not a letter, a digit, a combining mark, a space, `-` or
+`_` removed, runs of spaces turned into one `-`; a duplicate gets `-1`,
+`-2`, … in document order. Accents and non-Latin scripts survive, as on
+GitHub and MkDocs Material; a site whose slugifier differs (Python-Markdown's
+default `toc` drops accents) needs an explicit id, which is the
+recommendation anyway. The implicit id is a label like any other
+(`@boot-sequence` renders "section 2"), derived at resolution and never
+stored in the IR or printed, so the round-trip is untouched; an explicit
+`{#id}` replaces it, a heading having one id. Because an implicit id
+changes whenever the title is edited, a reference to one is a lint hint
+`ref-implicit-id` that suggests `{#id}`. Editors compute go-to-target with
+the same function.
+
 #### Para
 
 CommonMark. A *lead-in* paragraph (a short run-in heading that opens a
@@ -642,13 +683,35 @@ separate node. Class C.
 
 #### HorizontalRule
 
-`---` on its own line, blank lines around, is a *divider* node. Paged
-backends render a page break by default; HTML renders `<hr>`; a template may
-restyle it (a fleuron instead of `\clearpage`). The syntax keeps its
-CommonMark semantics ("section divider"); only the default paged rendering
-is opinionated (X2). There is no line-break role: Markdown's hard break
-(trailing `\`) exists, and a backend-specific break is a raw passthrough:
+`---` on its own line, blank lines around, is a *divider* node
+(`HorizontalRule`). The syntax keeps its CommonMark semantics ("section
+divider"); what a divider looks like is form, so no writer chooses it
+itself: the LaTeX writer emits `\tsdivider`, the Typst writer
+`#ts-divider()`, and the `ts-typesetting` fragment defines both as a page
+break (`\clearpage`, `#pagebreak()`), which a template redefines at will (a
+fleuron, a blank line, nothing). The HTML writer emits `<hr>`: the web shows
+a rule and never a page break. The paged default is the one opinionated
+part (X2). There is no line-break role: Markdown's hard break (trailing
+`\`) exists, and a backend-specific break is a raw passthrough:
 `{raw latex}(\newpage)`.
+
+#### Foreign directive
+
+Two spellings of the MkDocs world are directives for a processor other than
+TMark: Python-Markdown's `[TOC]` paragraph, and a `:::` line whose name is
+dotted (`::: texsmith.core.config`, mkdocstrings' syntax, its options in the
+indented YAML that follows, no closing fence). TMark interprets neither:
+each is a `RawBlock` with `format=markdown`, kept verbatim. The `[TOC]` form
+is the paragraph alone; the dotted form is the `:::` line plus every
+following line that is blank or indented by four spaces or more, so the
+directive closes at the first dedent, and the fence rules of
+§@[sec:families] (matching `:::`, `container-unknown`, `container-unclosed`)
+do not apply to it. The printer emits the block as typed; the HTML writer
+and the paged writers emit nothing: the table of contents in print is
+`press.toc`, and an API reference has no print form. `[TOC]` is silent
+(class E); a dotted directive is a hint `directive-foreign` in every
+backend but the printer, so that a document meant for print does not lose a
+block without notice (class D).
 
 ### Inline text {#sec:inline}
 
@@ -663,7 +726,7 @@ Table: Inline text nodes. {#tbl:inline}
 | `Strong` | `**x**` | (none) | C | `\textbf` / `*x*` / `<strong>` |
 | `SmallCaps` | `{sc}[x]` | `__x__` (X1) | X | `\textsc` / `smallcaps` / `font-variant` |
 | `Strikeout` | `{del}[x]` | `~~x~~` | C | `\sout` / `strike` / `<del>` |
-| `Underline` | `{underline}[x]` | (none, deliberately) | D | `\underline` / `underline` / `<u>` |
+| `Underline` | `{underline}[x]` | `^^x^^` under `inline.insert` only | D | `\underline` / `underline` / `<u>` |
 | `Highlight` | `{mark}[x]` | `==x==` | E | `\hl` / `highlight` / `<mark>` |
 | `Subscript` | `{sub}[x]` | `~x~` (X3) | X | `\textsubscript` / `sub` / `<sub>` |
 | `Superscript` | `{sup}[x]` | `^x^` | E | `\textsuperscript` / `super` / `<sup>` |
@@ -695,8 +758,11 @@ does not want to encourage. The visual argument is real but it is the same
 argument that gave Markdown `*` for emphasis, which does not look like
 italics either. Draft 1 assigned `__` to underline; draft 2 reversed it to
 match the shipping implementation and the reasoning above. `^^x^^` (caret "insert") is not a TMark
-construct; feature `inline.insert` re-enables it as `<ins>` or underline for
-HTML-first users. Long inline code wraps per `press.code.inline`.
+construct: with the feature `inline.insert` off (the default) it is literal
+text and `tmark lint` hints `feature-off`; on, it is sugar for
+`{underline}[x]`, one node whatever the spelling, and the printer emits the
+role (Appendix @[app:pymdownx]). Long inline code wraps per
+`press.code.inline`.
 
 #### Math (inline)
 
@@ -704,6 +770,71 @@ HTML-first users. Long inline code wraps per `press.code.inline`.
 class E under `arithmatex`, literal elsewhere). Content is LaTeX math
 (MathJax-compatible), the Typst backend translates it. No space directly
 after the opening delimiter. Class C for `$…$`: GitHub renders it natively.
+
+#### ProgressBar
+
+```md
+[=45% "Review"]
+[=100% "Launch"]{.thin}
+```
+
+An inline node with a `value` (a number from 0 to 100, clamped) and an
+optional `label` (plain text in double quotes; the percentage when absent).
+Attributes attach as on any host: `.thin` halves the height; other classes
+reach the web stylesheet and are ignored in print. The spelling is
+PyMdownX's and is the canonical one. Sugar: the fraction form
+`[=9/20 "Review"]`, normalised to a percentage, and the Python-Markdown
+attribute spelling `{: .thin}` (both deprecated, Appendix
+@[app:deprecations]). PyMdownX registers the pattern inline and its
+stylesheet displays the bar as a block; TMark keeps the node inline
+(a bar fits a table cell), consecutive bars on separate lines are separate
+paragraphs or hard-broken lines, and the template chooses the width. Class
+E. Backends: `\tsprogress` (`ts-typesetting`, over the `progressbar`
+package), `#ts-progress`, `<div class="progress">`. Recogniser:
+
+```text
+\[=\s*(?<value>\d+(?:\.\d+)?)%(?:\s+"(?<label>[^"]*)")?\s*\]
+```
+
+#### Emoji and icon shortcodes
+
+An emoji shortcode `:smile:` is sugar for the character it names: the
+tokenizer replaces it with a `Str` holding U+1F604, and the printer emits
+the character. The name table is GitHub's (the `gemoji` short names, which
+`pymdownx.emoji` ships as one of its indexes): a colon-delimited word that
+is not in the table is literal text with no diagnostic, so `12:30:45` and
+`a:b:c` are safe. Nothing fires in code. Class E, and GitHub renders the
+shortcodes too. How an emoji is set in print (a colour font, a monochrome
+one, an image) is the template's business, not syntax.
+
+An icon shortcode (`:material-cog:`, `:fontawesome-solid-check:`,
+`:octicons-tag-16:`, `:simple-github:`) names an SVG of the MkDocs Material
+theme, which no print backend and no icon-less site can honour (P5). It is
+recognised by those four set prefixes and lowers to a web-only span,
+`Span{.icon media=web}` holding the shortcode as its text, so the media rule
+of §@[sec:families] removes it from print (the spaces around it collapse)
+and the HTML writer emits `<span class="icon">:material-cog:</span>` for the
+site's stylesheet or plugin to replace. The shortcode is its own canonical
+spelling: the printer writes such a span back as the shortcode. `tmark
+lint` hints `icon-web-only` once per shortcode, so an author writing for
+print knows the icon is not there. Class D. Icons are decoration; a symbol
+that must reach print is an emoji or an image.
+
+#### TeX logos
+
+`TeX`, `LaTeX`, `LaTeX2e`, `XeTeX`, `XeLaTeX`, `LuaTeX`, `LuaLaTeX`,
+`pdfTeX`, `pdfLaTeX`, `BibTeX`, `BibLaTeX` and `ConTeXt`, written as plain
+words, are set as logos by the backends (`\LaTeX{}` and the
+`ts-typesetting` logo macros, a Typst function, `<span class="tex-logo">`
+with the raised and lowered letters). There is no node and no role: the
+words are `Str` in the IR and print as typed. Like the language-driven
+punctuation spacing of §@[sec:front-matter], the logo is a typographic
+rule applied by the writer, form rather than content (P1). The rule is the
+feature `typography.tex-logos`, on by default (shipping behaviour): it
+matches whole words only, case-sensitively, and never inside code, math,
+raw passthroughs, link destinations or attribute values. To print one of
+these words literally, turn the feature off or put the word in a code span;
+there is no per-word opt-out, on purpose.
 
 ### Notes {#sec:notes}
 
@@ -1155,12 +1286,78 @@ a series or not is a declaration choice, not a spec decision (this closes
 draft 2's open question 6). Backends: `amsthm`, `#theorem` (ctheorems),
 `<div>`.
 
+#### Tabs
+
+```md
+:::: tabs
+::: tab {title=Windows}
+Windows is a Microsoft operating system.
+:::
+::: tab {title=Linux}
+Linux is an open-source operating system.
+:::
+::::
+```
+
+A `tabs` container holds `tab` containers, each with a `title=`; on the web
+the reader sees one at a time. Print has no interaction, so the paged
+writers render the tabs in sequence, each as a titled block (the `tsdiv`
+contract of §Div; default: the title in bold, then the content), which is
+what TeXSmith ships today, and a template restyles it. Sugar: PyMdownX's
+`=== "Windows"` line followed by its four-space-indented body, consecutive
+tab lines forming one set; class E, kept indefinitely because MkDocs
+Material renders it natively (the standing of `!!!`, Appendix
+@[app:deprecations]). A `tab` outside `tabs` is a `tabs` of one and a hint
+`container-orphan`. The nodes are `Div{name=tabs}` and `Div{name=tab}`;
+`tabs` takes no attribute of its own, a `tab` takes `title=` and `#id`.
+Class D for `:::`, E for `===`.
+
 #### Div
 
-Generic container for the remaining block-level roles: `aside`
-(§@[sec:notes]), `figure` (§@[sec:floats]), and the layout helpers templates
-provide (multi-column lists, grid cards). A `::: name` whose name is unknown
-is a class D error, not a silent `<div>`.
+`Div{name, attrs}` is the node behind every `::: name` container that has
+no node of its own: `aside` (§@[sec:notes]) and `figure` (§@[sec:floats])
+have theirs, admonition types are `Admonition`, and the rest is a `Div`.
+The container names TMark knows form a closed registry (P4, P6): the
+admonition types, built-in and declared; `aside`, `figure`, `tabs`, `tab`;
+and two *layout* containers whose whole meaning is their name:
+
+`::: multicolumn {cols=2}`
+:   The content flows in `cols` columns (default 2): `multicol`,
+    `#columns`, CSS columns.
+
+`::: div {.grid .cards}`
+:   A container that means nothing: a hook for classes and an id, rendered
+    transparently. It exists so that a wrapper an author needs for a site
+    stylesheet has a canonical spelling, and so that the `md_in_html`
+    sugar of this section lowers to something honest.
+
+A layout container is rendered by one contract on the paged backends,
+`\begin{tsdiv}{name}[attrs]` and `#ts-div("name", ..)`, dispatched on the
+name with the attributes forwarded as keys (`#id` as `id`, classes as
+`class={a,b}`, `key=val` as is; `lang` and `media` never), and by
+`<div class="name …">` on the web. A template restyles a layout by
+redefining the contract for that name. A new *kind* of thing is not a new
+container name: it is an admonition type declared under `declare:` (P1).
+The spec adds no mechanism to declare container names; a template that
+renders a name the registry does not know has extended the language, which
+P4 and P6 exclude.
+
+A `::: name` whose name is unknown is a class D error (`container-unknown`),
+not a silent `<div>`: the node is still a `Div`, its content renders in
+place, transparently, and the name is kept so the printer round-trips it.
+A dotted name is not an unknown container but a foreign directive
+(§@[sec:structure]).
+
+A CommonMark HTML block whose opening tag carries the `markdown` attribute
+(`<div class="grid cards" markdown>`, Python-Markdown's `md_in_html`, in
+the standard extension set) is sugar for a container named after the tag,
+its `id` and `class` attributes becoming the attribute list and its body
+parsed as Markdown (`markdown="span"` parses it as inlines). `<div
+markdown>` is therefore `::: div`; any other tag is an unknown container,
+with the diagnostic. The sugar is class E, kept indefinitely because it is
+the only container spelling a Python-Markdown site renders, and the
+`mkdocs` profile of `tmark fmt` emits it for every `Div`
+(§@[sec:roadmap]). HTML without the attribute is raw (§@[sec:raw]).
 
 ### Raw passthrough {#sec:raw}
 
@@ -1179,6 +1376,19 @@ versa, which is precisely how one document targets three outputs. Backend
 names do not occupy the role namespace, and the parentheses of the inline
 form say what the fence says for the block form: the payload is verbatim,
 never Markdown. Class D.
+
+HTML in the body is the third raw format and needs no fence: CommonMark
+already passes inline and block HTML through, so a tag or an HTML block is
+kept *as typed*, class C, and lowers to `RawInline` or `RawBlock` with
+`format=html` (a comment is the exception, §@[sec:structure]; a block whose
+opening tag carries `markdown` is a container, §@[sec:containers]). The
+printer's choice is decided by the text, not by a flag: a raw HTML node
+whose text CommonMark recognises as HTML (an inline tag, a block of one of
+its seven kinds) prints as typed; any other payload prints as
+`{raw html}(…)` or an `html raw` fence, which is what those spellings are
+for. The paged writers drop raw HTML like any foreign raw, so
+`<span class="x">text</span>` prints "text" and `<br>` prints nothing; a
+break that must reach print is Markdown's hard break.
 
 ### Includes {#sec:includes}
 
@@ -1347,7 +1557,8 @@ Table: The feature registry. {#tbl:features}
 | `tasklist.partial` | off | `- [.]` partial task items |
 | `figures.exec` | off | execute `python image` fences |
 | `glossary.wikipedia` | off | fetch glossary summaries from Wikipedia links |
-| `inline.insert` | off | `^^x^^` as `<ins>` (Appendix @[app:pymdownx]) |
+| `inline.insert` | off | `^^x^^` as `{underline}[x]` (Appendix @[app:pymdownx]) |
+| `typography.tex-logos` | on | set the TeX logo words of §@[sec:inline] as logos |
 | `compat.pymdownx` | on | accept the Appendix @[app:pymdownx] sugar; off under `strict` |
 
 Extension points other than features:
@@ -1516,7 +1727,7 @@ Table: Divergences from draft 1. {#tbl:draft1}
 | ------- | -------------- | --- |
 | Two universal primitives, `{heading 1}[x]` | Four families over a CommonMark substrate | False purity; conflated inline and block; nobody writes headings as roles. |
 | `__x__` = underline | `__x__` = small caps (X1), underline role-only | Matches the shipping implementation; underline is poor print typography. |
-| `---` "recycled into page break" | Divider node; paged templates render `\clearpage` | Same behaviour, honest semantics: the mapping is form, not syntax. |
+| `---` "recycled into page break" | Divider node; paged writers emit `\tsdivider`, a page break by default | Same behaviour, honest semantics: the mapping is form, not syntax. |
 | `!!! equation #id` | `$$ … $$ {#eq:id}` | Admonitions are callouts; attribute anchors are lighter (Quarto-proven). |
 | Citations `@https://doi.org/…` | `@doi:…` in place, or a front-matter key | Reversed in draft 3: `doi` is a predeclared prefix, so the guard on URLs is untouched and the DOI form fits the registry model. |
 | `[](gls:solid)` | `@gls:solid` | One reference mechanism; `gls` is just a predeclared prefix. |
@@ -1561,6 +1772,12 @@ Table: Divergences from draft 1. {#tbl:draft1}
     (`"{text} ({number})"` or `"{text} (p. {page})"`), and whether a
     textual reference to a section should say "section 2" or the section
     title.
+11. Icon shortcodes in print: nothing today (§@[sec:inline]). Whether a
+    bundled monochrome fallback for the most used Material icons is worth
+    its size, or whether "an icon is decoration" is the final word.
+12. Implicit heading ids on sites whose slugifier is not GitHub's
+    (Python-Markdown's default `toc` drops accents): a `press.slugs` switch
+    mirroring the site's rule, or the lint recommendation to write `{#id}`.
 
 ### PyMdownX compatibility profile {#app:pymdownx}
 
@@ -1580,17 +1797,21 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | `++ctrl+s++` | `{keys}[ctrl+s]` | E | |
 | `` `#!py code` `` | `{code py}[code]` | E | |
 | `==x==`, `~~x~~`, `^x^`, `~x~` | `{mark}`, `{del}`, `{sup}`, `{sub}` | E, X3 for `~x~` | see §@[sec:inline] |
-| `^^x^^` | `{underline}[x]` | E | only with `inline.insert` |
-| `[=75% "Review"]`, `.thin` | `ProgressBar` node | E | web-first; print renders a bar via `ts-extra` |
+| `^^x^^` | `{underline}[x]` | E | only with `inline.insert`; literal and hinted `feature-off` otherwise |
+| `[=75% "Review"]`, `[=15/20 "…"]`, `{: .thin}` | `ProgressBar` (§@[sec:inline]) | E | the percentage form is canonical; the fraction and the `{: ` colon are deprecated, Appendix @[app:deprecations] |
+| `=== "Title"` and its indented body | `::: tab {title=…}` inside `::: tabs` (§@[sec:containers]) | E | kept indefinitely: MkDocs Material renders it |
+| `<div class="x" markdown>` | `::: div {.x}` (§@[sec:containers]) | E | `md_in_html`; kept indefinitely, emitted by the `mkdocs` profile |
+| `{: .cls #id}` | `{.cls #id}` | E | Python-Markdown `attr_list` colon; deprecated |
 | `[[Page Title]]`, optional label after a vertical bar | `Link` to the project file | D | wiki links |
 | critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Underline`, `Strikeout`, `Highlight`, `Comment` | E | not shown literally here: the extension fires even inside code spans |
-| `:smile:` | `Str` | E | emoji |
+| `:smile:` | `Str` holding the character | E | emoji, GitHub's name table; the printer emits the character (§@[sec:inline]) |
+| `:material-…:`, `:fontawesome-…:`, `:octicons-…:`, `:simple-…:` | `Span{.icon media=web}` | D | Material icons; print drops them, hint `icon-web-only` (§@[sec:inline]) |
 | `(c)`, `(tm)`, `-->`, `1/2` | `Str` | E | smart symbols |
 | `"quotes"`, `--`, `...` | `Quoted`, `Str` | E | SmartyPants |
 | `https://…` bare | `Link` | C | magic links; GFM autolinks too |
 | `1)`, `a.`, `i.`, `#.` list markers | `OrderedList` with style | E | fancylists |
 | `--8<-- "file"` | `{include}(file)` (§@[sec:includes]) | E | deprecated, Appendix @[app:deprecations] |
-| `[TOC]` | (none) | E | accepted and ignored: the table of contents is `press.toc` in print and the site's own on the web |
+| `[TOC]` | `RawBlock{format=markdown}` (§@[sec:structure]) | E | kept verbatim, emitted by the printer alone: the table of contents is `press.toc` in print and the site's own on the web |
 
 ```yaml table-config
 columns:
@@ -1634,6 +1855,10 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | `admonitions.<type>` `.icon` / `.color` | `press.callouts.<type>` | draft 3 | fmt |
 | `press.callout_style`, `press.admonition_style` | `press.callouts.style` | draft 3 | fmt |
 | `--no-promote-title` CLI flag | `title: null` | (none) | indefinite |
+| `{: .cls #id}` attribute list | `{.cls #id}` | draft 3 | fmt |
+| `[=a/b "…"]` progress fraction | `[=NN% "…"]` | draft 3 | fmt |
+| `=== "Title"` tabs | `::: tabs` / `::: tab {title=…}` | draft 3 | indefinite (MkDocs Material renders them) |
+| `<div markdown>` | `::: div` | draft 3 | indefinite (the only container a Python-Markdown site renders) |
 
 ```yaml table-config
 columns:
