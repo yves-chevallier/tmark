@@ -1,0 +1,9 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Inline <span class="x">text</span> and <br> here.
+
+<div class="note">
+Raw block.
+</div>

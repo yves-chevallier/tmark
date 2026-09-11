@@ -1,0 +1,11 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+[TOC]
+
+::: texsmith.core.config
+    options:
+      members: true
+
+Next paragraph.

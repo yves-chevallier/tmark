@@ -1,0 +1,7 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+## Boot sequence
+
+See [](#boot-sequence) and [Boot sequence](#boot-sequence).

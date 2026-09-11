@@ -337,9 +337,8 @@ fn every_row_of_the_table() {
     assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
 }
 
-/// The mkdocstrings case: `::: pkg.mod` is never closed, so the parser
-/// puts the rest of the page inside it; the bytes of the directive stay,
-/// the prose after it is still lowered.
+/// The mkdocstrings case: `::: pkg.mod` is a foreign directive (spec C40)
+/// closed by the dedent; its bytes stay, the prose after it is lowered.
 #[test]
 fn unclosed_foreign_container_keeps_its_bytes() {
     let text = "---\npress:\n  declare:\n    counters:\n      fw: {name: Finding, format: \"FW-{n:02d}\"}\n---\n\n#(fw:boot) A finding.\n\n::: texsmith.core.counters\n    options:\n      show_source: false\n\nProse after the directive still refers to @fw:boot and @sec:nope.\n";
@@ -349,13 +348,9 @@ fn unclosed_foreign_container_keeps_its_bytes() {
         .iter()
         .map(|d| (d.code.id(), d.severity.as_str()))
         .collect();
-    assert_eq!(
-        severities,
-        [
-            ("container-unclosed", "info"),
-            ("container-unknown", "info")
-        ]
-    );
+    // Spec C40: a dotted name is a foreign directive (`RawBlock{markdown}`),
+    // parsed without a diagnostic; `directive-foreign` is a lint hint.
+    assert_eq!(severities, []);
     let lowered = lower(text);
     assert_eq!(
         lowered.text,
