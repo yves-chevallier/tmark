@@ -33,7 +33,7 @@ pub mod table;
 pub mod walk;
 
 pub use attrs::Attrs;
-pub use diagnostic::{Code, Diagnostic, Fix, Severity};
+pub use diagnostic::{Code, Diagnostic, Fix, Severity, Stage};
 pub use frontmatter::{
     AdmonitionDecl, Author, CounterDecl, Declare, Epigraph, FrontMatter, FrontMatterError, Keys,
     Press, Sources,
@@ -56,12 +56,14 @@ pub use table::{
 pub use walk::{find, nodes_at, plain_text, walk, walk_blocks, walk_inlines, NodeRef};
 
 /// The JSON schema of a public shape, by name: `"ir"` (a `Document`),
-/// `"frontmatter"` (the `Keys` of the front matter). The example
-/// `schema` writes them under `schema/`; the CLI prints them.
+/// `"frontmatter"` (the `Keys` of the front matter), `"diagnostic"` (one
+/// `Diagnostic`). The example `schema` writes them under `schema/`; the
+/// CLI prints them; the facade adds the shapes of the later stages.
 pub fn schema(name: &str) -> Option<serde_json::Value> {
     let schema = match name {
         "ir" => schemars::schema_for!(Document),
         "frontmatter" => schemars::schema_for!(Keys),
+        "diagnostic" => schemars::schema_for!(Diagnostic),
         _ => return None,
     };
     serde_json::to_value(schema).ok()

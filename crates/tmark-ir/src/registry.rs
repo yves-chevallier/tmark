@@ -27,7 +27,7 @@ pub enum ArgStyle {
 }
 
 /// One entry of the role registry. Spec §Roles, §Node catalogue.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Role {
     /// The bare identifier after `{`.
     pub name: &'static str,
@@ -123,7 +123,7 @@ pub fn role(name: &str) -> Option<&'static Role> {
 // ---------------------------------------------------------------------------
 
 /// The second word of a data directive's info string. Spec §Data directives.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct NodeWord {
     pub word: &'static str,
     /// The block node produced.
@@ -187,7 +187,7 @@ pub enum Scope {
 
 /// A predeclared entry of the counter registry. Spec §Counters, Table
 /// "Predeclared counter prefixes".
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Prefix {
     pub name: &'static str,
     /// The label word ("Figure"); `None` for `gls` and `doi`, which number
@@ -258,7 +258,7 @@ pub fn prefix(name: &str) -> Option<&'static Prefix> {
 // ---------------------------------------------------------------------------
 
 /// A built-in admonition type. Spec §Admonition (callout).
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Admonition {
     /// The type word after `:::` or `!!!`.
     pub name: &'static str,
@@ -314,7 +314,7 @@ pub fn admonition(name: &str) -> Option<&'static Admonition> {
 // ---------------------------------------------------------------------------
 
 /// A switchable behaviour. Spec §Feature registry and extensibility.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Feature {
     /// Dotted name, as written under `features:`.
     pub name: &'static str,
@@ -400,7 +400,7 @@ pub enum Horizon {
 }
 
 /// One row of the deprecation table.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Deprecation {
     /// Stable identifier used by parsers and lint messages.
     pub id: &'static str,
