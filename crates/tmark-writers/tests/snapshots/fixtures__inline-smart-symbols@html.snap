@@ -1,0 +1,19 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>Copyright © 2025, tea ™, reg ®, ℅ Ada: ½ a cup, ± 3, 4 ≠ 5, a → b.</p>
+<p>He said “straight quotes”, <code>&quot;not in code&quot;</code>, and &quot;not a quote&quot;.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

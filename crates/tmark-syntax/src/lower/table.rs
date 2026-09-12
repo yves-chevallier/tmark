@@ -4,8 +4,8 @@
 //! parses the cell text as inline Markdown and reports the findings.
 
 use tmark_ir::{
-    Align, Cell, Column, ColumnConfig, DataRow, LeafColumn, Row, Separator, Span, TableModel,
-    TableSettings,
+    Align, Cell, Column, ColumnConfig, DataRow, Inline, LeafColumn, Row, Separator, Span,
+    TableModel, TableSettings,
 };
 use tmark_markdown::mdast::{AlignKind, Node};
 
@@ -38,6 +38,7 @@ impl Lowerer {
                     let name = plain_text(&content);
                     model.columns.push(Column::Leaf(LeafColumn {
                         name: (!name.is_empty()).then_some(name),
+                        title: rich_title(content),
                         config: ColumnConfig {
                             align,
                             ..Default::default()
@@ -71,9 +72,11 @@ impl Lowerer {
         for (code, message) in raw.findings {
             self.diag(code, span, message);
         }
+        let mut columns = raw.columns;
+        self.column_titles(&mut columns, span);
         let model = TableModel {
             settings: raw.settings,
-            columns: raw.columns,
+            columns,
             rows: self.rows(raw.rows, span),
             footer: self.rows(raw.footer, span),
         };
@@ -92,6 +95,27 @@ impl Lowerer {
             self.diag(code, span, message);
         }
         Ok((raw.columns, raw.settings, rejected))
+    }
+
+    /// The header of every column of a `yaml table` parsed as inline
+    /// Markdown. `name` stays the scalar as written: it is the key of
+    /// named-row mode and what the printer writes back.
+    fn column_titles(&mut self, columns: &mut [Column], span: Span) {
+        for column in columns {
+            match column {
+                Column::Leaf(leaf) => {
+                    if let Some(name) = leaf.name.clone() {
+                        let content = self.lower_fragment(&name, span);
+                        leaf.title = rich_title(content);
+                    }
+                }
+                Column::Group(group) => {
+                    let content = self.lower_fragment(&group.name.clone(), span);
+                    group.title = rich_title(content);
+                    self.column_titles(&mut group.columns, span);
+                }
+            }
+        }
     }
 
     fn rows(&mut self, rows: Vec<RawRow>, span: Span) -> Vec<Row> {
@@ -121,5 +145,16 @@ impl Lowerer {
                 }),
             })
             .collect()
+    }
+}
+
+/// The header of a column as inline Markdown, kept only when it carries
+/// markup a plain `name` cannot hold (spec §Table: "Inline Markdown
+/// survives inside cells in all forms"). A plain header is the common case
+/// and stays `name` alone, so the IR of an ordinary table is unchanged.
+pub(crate) fn rich_title(content: Vec<Inline>) -> Vec<Inline> {
+    match content.as_slice() {
+        [] | [Inline::Str(_)] => Vec::new(),
+        _ => content,
     }
 }

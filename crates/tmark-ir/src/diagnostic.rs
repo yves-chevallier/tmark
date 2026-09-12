@@ -447,7 +447,9 @@ impl Code {
             Code::DeprecatedFrontmatterKey => {
                 "Appendix \"Deprecation schedule\": a deprecated front-matter key"
             }
-            Code::LeadPromotion => "Spec §Para: a leading strong span promoted to a lead-in",
+            Code::LeadPromotion => {
+                "Spec §Para: a paragraph that is one strong span promoted to a lead-in"
+            }
             Code::CompatUnsupported => {
                 "Appendix \"PyMdownX compatibility profile\": a spelling milestone 5 implements, literal today"
             }

@@ -4,7 +4,7 @@ expression: snapshot
 ---
 <h1>Top</h1>
 <h3>Skipped</h3>
-<p><strong class="lead">Note.</strong> Promoted.</p>
+<p><strong class="lead">Note.</strong></p>
 <table id="fig:t">
 <caption>T.</caption>
 <thead>

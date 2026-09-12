@@ -71,6 +71,7 @@ fn leaf(named: bool) -> impl Strategy<Value = Column> {
     (name(), config(), any::<bool>()).prop_map(move |(name, config, unnamed)| {
         Column::Leaf(LeafColumn {
             name: (named || !unnamed).then_some(name),
+            title: Vec::new(),
             config,
         })
     })
@@ -80,7 +81,12 @@ fn column() -> impl Strategy<Value = Column> {
     prop_oneof![
         3 => leaf(false),
         2 => (name(), config(), prop::collection::vec(leaf(true), 1..=3)).prop_map(
-            |(name, config, columns)| Column::Group(ColumnGroup { name, columns, config })
+            |(name, config, columns)| Column::Group(ColumnGroup {
+                name,
+                title: Vec::new(),
+                columns,
+                config
+            })
         ),
         1 => (
             name(),
@@ -89,6 +95,7 @@ fn column() -> impl Strategy<Value = Column> {
                 (name(), prop::collection::vec(leaf(true), 1..=2)).prop_map(|(name, columns)| {
                     Column::Group(ColumnGroup {
                         name,
+                        title: Vec::new(),
                         columns,
                         config: ColumnConfig::default(),
                     })
@@ -98,6 +105,7 @@ fn column() -> impl Strategy<Value = Column> {
         )
             .prop_map(|(name, config, columns)| Column::Group(ColumnGroup {
                 name,
+                title: Vec::new(),
                 columns,
                 config
             })),

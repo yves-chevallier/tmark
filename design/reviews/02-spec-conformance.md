@@ -146,7 +146,7 @@ showed something those notes do not say.
 | Spec claim | Status | Evidence | Proposed action |
 | - | - | - | - |
 | Header: six levels, attributes at end of line | implemented | `####### Seven` → paragraph; `# Heading {#id} more text` → literal + `attr-no-host` | — |
-| Para: lead promotion under 80 chars, feature-switched, `lead-promotion` info | implemented | `**Boot sequence.** The device…` → `lead`; a 110-character strong opener stays `Strong`; `paragraph.lead: false` disables | — |
+| Para: lead promotion under 80 chars, feature-switched, `lead-promotion` info | implemented | `**Boot sequence.**` (the whole paragraph) → `lead`; `**Boot sequence.** The device…` stays a bold run-in (parity F4); a 110-character strong paragraph stays `Strong`; `paragraph.lead: false` disables | — |
 | BlockQuote `{.epigraph}` | partial (D26) | see §Attributes | — |
 | Task items `- [ ]`, `- [x]`; `- [.]` under `tasklist.partial` | implemented | `task: open/done`; `[.]` literal by default, `partial` with the feature | — |
 | `pymdownx.fancylists` markers | missing (confirmed) | `a.`, `i.`, `#.` lists → paragraphs; `1)` → `OrderedList` printed `1.` | M5 |

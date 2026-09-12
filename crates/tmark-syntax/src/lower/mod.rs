@@ -100,6 +100,14 @@ pub(crate) struct Lowerer {
     /// Set by `lower_container` before the body of a `tabs`; consumed by
     /// `lower_content`.
     pub next_body_is_tabs: bool,
+    /// Lowering an inline fragment (`lower_fragment`: a table cell, a
+    /// column header, an attribute value). The text is inline content, not
+    /// a paragraph, so the `paragraph.lead` promotion does not apply —
+    /// taking a lead there would drop the strong span from the fragment.
+    pub in_fragment: bool,
+    /// Lowering the blocks of a list item: the `paragraph.lead` sugar does
+    /// not fire there (spec §Para).
+    pub in_list_item: bool,
 }
 
 pub fn parse(text: &str, file: FileId) -> Parsed {
@@ -130,6 +138,8 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
         generic_captions: Vec::new(),
         in_tabs: false,
         next_body_is_tabs: false,
+        in_fragment: false,
+        in_list_item: false,
     };
     let ctx = Ctx {
         text,
@@ -397,11 +407,13 @@ impl Lowerer {
         let ctx = Ctx { text, map };
         let mut document = Document::default();
         let saved = std::mem::take(&mut self.definitions);
+        let was_fragment = std::mem::replace(&mut self.in_fragment, true);
         let blocks = self.lower_blocks(
             tree.children().map_or(&[], Vec::as_slice),
             &ctx,
             &mut document,
         );
+        self.in_fragment = was_fragment;
         self.definitions = saved;
         match blocks.into_iter().next() {
             Some(tmark_ir::Block::Para(para)) => para.content,

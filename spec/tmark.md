@@ -223,7 +223,11 @@ caption lines are hosts; so is an anonymous span, written Pandoc-style as
 piece of text rather than a new kind of node: an anchor on a phrase
 (`[this claim]{#claim:one}`), the language of a quotation
 (`[this taylor]{lang=en}`), or media restriction (`[web only]{media=web}`).
-A span with no attributes is just brackets, as in CommonMark.
+A span with no attributes is just brackets, as in CommonMark. An *empty*
+link hugging an attribute list (`[](){#id}`, the MkDocs/autorefs anchor
+idiom) is the same anchor written the long way: an empty link is no link,
+so it reads as the span and is deprecated in favour of it (Appendix
+@[app:deprecations]).
 
 Three attributes are universal, accepted on every host:
 
@@ -626,9 +630,16 @@ paragraph) has an explicit role:
 {lead}[Boot sequence.] The device powers the flash before the SoC…
 ```
 
-Sugar: a paragraph whose first inline is a strong span shorter than 80
+The role takes what follows it on the paragraph, whatever that is: the
+lead-in is what the author wrote between the brackets.
+
+Sugar: a paragraph whose *whole* content is a strong span shorter than 80
 characters is promoted to a lead-in when feature `paragraph.lead` is on (on
-by default, off under `strict`). The promotion is sugar, not magic: it is
+by default, off under `strict`). A strong span that merely opens a
+paragraph is a bold run-in and stays one — promoting it would move the rest
+of the sentence into a paragraph of its own, since `\tslead` breaks the
+paragraph around the lead-in. A list item is not promoted either: a
+bold-only item is a label. The promotion is sugar, not magic: it is
 named, switchable, and `tmark fmt` rewrites it to the role. Class C.
 Backends: `\tslead{…}`, a bold run-in, `<p><b class="lead">`.
 
@@ -1565,7 +1576,7 @@ Table: The feature registry. {#tbl:features}
 
 | Feature | Default | Effect |
 | ------- | ------- | ------ |
-| `paragraph.lead` | on | promote a leading short strong span to `{lead}[…]` (§@[sec:structure]) |
+| `paragraph.lead` | on | promote a paragraph that is one short strong span to `{lead}[…]` (§@[sec:structure]) |
 | `table.decimal-align` | on | align numeric right-aligned columns on the decimal point |
 | `tasklist.partial` | off | `- [.]` partial task items |
 | `figures.exec` | off | execute `python image` fences |
@@ -1819,8 +1830,9 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Underline`, `Strikeout`, `Highlight`, `Comment` | E | not shown literally here: the extension fires even inside code spans |
 | `:smile:` | `Str` holding the character | E | emoji, GitHub's name table; the printer emits the character (§@[sec:inline]) |
 | `:material-…:`, `:fontawesome-…:`, `:octicons-…:`, `:simple-…:` | `Span{.icon media=web}` | D | Material icons; print drops them, hint `icon-web-only` (§@[sec:inline]) |
-| `(c)`, `(tm)`, `-->`, `1/2` | `Str` | E | smart symbols |
-| `"quotes"`, `--`, `...` | `Quoted`, `Str` | E | SmartyPants |
+| `(c)`, `(tm)`, `(r)`, `c/o`, `+/-`, `=/=`, `-->`, `<--`, `<-->`, `1/2` … | `Str` holding the character | E | smart symbols; the ordinal-number form (`1st`) is *not* applied: it is a superscript, not a `Str` |
+| `"quotes"` | `Quoted` | E | SmartyPants; the pair is read inside one text run, so a phrase whose quotes sit on either side of inline markup stays literal. Single quotes are left alone: an apostrophe is not a quote |
+| `--`, `---`, `...` | `Str`, as typed | E | both backends typeset the ASCII spelling as the dash and the ellipsis; converting them would gain nothing and lose the round-trip |
 | `https://…` bare | `Link` | C | magic links; GFM autolinks too |
 | `1)`, `a.`, `i.`, `#.` list markers | `OrderedList` with style | E | fancylists |
 | `--8<-- "file"` | `{include}(file)` (§@[sec:includes]) | E | deprecated, Appendix @[app:deprecations] |
@@ -1860,6 +1872,7 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | `--8<-- "file"` | `{include}(file)` | draft 3 | fmt |
 | `@https://doi.org/…` | `@doi:…` | draft 3 | indefinite (sugar) |
 | `[](gls:term)` | `@gls:term` | draft 2 | fmt |
+| `[](){#id}` anchor | `[]{#id}` | draft 3 | fmt |
 | bare `mermaid` fence | `mermaid image` | draft 3 | indefinite (MkDocs renders it) |
 | `Table:` line before the table | `Table:` line after | draft 3 | indefinite (Pandoc accepts both); open question 6 |
 | `!!!` / `???` callouts | `::: type {…}` | draft 2 | indefinite (MkDocs Material renders them) |

@@ -209,7 +209,7 @@ yet.
 
 - `tmark-py` wheel and `tmark-wasm`; TeXSmith depends on the wheel.
 - PyMdownX compatibility profile completed (critic markup, wiki links,
-  fancy list markers, smart symbols as the spec lists them). Each spelling
+  fancy list markers; smart symbols are done). Each remaining spelling
   is reported as `compat-unsupported` today (`lower/compat.rs`);
   implementing one means replacing its scan with the construct and
   updating fixture `diag-compat-unsupported`.
@@ -255,8 +255,9 @@ Remaining for M5:
 1. **Critic markup, wiki links, fancy list markers**: the three
    `compat-unsupported` scans become constructs (spec appendix rows, a
    fixture each), and `OrderedList` gains its style.
-2. **Smart symbols and dialect import** (`tmark fmt` on GFM/MyST/Pandoc
-   spellings): not started.
+2. **Dialect import** (`tmark fmt` on GFM/MyST/Pandoc spellings): not
+   started. Smart symbols and straight quotes landed with the parity
+   triage (finding F6, fixture `inline-smart-symbols`, challenge C45).
 3. **Releases**: nothing is on crates.io or PyPI; the wheel workflow has
    run on no tag yet. The wheel does not carry the CLI as a console
    script (`09-bindings.md` says "later").

@@ -4,7 +4,7 @@
 //! `table.hline()` for separators, wrapped in `#figure` when captioned or
 //! labelled.
 
-use tmark_ir::{Align, Caption, Cell, Column, Row, Table, TableConfig, TableModel};
+use tmark_ir::{Align, Caption, Cell, Column, Inline, Row, Table, TableConfig, TableModel};
 
 use super::escape;
 use super::Typst;
@@ -101,7 +101,7 @@ impl Typst<'_> {
             let mut cells: Vec<String> = Vec::new();
             let depth = model.header_depth();
             for level in 0..depth {
-                header_level(&model.columns, level, depth, &mut cells);
+                self.header_level(&model.columns, level, depth, &mut cells);
             }
             lines.push(format!("  table.header({}),", cells.join(", ")));
         }
@@ -145,6 +145,15 @@ impl Typst<'_> {
         lines
     }
 
+    /// The header of a column: its inline Markdown when it carries any
+    /// (`LeafColumn::title`), the escaped plain name otherwise.
+    fn header_text(&mut self, title: &[Inline], name: Option<&str>) -> String {
+        if title.is_empty() {
+            return escape::markup(name.unwrap_or(""));
+        }
+        self.render_inlines(title).replace('\n', " ")
+    }
+
     fn cell(&mut self, cell: &Cell) -> String {
         let body = self.render_inlines(&cell.content);
         let body = body.replace('\n', " ");
@@ -166,28 +175,36 @@ impl Typst<'_> {
     }
 }
 
-fn header_level(columns: &[Column], level: usize, depth: usize, cells: &mut Vec<String>) {
-    for column in columns {
-        match column {
-            Column::Leaf(leaf) => {
-                if level == 0 {
-                    let name = escape::markup(leaf.name.as_deref().unwrap_or(""));
-                    if depth > 1 {
-                        cells.push(format!("table.cell(rowspan: {depth})[{name}]"));
-                    } else {
-                        cells.push(format!("[{name}]"));
+impl Typst<'_> {
+    fn header_level(
+        &mut self,
+        columns: &[Column],
+        level: usize,
+        depth: usize,
+        cells: &mut Vec<String>,
+    ) {
+        for column in columns {
+            match column {
+                Column::Leaf(leaf) => {
+                    if level == 0 {
+                        let name = self.header_text(&leaf.title, leaf.name.as_deref());
+                        if depth > 1 {
+                            cells.push(format!("table.cell(rowspan: {depth})[{name}]"));
+                        } else {
+                            cells.push(format!("[{name}]"));
+                        }
                     }
                 }
-            }
-            Column::Group(g) => {
-                if level == 0 {
-                    let width = g.columns.iter().map(|c| c.leaves().len()).sum::<usize>();
-                    cells.push(format!(
-                        "table.cell(colspan: {width}, align: center)[{}]",
-                        escape::markup(&g.name)
-                    ));
-                } else {
-                    header_level(&g.columns, level - 1, depth - 1, cells);
+                Column::Group(g) => {
+                    if level == 0 {
+                        let width = g.columns.iter().map(|c| c.leaves().len()).sum::<usize>();
+                        let name = self.header_text(&g.title, Some(&g.name));
+                        cells.push(format!(
+                            "table.cell(colspan: {width}, align: center)[{name}]"
+                        ));
+                    } else {
+                        self.header_level(&g.columns, level - 1, depth - 1, cells);
+                    }
                 }
             }
         }

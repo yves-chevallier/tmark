@@ -123,6 +123,36 @@ recognised construct untouched; `tmark lower FILE --to web`; the Python
 `::: pkg.mod` keeps its bytes, the prose after it is lowered) after the
 merge with the spec wave.
 
+### The parity-triage round (2026-09-12, worktree `wt/parityfix`)
+
+Four findings of TeXSmith's `specs/migration/parity-triage.md` whose cause
+was in this core, one commit each:
+
+- **F3** — inline markup flattened in a table header cell. `LeafColumn`
+  and `ColumnGroup` gained `title`; the writers and `tmark fmt` render it.
+  Also fixed the lead promotion firing inside `lower_fragment`, which was
+  dropping a leading `Strong` from a cell.
+- **F4** — the lead-paragraph heuristic. The sugar now promotes only a
+  paragraph that *is* one short strong span, outside a list item; the
+  `{lead}[…]` role takes what follows it whatever the feature says. Spec
+  §Para was the thing at fault (C44).
+- **F5** — `[](){#id}` is the anchor `[]{#id}`, deprecated with a fix
+  (C45).
+- **F6** — the smart symbols and the straight-quote pairing, which were
+  never implemented (C46); this closes M5 item 2 except for dialect
+  import.
+
+Left to TeXSmith, with the reason: F1 (Typst document metadata), F2
+(front-matter `glossary.entries`), F7 (the scripts pass, `fonts/`), F8
+(snippet includes: I/O, and the stray `;` is in the source), F9 (same
+`;`), F10 (choosing one of a light/dark image pair — tmark strips the
+`#only-light` marker as the contract says; dropping the duplicate is an
+assets-pass decision that would need a spec row, most naturally as a
+`media=` restriction), F11 (the Typst equation numbering is the template's;
+the emphasis nesting, the code-span padding and the `<code>` in a cell are
+places where tmark is the faithful one and legacy the lossy one, so they
+belong in the allow-list or §4).
+
 ### The cross-repository contract now in force
 
 TeXSmith's `tmark-migration` branch depends on these; changing one is a
@@ -133,7 +163,10 @@ two-repository change (R14 of its plan):
   generates `texsmith/ir/model.py` from `tmark.schema("ir")`, records
   `tmark.schema_hash()` (FNV-1a of the schema, 16 hex digits) and its CI
   fails when the committed models drift. A field added to a node is a
-  regeneration on their side; a renamed one breaks their passes.
+  regeneration on their side; a renamed one breaks their passes. The
+  parity-triage round added one: `LeafColumn.title` / `ColumnGroup.title`
+  (the header of a table column as inline Markdown, finding F3), so
+  `texsmith/ir/model.py` and the schema hash must be regenerated.
 - **`Requires` and `FRAGMENTS`.** A writer names the contracts it used
   in `Requires.fragments` and the structural packages in
   `Requires.packages`; TeXSmith's fragment loader reads

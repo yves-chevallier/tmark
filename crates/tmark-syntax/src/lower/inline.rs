@@ -5,9 +5,9 @@
 use tmark_ir::{
     registry::{self, ArgStyle},
     Aside, Attrs, Block, Code, CodeInline, Comment, CounterItem, Emph, Highlight, Image,
-    IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, ProgressBar, RawInline, Ref,
-    Side, SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong, SubSpan, Subscript,
-    Superscript, Target, Underline, Var,
+    IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, ProgressBar, QuoteKind,
+    Quoted, RawInline, Ref, Side, SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong,
+    SubSpan, Subscript, Superscript, Target, Underline, Var,
 };
 use tmark_markdown::mdast::{Node, TmarkMarkKind};
 use tmark_markdown::tmark::looks_like_attributes;
@@ -516,6 +516,32 @@ impl Lowerer {
                     continue;
                 }
             }
+            if rest.starts_with('"') && !escaped('"') {
+                if let Some((start, end)) = sugar::quoted(text, i) {
+                    flush(self, &mut buffer, buffer_start, i, out);
+                    let at = sub(self, i, end + 1);
+                    let meta = self.meta(at);
+                    let content = vec![Inline::Str(Str {
+                        meta: self.meta(sub(self, start, end)),
+                        text: text[start..end].to_string(),
+                    })];
+                    out.push(Inline::Quoted(Quoted {
+                        meta,
+                        kind: QuoteKind::Double,
+                        content,
+                    }));
+                    i = end + 1;
+                    buffer_start = i;
+                    continue;
+                }
+            }
+            if let Some((len, symbol)) = sugar::smart_symbol(text, i) {
+                if !escaped(rest.chars().next().expect("in bounds")) {
+                    buffer.push_str(symbol);
+                    i += len;
+                    continue;
+                }
+            }
             let c = rest.chars().next().expect("in bounds");
             buffer.push(c);
             i += c.len_utf8();
@@ -625,6 +651,35 @@ impl Lowerer {
                     if bar.meta.span.end == span.start {
                         bar.attrs = attrs;
                         bar.meta.span = bar.meta.span.join(span);
+                        return None;
+                    }
+                }
+                // `[](){#id}`: an empty link hugging an attribute list is
+                // the MkDocs/autorefs anchor idiom. An empty link is no
+                // link; what the author wrote is an anchor, which is the
+                // zero-width span `[]{#id}` (spec §Attributes) — deprecated
+                // in favour of that spelling.
+                if let Some(Inline::Link(link)) = out.last() {
+                    let empty = link.content.is_empty()
+                        && matches!(&link.target, Target::Url(url) if url.is_empty())
+                        && link.title.is_none();
+                    if empty && link.meta.span.end == span.start {
+                        let Some(Inline::Link(link)) = out.pop() else {
+                            unreachable!()
+                        };
+                        let whole = link.meta.span.join(span);
+                        self.deprecated_with_fix(
+                            whole,
+                            "[](){…}",
+                            "[]{…}",
+                            format!("[]{}", attrs_text(&attrs)),
+                        );
+                        let meta = self.meta(whole);
+                        out.push(Inline::Span(SpanNode {
+                            meta,
+                            content: Vec::new(),
+                            attrs,
+                        }));
                         return None;
                     }
                 }

@@ -685,7 +685,8 @@ impl<'a> Lowerer<'a> {
             let depth = model.header_depth();
             for level in 0..depth {
                 out.push_str("<tr markdown=\"block\">\n");
-                header_level(&mut out, &model.columns, level, depth);
+                let header = self.header_level(f, &model.columns, level, depth);
+                out.push_str(&header);
                 out.push_str("</tr>\n");
             }
             out.push_str("</thead>\n");
@@ -734,6 +735,55 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
+    }
+
+    /// Header rows of a table model, one `<th>` per column of the level.
+    fn header_level(&mut self, f: &File, columns: &[Column], level: usize, depth: usize) -> String {
+        let mut out = String::new();
+        for column in columns {
+            match column {
+                Column::Leaf(leaf) => {
+                    if level == 0 {
+                        let span = depth - level;
+                        out.push_str("<th markdown=\"span\"");
+                        if span > 1 {
+                            out.push_str(&format!(" rowspan=\"{span}\""));
+                        }
+                        out.push_str(&html::align_attr(leaf.config.align));
+                        out.push('>');
+                        out.push_str(&self.header_text(f, &leaf.title, leaf.name.as_deref()));
+                        out.push_str("</th>\n");
+                    }
+                }
+                Column::Group(group) => {
+                    if level == 0 {
+                        let cols = group
+                            .columns
+                            .iter()
+                            .map(|c| c.leaves().len())
+                            .sum::<usize>();
+                        out.push_str(&format!(
+                            "<th markdown=\"span\" colspan=\"{cols}\"{}>",
+                            html::align_attr(group.config.align)
+                        ));
+                        out.push_str(&self.header_text(f, &group.title, Some(&group.name)));
+                        out.push_str("</th>\n");
+                    } else {
+                        out.push_str(&self.header_level(f, &group.columns, level - 1, depth - 1));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// The header of a column: its inline Markdown when it carries any
+    /// (`LeafColumn::title`), the escaped plain name otherwise.
+    fn header_text(&mut self, f: &File, title: &[Inline], name: Option<&str>) -> String {
+        if title.is_empty() {
+            return escape::text(name.unwrap_or(""));
+        }
+        self.inlines_text(f, title)
     }
 
     fn cell(&mut self, f: &File, cell: &Cell, align: Option<tmark_ir::Align>) -> String {
@@ -1511,43 +1561,6 @@ fn caption_matches(block: &Block, kind: CaptionKind) -> bool {
         (Block::Figure(_), CaptionKind::Figure) => true,
         (Block::Para(p), CaptionKind::Figure) => matches!(p.content.as_slice(), [Inline::Image(_)]),
         _ => false,
-    }
-}
-
-/// Header rows of a table model, one `<th>` per column of the level.
-fn header_level(out: &mut String, columns: &[Column], level: usize, depth: usize) {
-    for column in columns {
-        match column {
-            Column::Leaf(leaf) => {
-                if level == 0 {
-                    let span = depth - level;
-                    out.push_str("<th markdown=\"span\"");
-                    if span > 1 {
-                        out.push_str(&format!(" rowspan=\"{span}\""));
-                    }
-                    out.push_str(&html::align_attr(leaf.config.align));
-                    out.push('>');
-                    out.push_str(&escape::text(leaf.name.as_deref().unwrap_or("")));
-                    out.push_str("</th>\n");
-                }
-            }
-            Column::Group(group) => {
-                if level == 0 {
-                    let cols = group
-                        .columns
-                        .iter()
-                        .map(|c| c.leaves().len())
-                        .sum::<usize>();
-                    out.push_str(&format!(
-                        "<th markdown=\"span\" colspan=\"{cols}\"{}>{}</th>\n",
-                        html::align_attr(group.config.align),
-                        escape::text(&group.name)
-                    ));
-                } else {
-                    header_level(out, &group.columns, level - 1, depth - 1);
-                }
-            }
-        }
     }
 }
 

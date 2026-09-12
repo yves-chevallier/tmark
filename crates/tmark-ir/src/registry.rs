@@ -454,7 +454,7 @@ pub const FEATURES: &[Feature] = &[
         "paragraph.lead",
         true,
         "Para",
-        "promote a leading short strong span to {lead}[…]",
+        "promote a paragraph that is one short strong span to {lead}[…]",
     ),
     mk_feature(
         "table.decimal-align",

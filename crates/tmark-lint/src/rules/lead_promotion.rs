@@ -1,6 +1,6 @@
-//! `lead-promotion`: a leading strong span promoted to a lead-in by the
-//! `paragraph.lead` feature (spec §Para). Information, not a fault: the
-//! formatter rewrites it to `{lead}[…]`.
+//! `lead-promotion`: a paragraph that is one strong span, promoted to a
+//! lead-in by the `paragraph.lead` feature (spec §Para). Information, not
+//! a fault: the formatter rewrites it to `{lead}[…]`.
 
 use tmark_ir::{Block, Code, Diagnostic};
 

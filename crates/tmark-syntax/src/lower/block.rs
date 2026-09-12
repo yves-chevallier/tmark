@@ -93,8 +93,9 @@ impl Lowerer {
                 let meta = self.meta(span);
                 let lowered = self.lower_inlines(&p.children, ctx);
                 let mut content = lowered.inlines;
-                self.compat_scan_paragraph(&content, ctx.slice(p.position.as_ref()), span);
-                let lead = self.take_lead(&mut content);
+                let source = ctx.slice(p.position.as_ref());
+                self.compat_scan_paragraph(&content, source, span);
+                let lead = self.take_lead(&mut content, source);
                 if let Some((attrs, attrs_span)) = lowered.tail_attrs {
                     // A paragraph cannot host attributes, except through the
                     // image that is its only content (already taken) or a
@@ -202,7 +203,9 @@ impl Lowerer {
                     let Node::ListItem(item) = child else {
                         continue;
                     };
+                    let was_item = std::mem::replace(&mut self.in_list_item, true);
                     let mut content = self.lower_blocks(&item.children, ctx, document);
+                    self.in_list_item = was_item;
                     let mut task = item
                         .checked
                         .map(|c| if c { Task::Done } else { Task::Open });
@@ -454,31 +457,46 @@ impl Lowerer {
     }
 
     /// A paragraph-initial `{lead}[…]` role, or the `paragraph.lead`
-    /// promotion of a short leading strong span (spec §Para).
-    fn take_lead(&mut self, content: &mut Vec<Inline>) -> Option<Vec<Inline>> {
-        if content.len() < 2 {
+    /// promotion of a paragraph that is a single short strong span
+    /// (spec §Para).
+    ///
+    /// The role and the sugar are two rules. `{lead}[…]` written at the
+    /// start of a paragraph is the lead-in whatever follows it and whatever
+    /// the feature says: it is the canonical spelling, recognised by the
+    /// source (it lowers to a `Strong` like any other). The sugar promotes
+    /// only a paragraph that *is* one strong span under 80 characters: a
+    /// strong span that merely opens a paragraph is a bold run-in, and
+    /// `\tslead` (`\par\noindent…\par\nobreak\smallskip`) would break the
+    /// sentence in two.
+    fn take_lead(&mut self, content: &mut Vec<Inline>, source: &str) -> Option<Vec<Inline>> {
+        // A fragment (a table cell, a column header) is inline content, not
+        // a paragraph: taking a lead there would drop the strong span.
+        if self.in_fragment {
             return None;
         }
-        // `{lead}[…]` lowers to `Strong` mid-paragraph; at the start it is the
-        // lead-in whatever its length. The promotion applies to any strong.
-        match &content[0] {
-            Inline::Strong(strong) => {
-                let short = plain_text(&strong.content).chars().count() < 80;
-                let followed_by_text =
-                    matches!(&content[1], Inline::Str(s) if s.text.starts_with(' '));
-                if short && followed_by_text && self.features.paragraph_lead {
-                    let Inline::Strong(strong) = content.remove(0) else {
-                        unreachable!()
-                    };
-                    if let Some(Inline::Str(s)) = content.first_mut() {
-                        s.text = s.text.trim_start().to_string();
-                    }
-                    return Some(strong.content);
-                }
-                None
+        let Some(Inline::Strong(strong)) = content.first() else {
+            return None;
+        };
+        let role = source.trim_start().starts_with("{lead}");
+        if !role {
+            let whole_paragraph = content[1..].iter().all(is_blank);
+            let short = plain_text(&strong.content).chars().count() < 80;
+            // A list item is not a paragraph of running prose: a bold-only
+            // item is a label, not a lead-in, and legacy TeXSmith leaves it
+            // a `\textbf` too.
+            if !(whole_paragraph && short && !self.in_list_item && self.features.paragraph_lead) {
+                return None;
             }
-            _ => None,
         }
+        let Inline::Strong(strong) = content.remove(0) else {
+            unreachable!()
+        };
+        if content.iter().all(is_blank) {
+            content.clear();
+        } else if let Some(Inline::Str(s)) = content.first_mut() {
+            s.text = s.text.trim_start().to_string();
+        }
+        Some(strong.content)
     }
 
     /// A fenced code block: listing or data directive (spec §Data directives).
@@ -1326,4 +1344,14 @@ fn markdown_tag(line: &str) -> Option<(String, Attrs)> {
         rest = rest.trim_start();
     }
     markdown.then_some((tag, attrs))
+}
+
+/// An inline that typesets nothing: the trailing whitespace a paragraph
+/// whose whole content is one strong span may still carry.
+fn is_blank(inline: &Inline) -> bool {
+    match inline {
+        Inline::Str(s) => s.text.trim().is_empty(),
+        Inline::Space(_) | Inline::SoftBreak(_) => true,
+        _ => false,
+    }
 }

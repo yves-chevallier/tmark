@@ -148,3 +148,111 @@ fn deprecated_citations() {
         2
     );
 }
+
+#[test]
+fn table_header_keeps_its_markup() {
+    // Spec §Table: inline Markdown survives in every cell, the header
+    // included; `name` stays the plain text (the named-row key).
+    let pipe = blocks("| **Bold** | [L](https://e.org) |\n| - | - |\n| a | b |\n");
+    let Block::Table(t) = &pipe[0] else {
+        panic!("{pipe:?}")
+    };
+    let names: Vec<Option<&str>> = t.model.columns.iter().map(|c| c.name()).collect();
+    assert_eq!(names, [Some("Bold"), Some("L")]);
+    assert!(matches!(t.model.columns[0].title(), [Inline::Strong(_)]));
+    assert!(matches!(t.model.columns[1].title(), [Inline::Link(_)]));
+
+    // A plain header carries no `title`: the IR of an ordinary table is
+    // unchanged.
+    let plain = blocks("| A |\n| - |\n| 1 |\n");
+    let Block::Table(t) = &plain[0] else {
+        panic!("{plain:?}")
+    };
+    assert!(t.model.columns[0].title().is_empty());
+
+    // A `yaml table` column name is read the same way, and a cell that
+    // starts with a strong span keeps it (no lead promotion in a fragment).
+    let yaml = blocks(
+        "```yaml table\ncolumns: [\"**Bold** name\"]\nrows:\n  - [\"**Lead** cell\"]\n```\n",
+    );
+    let Block::Table(t) = &yaml[0] else {
+        panic!("{yaml:?}")
+    };
+    assert_eq!(t.model.columns[0].name(), Some("**Bold** name"));
+    assert!(matches!(
+        t.model.columns[0].title(),
+        [Inline::Strong(_), Inline::Str(_)]
+    ));
+    let tmark_ir::Row::Data(row) = &t.model.rows[0] else {
+        panic!("{:?}", t.model.rows)
+    };
+    assert!(matches!(
+        row.cells[0].content.as_slice(),
+        [Inline::Strong(_), Inline::Str(_)]
+    ));
+}
+
+#[test]
+fn lead_promotion_is_the_whole_paragraph() {
+    // Spec §Para: the sugar promotes a paragraph that *is* one short strong
+    // span; a strong span that opens a paragraph stays a bold run-in, and a
+    // list item is never promoted. The role takes what follows it.
+    let out = blocks(
+        "**A whole paragraph in bold.**\n\n\
+         **Leading bold:** followed by text.\n\n\
+         - **macOS:** install it\n- **macOS**\n\n\
+         {lead}[Explicit.] Text after.\n\n\
+         {lead}[Alone.]\n",
+    );
+    let lead = |b: &Block| match b {
+        Block::Para(p) => p.lead.is_some(),
+        _ => false,
+    };
+    assert!(lead(&out[0]));
+    let Block::Para(p) = &out[0] else {
+        unreachable!()
+    };
+    assert!(p.content.is_empty());
+    assert!(!lead(&out[1]));
+    let Block::BulletList(list) = &out[2] else {
+        panic!("{:?}", out[2])
+    };
+    assert!(list.items.iter().all(|i| !lead(&i.content[0])));
+    assert!(lead(&out[3]));
+    let Block::Para(p) = &out[3] else {
+        unreachable!()
+    };
+    assert_eq!(p.content.len(), 1);
+    assert!(lead(&out[4]));
+}
+
+#[test]
+fn empty_link_with_attributes_is_an_anchor() {
+    // Spec §Attributes: `[](){#id}` is the anchor `[]{#id}`, deprecated.
+    let parsed = parse("[](){ #myanchor }\n\n[label](){#a}\n", FileId::default());
+    let Block::Para(p) = &parsed.document.blocks[0] else {
+        panic!("{:?}", parsed.document.blocks)
+    };
+    let [Inline::Span(span)] = p.content.as_slice() else {
+        panic!("{:?}", p.content)
+    };
+    assert_eq!(span.attrs.id.as_deref(), Some("myanchor"));
+    assert!(span.content.is_empty());
+    let deprecated: Vec<&str> = parsed
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == tmark_ir::Code::Deprecated)
+        .filter_map(|d| d.fix.as_ref().map(|f| f.replacement.as_str()))
+        .collect();
+    assert_eq!(deprecated, ["[]{#myanchor}"]);
+
+    // A link with a label is a link: the list still finds no host.
+    let Block::Para(p) = &parsed.document.blocks[1] else {
+        panic!("{:?}", parsed.document.blocks)
+    };
+    assert!(matches!(p.content.first(), Some(Inline::Link(_))));
+    assert!(parsed
+        .diagnostics
+        .iter()
+        .any(|d| d.code == tmark_ir::Code::AttrNoHost));
+}

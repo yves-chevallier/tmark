@@ -6,7 +6,7 @@ expression: mkdocs(&canonical)
 
 ### Skipped
 
-{lead}[Note.] Promoted.
+{lead}[Note.]
 
 Table: T. {#fig:t}
 

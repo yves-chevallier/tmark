@@ -1,0 +1,7 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Copyright © 2025, tea ™, reg ®, ℅ Ada: ½ a cup, ± 3, 4 ≠ 5, a → b.
+
+He said "straight quotes", `"not in code"`, and \"not a quote".

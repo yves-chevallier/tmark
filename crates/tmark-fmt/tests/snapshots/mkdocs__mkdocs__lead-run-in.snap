@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+{lead}[Boot sequence.] The device powers the flash before the SoC.
