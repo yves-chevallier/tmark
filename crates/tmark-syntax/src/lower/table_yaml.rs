@@ -330,6 +330,7 @@ fn column(value: &Value, findings: &mut Vec<Finding>) -> Option<Column> {
     match value {
         Value::String(_) | Value::Number(_) => Some(Column::Leaf(LeafColumn {
             name: text(value),
+            title: Vec::new(),
             config: ColumnConfig::default(),
         })),
         Value::Mapping(map) if map.contains_key("columns") => {
@@ -364,6 +365,7 @@ fn column(value: &Value, findings: &mut Vec<Finding>) -> Option<Column> {
             }
             Some(Column::Group(ColumnGroup {
                 name,
+                title: Vec::new(),
                 columns,
                 config: config(map, findings),
             }))
@@ -385,6 +387,7 @@ fn column(value: &Value, findings: &mut Vec<Finding>) -> Option<Column> {
             };
             Some(Column::Leaf(LeafColumn {
                 name,
+                title: Vec::new(),
                 config: config(map, findings),
             }))
         }

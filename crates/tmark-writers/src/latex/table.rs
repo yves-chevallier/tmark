@@ -5,7 +5,9 @@
 //! `renderer.py` (`\cmidrule`, `\multirow`/`\multicolumn`, labelled
 //! separators, footer, `longtable` heads).
 
-use tmark_ir::{Align, Caption, Cell, Column, ColumnConfig, Row, Table, TableConfig, TableModel};
+use tmark_ir::{
+    Align, Caption, Cell, Column, ColumnConfig, Inline, Row, Table, TableConfig, TableModel,
+};
 
 use super::escape;
 use super::Latex;
@@ -350,6 +352,19 @@ impl Latex<'_> {
         text.trim().to_string()
     }
 
+    /// The header of a column: its inline Markdown when it carries any
+    /// (`LeafColumn::title`), the escaped plain name otherwise.
+    fn header_text(&mut self, title: &[Inline], name: Option<&str>) -> String {
+        if title.is_empty() {
+            return escape::prose(name.unwrap_or(""));
+        }
+        let was = self.in_cell;
+        self.in_cell = true;
+        let text = self.render_inlines(title);
+        self.in_cell = was;
+        text.trim().to_string()
+    }
+
     /// `table.tex`.
     fn plain_table(
         &mut self,
@@ -375,7 +390,7 @@ impl Latex<'_> {
                 .map(|l| {
                     format!(
                         "\\textbf{{{}}}",
-                        escape::prose(l.name.as_deref().unwrap_or(""))
+                        self.header_text(&l.title, l.name.as_deref())
                     )
                 })
                 .collect();
@@ -489,7 +504,7 @@ impl Latex<'_> {
             let mut cells: Vec<String> = Vec::new();
             let mut rules: Vec<String> = Vec::new();
             let mut cursor = 0;
-            header_level(
+            self.header_level(
                 &model.columns,
                 level,
                 depth,
@@ -594,49 +609,50 @@ impl Latex<'_> {
     }
 }
 
-/// One header level over the column tree (`_render_header`).
-fn header_level(
-    columns: &[Column],
-    level: usize,
-    depth: usize,
-    cursor: &mut usize,
-    cells: &mut Vec<String>,
-    rules: &mut Vec<String>,
-) {
-    for column in columns {
-        match column {
-            Column::Leaf(leaf) => {
-                let name = escape::prose(leaf.name.as_deref().unwrap_or(""));
-                if level == 0 {
-                    let span = depth;
-                    cells.push(if span > 1 {
-                        format!("\\multirow{{{span}}}{{*}}{{{name}}}")
+impl Latex<'_> {
+    /// One header level over the column tree (`_render_header`).
+    fn header_level(
+        &mut self,
+        columns: &[Column],
+        level: usize,
+        depth: usize,
+        cursor: &mut usize,
+        cells: &mut Vec<String>,
+        rules: &mut Vec<String>,
+    ) {
+        for column in columns {
+            match column {
+                Column::Leaf(leaf) => {
+                    if level == 0 {
+                        let name = self.header_text(&leaf.title, leaf.name.as_deref());
+                        let span = depth;
+                        cells.push(if span > 1 {
+                            format!("\\multirow{{{span}}}{{*}}{{{name}}}")
+                        } else {
+                            name
+                        });
+                    }
+                    // Rows below the leaf's own: empty slot (covered by the
+                    // multirow above).
+                    if level > 0 {
+                        cells.push(String::new());
+                    }
+                    *cursor += 1;
+                }
+                Column::Group(g) => {
+                    let width = g.columns.iter().map(|c| c.leaves().len()).sum::<usize>();
+                    if level == 0 {
+                        let name = self.header_text(&g.title, Some(&g.name));
+                        cells.push(format!("\\multicolumn{{{width}}}{{c}}{{{name}}}"));
+                        rules.push(format!(
+                            "\\cmidrule(lr){{{}-{}}}",
+                            *cursor + 1,
+                            *cursor + width
+                        ));
+                        *cursor += width;
                     } else {
-                        name
-                    });
-                }
-                // Rows below the leaf's own: empty slot (covered by the
-                // multirow above).
-                if level > 0 {
-                    cells.push(String::new());
-                }
-                *cursor += 1;
-            }
-            Column::Group(g) => {
-                let width = g.columns.iter().map(|c| c.leaves().len()).sum::<usize>();
-                if level == 0 {
-                    cells.push(format!(
-                        "\\multicolumn{{{width}}}{{c}}{{{}}}",
-                        escape::prose(&g.name)
-                    ));
-                    rules.push(format!(
-                        "\\cmidrule(lr){{{}-{}}}",
-                        *cursor + 1,
-                        *cursor + width
-                    ));
-                    *cursor += width;
-                } else {
-                    header_level(&g.columns, level - 1, depth - 1, cursor, cells, rules);
+                        self.header_level(&g.columns, level - 1, depth - 1, cursor, cells, rules);
+                    }
                 }
             }
         }
@@ -651,6 +667,7 @@ mod tests {
     fn leaf(name: &str, width: Option<&str>) -> Column {
         Column::Leaf(LeafColumn {
             name: Some(name.into()),
+            title: Vec::new(),
             config: ColumnConfig {
                 width: width.map(str::to_string),
                 ..Default::default()
@@ -697,6 +714,7 @@ mod tests {
                 leaf("A", None),
                 Column::Group(ColumnGroup {
                     name: "G".into(),
+                    title: Vec::new(),
                     columns: vec![leaf("B", None), leaf("C", None)],
                     config: ColumnConfig {
                         width: Some("50%".into()),

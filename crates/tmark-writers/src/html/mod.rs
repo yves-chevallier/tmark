@@ -645,6 +645,16 @@ impl Html<'_> {
         }
     }
 
+    /// The header of a column: its inline Markdown when it carries any
+    /// (`LeafColumn::title`), the escaped plain name otherwise.
+    fn header_text(&mut self, title: &[Inline], name: Option<&str>) {
+        if title.is_empty() {
+            self.out.push(&escape::text(name.unwrap_or("")));
+        } else {
+            self.inlines(title);
+        }
+    }
+
     fn header_level(&mut self, columns: &[Column], level: usize, depth: usize) {
         for column in columns {
             match column {
@@ -658,8 +668,7 @@ impl Html<'_> {
                         th.push_str(&align_attr(leaf.config.align));
                         th.push('>');
                         self.out.push(&th);
-                        self.out
-                            .push(&escape::text(leaf.name.as_deref().unwrap_or("")));
+                        self.header_text(&leaf.title, leaf.name.as_deref());
                         self.out.push("</th>\n");
                     }
                 }
@@ -671,10 +680,11 @@ impl Html<'_> {
                             .map(|c| c.leaves().len())
                             .sum::<usize>();
                         self.out.push(&format!(
-                            "<th colspan=\"{cols}\"{}>{}</th>\n",
-                            align_attr(group.config.align),
-                            escape::text(&group.name)
+                            "<th colspan=\"{cols}\"{}>",
+                            align_attr(group.config.align)
                         ));
+                        self.header_text(&group.title, Some(&group.name));
+                        self.out.push("</th>\n");
                     } else {
                         self.header_level(&group.columns, level - 1, depth - 1);
                     }

@@ -1,0 +1,33 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<table>
+<thead>
+<tr>
+<th>Key <code>tlmgr</code> name</th>
+<th><strong>Bold head</strong></th>
+<th><a href="https://e.org">Link</a></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>body code</code></td>
+<td><em>em</em></td>
+<td>plain</td>
+</tr>
+</tbody>
+</table>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

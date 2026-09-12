@@ -101,7 +101,10 @@ contract.
   by the backend engines (`babel`, Typst), never by writers.
 - **Tables.** The writer computes the column preamble from the semantic
   model (`X` columns → `tabularx`, spans → `multirow`/`multicolumn`, `long`
-  → `longtable`); decimal alignment when the feature is on.
+  → `longtable`); decimal alignment when the feature is on. A header cell
+  is a cell: the writers render `Column::title` (the header as inline
+  Markdown) when it is set and escape `Column::name` otherwise, so a link
+  or a code span in a header survives (fixture `table-header-markup`).
 - **Code.** `pygments` engine is TeXSmith's (it needs Python); the LaTeX
   writer emits an engine-neutral `\begin{tscode}[lang, title, linenums,
   hl_lines]` contract from the `ts-code` fragment and lets the fragment

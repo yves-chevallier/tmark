@@ -148,3 +148,46 @@ fn deprecated_citations() {
         2
     );
 }
+
+#[test]
+fn table_header_keeps_its_markup() {
+    // Spec §Table: inline Markdown survives in every cell, the header
+    // included; `name` stays the plain text (the named-row key).
+    let pipe = blocks("| **Bold** | [L](https://e.org) |\n| - | - |\n| a | b |\n");
+    let Block::Table(t) = &pipe[0] else {
+        panic!("{pipe:?}")
+    };
+    let names: Vec<Option<&str>> = t.model.columns.iter().map(|c| c.name()).collect();
+    assert_eq!(names, [Some("Bold"), Some("L")]);
+    assert!(matches!(t.model.columns[0].title(), [Inline::Strong(_)]));
+    assert!(matches!(t.model.columns[1].title(), [Inline::Link(_)]));
+
+    // A plain header carries no `title`: the IR of an ordinary table is
+    // unchanged.
+    let plain = blocks("| A |\n| - |\n| 1 |\n");
+    let Block::Table(t) = &plain[0] else {
+        panic!("{plain:?}")
+    };
+    assert!(t.model.columns[0].title().is_empty());
+
+    // A `yaml table` column name is read the same way, and a cell that
+    // starts with a strong span keeps it (no lead promotion in a fragment).
+    let yaml = blocks(
+        "```yaml table\ncolumns: [\"**Bold** name\"]\nrows:\n  - [\"**Lead** cell\"]\n```\n",
+    );
+    let Block::Table(t) = &yaml[0] else {
+        panic!("{yaml:?}")
+    };
+    assert_eq!(t.model.columns[0].name(), Some("**Bold** name"));
+    assert!(matches!(
+        t.model.columns[0].title(),
+        [Inline::Strong(_), Inline::Str(_)]
+    ));
+    let tmark_ir::Row::Data(row) = &t.model.rows[0] else {
+        panic!("{:?}", t.model.rows)
+    };
+    assert!(matches!(
+        row.cells[0].content.as_slice(),
+        [Inline::Strong(_), Inline::Str(_)]
+    ));
+}

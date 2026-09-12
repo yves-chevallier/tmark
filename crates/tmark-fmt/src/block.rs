@@ -525,19 +525,24 @@ fn pipe_table(out: &mut Out, model: &TableModel) {
     let mut delimiters = Vec::new();
     for column in &model.columns {
         if let Column::Leaf(leaf) = column {
-            // Names are plain strings: escape them like cell text.
-            let name = leaf.name.clone().unwrap_or_default();
-            let mut buf = Out::new();
-            crate::escape::text(
-                &mut buf,
-                &name,
-                Context {
-                    in_cell: true,
-                    ..Context::default()
-                },
-                None,
-            );
-            header.push(buf.finish().trim_end().to_string());
+            // A header carrying markup is printed from its inlines; a plain
+            // name is a string and is escaped like cell text.
+            header.push(if leaf.title.is_empty() {
+                let name = leaf.name.clone().unwrap_or_default();
+                let mut buf = Out::new();
+                crate::escape::text(
+                    &mut buf,
+                    &name,
+                    Context {
+                        in_cell: true,
+                        ..Context::default()
+                    },
+                    None,
+                );
+                buf.finish().trim_end().to_string()
+            } else {
+                cell_text(&leaf.title, true)
+            });
             delimiters.push(match leaf.config.align {
                 Some(Align::Left) => ":--".to_string(),
                 Some(Align::Center) => ":-:".to_string(),

@@ -1,0 +1,7 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+| Key `tlmgr` name | **Bold head** | [Link](https://e.org) |
+| ---------------- | ------------- | --------------------- |
+| `body code`      | *em*          | plain                 |

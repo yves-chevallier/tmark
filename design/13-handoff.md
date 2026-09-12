@@ -133,7 +133,10 @@ two-repository change (R14 of its plan):
   generates `texsmith/ir/model.py` from `tmark.schema("ir")`, records
   `tmark.schema_hash()` (FNV-1a of the schema, 16 hex digits) and its CI
   fails when the committed models drift. A field added to a node is a
-  regeneration on their side; a renamed one breaks their passes.
+  regeneration on their side; a renamed one breaks their passes. The
+  parity-triage round added one: `LeafColumn.title` / `ColumnGroup.title`
+  (the header of a table column as inline Markdown, finding F3), so
+  `texsmith/ir/model.py` and the schema hash must be regenerated.
 - **`Requires` and `FRAGMENTS`.** A writer names the contracts it used
   in `Requires.fragments` and the structural packages in
   `Requires.packages`; TeXSmith's fragment loader reads

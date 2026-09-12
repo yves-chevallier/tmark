@@ -456,7 +456,9 @@ impl Lowerer {
     /// A paragraph-initial `{lead}[…]` role, or the `paragraph.lead`
     /// promotion of a short leading strong span (spec §Para).
     fn take_lead(&mut self, content: &mut Vec<Inline>) -> Option<Vec<Inline>> {
-        if content.len() < 2 {
+        // A fragment (a table cell, a column header) is inline content, not
+        // a paragraph: taking a lead there would drop the strong span.
+        if self.in_fragment || content.len() < 2 {
             return None;
         }
         // `{lead}[…]` lowers to `Strong` mid-paragraph; at the start it is the

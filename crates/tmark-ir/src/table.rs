@@ -118,21 +118,34 @@ pub struct ColumnConfig {
 /// the column has no header label; a table whose columns all lack a name
 /// has no header row. A bare scalar column descriptor (`Fruit`, `2024`) is
 /// a leaf named by its text.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct LeafColumn {
-    /// Python `LeafColumn.name`.
+    /// Python `LeafColumn.name`: the header as plain text. It is the key
+    /// of named-row mode and what a diagnostic names the column by, so it
+    /// stays a string even when the header carries markup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The header cell parsed as inline Markdown (spec §Table: "Inline
+    /// Markdown survives inside cells in all forms"). Empty when the
+    /// header is plain text, which is the common case: writers render
+    /// `title` when it is set and escape `name` otherwise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     #[serde(flatten)]
     pub config: ColumnConfig,
 }
 
 /// A header group over an ordered list of sub-columns (recursive).
 /// Mirrors Python `ColumnGroup` (`name` required, `columns` non-empty).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ColumnGroup {
-    /// Python `ColumnGroup.name`.
+    /// Python `ColumnGroup.name`: the header as plain text, like
+    /// [`LeafColumn::name`].
     pub name: String,
+    /// The group header parsed as inline Markdown, like
+    /// [`LeafColumn::title`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     /// Python `ColumnGroup.columns`.
     pub columns: Vec<Column>,
     #[serde(flatten)]
@@ -141,7 +154,7 @@ pub struct ColumnGroup {
 
 /// Spec §Table rung 5: "Grouped headers (recursive `columns:`)". Mirrors
 /// Python `Column = LeafColumn | ColumnGroup`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type")]
 pub enum Column {
     Leaf(LeafColumn),
@@ -186,6 +199,15 @@ impl Column {
         match self {
             Column::Leaf(leaf) => leaf.name.as_deref(),
             Column::Group(group) => Some(&group.name),
+        }
+    }
+
+    /// The header as inline Markdown, empty when it is plain text (then
+    /// [`Column::name`] is the whole header).
+    pub fn title(&self) -> &[Inline] {
+        match self {
+            Column::Leaf(leaf) => &leaf.title,
+            Column::Group(group) => &group.title,
         }
     }
 }
@@ -363,6 +385,7 @@ mod tests {
                 }),
                 Column::Group(ColumnGroup {
                     name: "Warehouses".into(),
+                    title: Vec::new(),
                     columns: vec![
                         Column::Leaf(LeafColumn::default()),
                         Column::Leaf(LeafColumn::default()),
