@@ -252,7 +252,8 @@ impl Typst<'_> {
                     match (&prefix, number) {
                         (Some(p), Some(number)) => {
                             let template = refs::reference_template(self.res, p);
-                            let word = refs::label_word(self.res, p, &item.key);
+                            let word =
+                                refs::label_word(self.res, p, &item.key, self.lang.as_deref());
                             let text = refs::template(
                                 &template,
                                 &escape::markup(&word),
@@ -261,7 +262,8 @@ impl Typst<'_> {
                             self.out.push(&format!("#link(<{label}>)[{}]", text.trim()));
                         }
                         (Some(p), None) => {
-                            let word = refs::label_word(self.res, p, &item.key);
+                            let word =
+                                refs::label_word(self.res, p, &item.key, self.lang.as_deref());
                             if word.is_empty() {
                                 self.out.push(&format!("#ref(<{label}>, supplement: none)"));
                             } else {

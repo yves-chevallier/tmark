@@ -214,12 +214,10 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The primary subtag of the language the lowering writes its own
-    /// words in.
+    /// words and its label words in (`refs::language`).
     fn lang(&self) -> String {
-        self.opts
-            .lang
+        refs::language(self.opts.lang.as_deref(), self.main, self.res)
             .as_deref()
-            .or(self.res.lang.as_deref())
             .unwrap_or("en")
             .split(['-', '_'])
             .next()
@@ -491,7 +489,7 @@ impl<'a> Lowerer<'a> {
         Some(match prefix {
             Some(prefix) => refs::template(
                 &refs::reference_template(self.res, prefix),
-                &refs::label_word(self.res, prefix, prefix),
+                &refs::label_word(self.res, prefix, prefix, Some(&self.lang())),
                 number,
             )
             .trim()
@@ -1378,7 +1376,7 @@ impl<'a> Lowerer<'a> {
             _ => numbers.join(", "),
         };
         let text = if template.contains("{name}") {
-            let word = refs::label_word(self.res, prefix, &first.key);
+            let word = refs::label_word(self.res, prefix, &first.key, Some(&self.lang()));
             let plural = match self.lang().as_str() {
                 "de" => word,
                 _ => format!("{word}s"),
@@ -1416,7 +1414,7 @@ impl<'a> Lowerer<'a> {
         let text = match (prefix, number) {
             (Some(p), Some(n)) => refs::template(
                 &refs::reference_template(self.res, p),
-                &refs::label_word(self.res, p, &item.key),
+                &refs::label_word(self.res, p, &item.key, Some(&self.lang())),
                 &n,
             )
             .trim()
@@ -1448,7 +1446,7 @@ impl<'a> Lowerer<'a> {
         Some(match (prefix, &book.number) {
             (Some(p), Some(n)) => refs::template(
                 &refs::reference_template(self.res, p),
-                &refs::label_word(self.res, p, &item.key),
+                &refs::label_word(self.res, p, &item.key, Some(&self.lang())),
                 n,
             )
             .trim()

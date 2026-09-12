@@ -40,6 +40,7 @@ impl Writer for HtmlWriter {
             notes: Vec::new(),
             abbr_keys: abbr::keys(doc),
             tex_logos: logos::enabled(doc),
+            lang: refs::language(opts.lang.as_deref(), doc, res),
         };
         w.blocks(&doc.blocks);
         w.footnotes();
@@ -104,6 +105,8 @@ struct Html<'a> {
     abbr_keys: Vec<String>,
     /// Feature `typography.tex-logos` (spec §TeX logos).
     pub(crate) tex_logos: bool,
+    /// The language of the label words (`refs::language`).
+    lang: Option<String>,
 }
 
 impl Html<'_> {
@@ -385,7 +388,7 @@ impl Html<'_> {
             "<p{}{}>{}: ",
             self.attrs(&c.attrs, &["caption"]),
             self.src(&c.meta),
-            c.kind.word()
+            refs::caption_word(c.kind, self.lang.as_deref())
         ));
         self.inlines(&c.content);
         self.out.push("</p>\n");
@@ -396,7 +399,7 @@ impl Html<'_> {
         self.out.push("<figcaption>");
         if let Some(id) = c.attrs.id() {
             if let Some(number) = self.numbers.get(&id.to_ascii_lowercase()) {
-                let word = c.kind.word();
+                let word = refs::caption_word(c.kind, self.lang.as_deref());
                 self.out.push(&format!(
                     "<span class=\"caption-label\">{word} {number}</span> "
                 ));
@@ -923,7 +926,7 @@ impl Html<'_> {
                     let text = match &prefix {
                         Some(p) => refs::template(
                             &refs::reference_template(self.res, p),
-                            &refs::label_word(self.res, p, &item.key),
+                            &refs::label_word(self.res, p, &item.key, self.lang.as_deref()),
                             &number,
                         ),
                         None => number,

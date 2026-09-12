@@ -28,14 +28,44 @@ pub fn textual(template: &str, text: &str, number: &str, page: &str) -> String {
         .replace("{page}", page)
 }
 
-/// The label word of a series as the reference wants it: a capitalised
-/// prefix (`@Fig:x`) capitalises the word (spec §Ref, pandoc-crossref).
-pub fn label_word(res: &Resolved, prefix: &str, key_as_written: &str) -> String {
-    let name = res
-        .counters
-        .get(prefix)
-        .and_then(|c| c.name.clone())
-        .unwrap_or_default();
+/// The language label words are rendered in: `WriterOptions.lang`, else
+/// the resolution's — itself `ResolveOptions.lang` else the front
+/// matter's `lang`, so a site-wide language keeps beating a page's — else
+/// the front matter's, for a document written without resolving one, else
+/// English (`None`).
+pub fn language(option: Option<&str>, doc: &tmark_ir::Document, res: &Resolved) -> Option<String> {
+    option
+        .map(str::to_string)
+        .or_else(|| res.lang.clone())
+        .or_else(|| doc.front_matter.keys.lang.clone())
+}
+
+/// The label word of a series as the reference wants it: the counter's
+/// own `name`, re-localised into `lang` when the resolution had left it at
+/// the registry's word for the resolution's own language
+/// (`tmark_ir::registry::PREFIX_NAMES`, predeclared prefixes only). A
+/// `declare.counters` `name` is therefore kept as written, even on a
+/// predeclared prefix and even when the writer renders another language.
+/// A capitalised prefix (`@Fig:x`) capitalises the word (spec §Ref,
+/// pandoc-crossref).
+pub fn label_word(
+    res: &Resolved,
+    prefix: &str,
+    key_as_written: &str,
+    lang: Option<&str>,
+) -> String {
+    let declared = res.counters.get(prefix).and_then(|c| c.name.clone());
+    // What the resolution would have put there on its own; `None` for
+    // `res.lang` is English, which is the table's fallback too.
+    let default = tmark_ir::registry::prefix_name(prefix, res.lang.as_deref().unwrap_or("en"));
+    let name = if declared.is_some() && declared.as_deref() != default {
+        declared
+    } else {
+        lang.and_then(|lang| tmark_ir::registry::prefix_name(prefix, lang))
+            .map(str::to_string)
+            .or(declared)
+    };
+    let name = name.unwrap_or_default();
     if key_as_written
         .chars()
         .next()
@@ -49,6 +79,13 @@ pub fn label_word(res: &Resolved, prefix: &str, key_as_written: &str) -> String 
     } else {
         name
     }
+}
+
+/// The word of a caption kind (`Table`, `Tableau`, `Tabelle`) in `lang`.
+pub fn caption_word(kind: tmark_ir::CaptionKind, lang: Option<&str>) -> String {
+    lang.and_then(|lang| tmark_ir::registry::prefix_name(kind.prefix(), lang))
+        .unwrap_or(kind.word())
+        .to_string()
 }
 
 /// The `ref` template of a series (`{name} {number}` by default).

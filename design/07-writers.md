@@ -75,6 +75,20 @@ contract.
   `[?key]` literally in every backend. Textual references (`[text](#id)`)
   apply `refs.textual.print` or `.web`; `{page}` is expanded by the backend
   (`\pageref`), never here.
+- **Label words.** The `{name}` of a predeclared series is the word
+  `tmark_ir::registry::PREFIX_NAMES` holds for the language
+  (`refs::label_word`), which is `WriterOptions::lang`, else the
+  resolution's — itself `ResolveOptions::lang` else the front matter's
+  `lang`, so a site-wide language keeps beating a page's — else the front
+  matter's, else English (`refs::language`). A `declare.counters` `name`
+  is kept as written — on a predeclared prefix too, and whatever language
+  the writer renders — by re-localising only a word the resolution had
+  left at the registry's default. The same word labels HTML captions
+  (`refs::caption_word`) and the web lowering's `[Figure 3](#id)` link
+  text. The words follow babel's `\figurename`, `\tablename` and friends,
+  which is what keeps a French reference (`Table 1`) agreeing with the
+  caption babel prints; LaTeX's own `\caption` numbering stays babel's
+  business and the writer never translates it.
 - **Citations.** `\cite`/`\parencite`/`\textcite` with locators, `#cite`
   in Typst, `<a>` plus a bibliography list in HTML rendered from the entry
   fields with a minimal built-in style (author-year); CSL is TeXSmith's.
@@ -185,9 +199,10 @@ replacement text is:
 Numbers are the resolution's (`html::number_labels`, shared with the HTML
 writer: a document-order count stands in for a series the resolution did
 not number), sub-figures take the figure's number and a letter (`3b`).
-The label word comes from the counter (`Resolved::lang` localises the
-predeclared ones); the lowering's own words (`and`, `References`) follow
-`WebOptions::lang`, then the resolution's language.
+The label word is the registry's for the language (§Mapping rules, "Label
+words"): `[Équation 1](#eq:m)` under `lang: fr`. The lowering's own words
+(`and`, `References`) follow that same language, so a page says `and` or
+`und` where its labels say `Figure` or `Abbildung`.
 
 Nesting: a whole-block replacement is re-indented for the line it is
 spliced on (the text before the block on its line, list markers turned

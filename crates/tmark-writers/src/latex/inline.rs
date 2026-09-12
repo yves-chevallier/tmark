@@ -330,7 +330,8 @@ impl Latex<'_> {
                             // TMark numbers the series: the template as text.
                             let template = refs::reference_template(self.res, p)
                                 .replace("{name} {number}", "{name}~{number}");
-                            let word = refs::label_word(self.res, p, &item.key);
+                            let word =
+                                refs::label_word(self.res, p, &item.key, self.lang.as_deref());
                             let label = refs::template(
                                 &template,
                                 &escape::prose(&word),
@@ -342,7 +343,8 @@ impl Latex<'_> {
                         (Some(p), None) => {
                             let template = refs::reference_template(self.res, p)
                                 .replace("{name} {number}", "{name}~{number}");
-                            let word = refs::label_word(self.res, p, &item.key);
+                            let word =
+                                refs::label_word(self.res, p, &item.key, self.lang.as_deref());
                             let label = refs::template(
                                 &template,
                                 &escape::prose(&word),

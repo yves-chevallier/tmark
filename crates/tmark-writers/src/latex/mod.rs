@@ -47,6 +47,7 @@ impl Writer for LatexWriter {
             in_cell: false,
             acronyms: BTreeMap::new(),
             abbr_keys: abbr::keys(doc),
+            lang: refs::language(opts.lang.as_deref(), doc, res),
             tex_logos: logos::enabled(doc),
         };
         w.blocks(&doc.blocks);
@@ -80,6 +81,8 @@ pub(crate) struct Latex<'a> {
     abbr_keys: Vec<String>,
     /// Feature `typography.tex-logos` (spec §TeX logos).
     pub(crate) tex_logos: bool,
+    /// The language of the label words (`refs::language`).
+    lang: Option<String>,
 }
 
 impl Latex<'_> {
@@ -486,7 +489,8 @@ impl Latex<'_> {
 
     /// A caption with no float next to it: its text, with its anchor.
     fn caption_orphan(&mut self, c: &Caption) {
-        self.out.push(&format!("{}: ", c.kind.word()));
+        let word = refs::caption_word(c.kind, self.lang.as_deref());
+        self.out.push(&format!("{word}: "));
         self.inlines(&c.content);
         if let Some(id) = c.attrs.id() {
             self.out.push(&format!("\\label{{{}}}", escape::escape(id)));

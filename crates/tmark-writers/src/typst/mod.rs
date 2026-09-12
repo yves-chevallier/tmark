@@ -39,6 +39,7 @@ impl Writer for TypstWriter {
             acronyms: BTreeMap::new(),
             abbr_keys: abbr::keys(doc),
             tex_logos: logos::enabled(doc),
+            lang: refs::language(opts.lang.as_deref(), doc, res),
         };
         w.blocks(&doc.blocks);
         w.req.close();
@@ -62,6 +63,8 @@ pub(crate) struct Typst<'a> {
     abbr_keys: Vec<String>,
     /// Feature `typography.tex-logos` (spec §TeX logos).
     pub(crate) tex_logos: bool,
+    /// The language of the label words (`refs::language`).
+    lang: Option<String>,
 }
 
 impl Typst<'_> {
@@ -124,7 +127,8 @@ impl Typst<'_> {
             Block::Table(t) => self.table(t, config, caption),
             Block::TableConfig(_) => {}
             Block::Caption(c) => {
-                self.out.push(&format!("{}: ", c.kind.word()));
+                let word = refs::caption_word(c.kind, self.lang.as_deref());
+                self.out.push(&format!("{word}: "));
                 self.inlines(&c.content);
                 if let Some(id) = c.attrs.id() {
                     self.out.push(&format!(" <{}>", escape::label(id)));
