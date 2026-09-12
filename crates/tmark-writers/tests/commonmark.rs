@@ -11,6 +11,11 @@
 //! paragraph is one strong span are a deviation of the same kind: the
 //! `paragraph.lead` feature (on by default, spec §Para) reads that shape
 //! as a lead-in, so the HTML writer marks it `<strong class="lead">`.
+//!
+//! The examples that carry a straight-quoted phrase in their prose are
+//! another: SmartyPants quoting (spec §Quoted, Appendix "PyMdownX
+//! compatibility profile") reads `"x"` as a `Quoted`, which the HTML
+//! writer types as `“x”`.
 
 use std::fs;
 use std::path::Path;
@@ -64,7 +69,6 @@ const PASSING: &[&str] = &[
     "Tabs (11)",
     "Backslash escapes (12)",
     "Backslash escapes (13)",
-    "Backslash escapes (14)",
     "Backslash escapes (15)",
     "Backslash escapes (16)",
     "Backslash escapes (17)",
@@ -88,7 +92,6 @@ const PASSING: &[&str] = &[
     "Entity and numeric character references (38)",
     "Entity and numeric character references (39)",
     "Entity and numeric character references (40)",
-    "Entity and numeric character references (41)",
     "Precedence (42)",
     "Thematic breaks (43)",
     "Thematic breaks (44)",
@@ -244,8 +247,6 @@ const PASSING: &[&str] = &[
     "Link reference definitions (205)",
     "Link reference definitions (207)",
     "Link reference definitions (208)",
-    "Link reference definitions (209)",
-    "Link reference definitions (210)",
     "Link reference definitions (211)",
     "Link reference definitions (212)",
     "Link reference definitions (213)",
@@ -368,18 +369,15 @@ const PASSING: &[&str] = &[
     "Code spans (349)",
     "Emphasis and strong emphasis (350)",
     "Emphasis and strong emphasis (351)",
-    "Emphasis and strong emphasis (352)",
     "Emphasis and strong emphasis (353)",
     "Emphasis and strong emphasis (354)",
     "Emphasis and strong emphasis (355)",
     "Emphasis and strong emphasis (356)",
     "Emphasis and strong emphasis (357)",
     "Emphasis and strong emphasis (358)",
-    "Emphasis and strong emphasis (359)",
     "Emphasis and strong emphasis (360)",
     "Emphasis and strong emphasis (361)",
     "Emphasis and strong emphasis (362)",
-    "Emphasis and strong emphasis (363)",
     "Emphasis and strong emphasis (364)",
     "Emphasis and strong emphasis (365)",
     "Emphasis and strong emphasis (366)",
@@ -395,11 +393,9 @@ const PASSING: &[&str] = &[
     "Emphasis and strong emphasis (376)",
     "Emphasis and strong emphasis (377)",
     "Emphasis and strong emphasis (379)",
-    "Emphasis and strong emphasis (380)",
     "Emphasis and strong emphasis (381)",
     "Emphasis and strong emphasis (383)",
     "Emphasis and strong emphasis (384)",
-    "Emphasis and strong emphasis (385)",
     "Emphasis and strong emphasis (386)",
     "Emphasis and strong emphasis (387)",
     "Emphasis and strong emphasis (388)",
@@ -484,7 +480,6 @@ const PASSING: &[&str] = &[
     "Links (500)",
     "Links (505)",
     "Links (506)",
-    "Links (508)",
     "Links (509)",
     "Links (510)",
     "Links (511)",
@@ -550,7 +545,6 @@ const PASSING: &[&str] = &[
     "Images (581)",
     "Images (582)",
     "Images (583)",
-    "Images (590)",
     "Images (592)",
     "Images (593)",
     "Autolinks (594)",
@@ -572,13 +566,10 @@ const PASSING: &[&str] = &[
     "Raw HTML (616)",
     "Raw HTML (617)",
     "Raw HTML (618)",
-    "Raw HTML (619)",
     "Raw HTML (620)",
     "Raw HTML (621)",
     "Raw HTML (622)",
     "Raw HTML (623)",
-    "Raw HTML (624)",
-    "Raw HTML (626)",
     "Raw HTML (627)",
     "Raw HTML (628)",
     "Raw HTML (629)",

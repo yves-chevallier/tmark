@@ -5,9 +5,9 @@
 use tmark_ir::{
     registry::{self, ArgStyle},
     Aside, Attrs, Block, Code, CodeInline, Comment, CounterItem, Emph, Highlight, Image,
-    IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, ProgressBar, RawInline, Ref,
-    Side, SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong, SubSpan, Subscript,
-    Superscript, Target, Underline, Var,
+    IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, ProgressBar, QuoteKind,
+    Quoted, RawInline, Ref, Side, SmallCaps, SoftBreak, Span, SpanNode, Str, Strikeout, Strong,
+    SubSpan, Subscript, Superscript, Target, Underline, Var,
 };
 use tmark_markdown::mdast::{Node, TmarkMarkKind};
 use tmark_markdown::tmark::looks_like_attributes;
@@ -512,6 +512,32 @@ impl Lowerer {
                             buffer_start = i + len;
                         }
                     }
+                    i += len;
+                    continue;
+                }
+            }
+            if rest.starts_with('"') && !escaped('"') {
+                if let Some((start, end)) = sugar::quoted(text, i) {
+                    flush(self, &mut buffer, buffer_start, i, out);
+                    let at = sub(self, i, end + 1);
+                    let meta = self.meta(at);
+                    let content = vec![Inline::Str(Str {
+                        meta: self.meta(sub(self, start, end)),
+                        text: text[start..end].to_string(),
+                    })];
+                    out.push(Inline::Quoted(Quoted {
+                        meta,
+                        kind: QuoteKind::Double,
+                        content,
+                    }));
+                    i = end + 1;
+                    buffer_start = i;
+                    continue;
+                }
+            }
+            if let Some((len, symbol)) = sugar::smart_symbol(text, i) {
+                if !escaped(rest.chars().next().expect("in bounds")) {
+                    buffer.push_str(symbol);
                     i += len;
                     continue;
                 }

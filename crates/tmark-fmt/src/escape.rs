@@ -47,7 +47,8 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     // Index of a character a line-start rule decided to escape later on the
     // line (the `.` of `1.`, the `:` of `Table:`).
     let mut pending: Option<usize> = None;
-    let forced = autolink_escapes(&chars);
+    let mut forced = autolink_escapes(&chars);
+    forced.extend(quote_escapes(&chars));
     for (i, &c) in chars.iter().enumerate() {
         let next_c = chars.get(i + 1).copied().or(next);
         if c == '\n' {
@@ -75,6 +76,31 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
         line_start = false;
     }
     out.push(&buf);
+}
+
+/// Positions of the straight double quotes that would pair into a
+/// `Quoted` when read back (`lower::sugar::quoted`): a `"` with a later
+/// `"` on the same line and something between them. A quote that reached
+/// the printer inside a `Str` is one the author escaped or one that never
+/// paired; escaping the opening quote keeps it that way.
+fn quote_escapes(chars: &[char]) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '"' {
+            let close = chars[i + 1..]
+                .iter()
+                .position(|c| matches!(c, '"' | '\n'))
+                .filter(|at| *at > 0 && chars[i + 1 + at] == '"');
+            if let Some(at) = close {
+                out.push(i);
+                i += at + 2;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
 }
 
 /// Positions to escape so that GFM autolink literals do not fire: the `:`

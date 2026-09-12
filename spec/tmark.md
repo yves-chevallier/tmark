@@ -1817,8 +1817,9 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Underline`, `Strikeout`, `Highlight`, `Comment` | E | not shown literally here: the extension fires even inside code spans |
 | `:smile:` | `Str` holding the character | E | emoji, GitHub's name table; the printer emits the character (§@[sec:inline]) |
 | `:material-…:`, `:fontawesome-…:`, `:octicons-…:`, `:simple-…:` | `Span{.icon media=web}` | D | Material icons; print drops them, hint `icon-web-only` (§@[sec:inline]) |
-| `(c)`, `(tm)`, `-->`, `1/2` | `Str` | E | smart symbols |
-| `"quotes"`, `--`, `...` | `Quoted`, `Str` | E | SmartyPants |
+| `(c)`, `(tm)`, `(r)`, `c/o`, `+/-`, `=/=`, `-->`, `<--`, `<-->`, `1/2` … | `Str` holding the character | E | smart symbols; the ordinal-number form (`1st`) is *not* applied: it is a superscript, not a `Str` |
+| `"quotes"` | `Quoted` | E | SmartyPants; the pair is read inside one text run, so a phrase whose quotes sit on either side of inline markup stays literal. Single quotes are left alone: an apostrophe is not a quote |
+| `--`, `---`, `...` | `Str`, as typed | E | both backends typeset the ASCII spelling as the dash and the ellipsis; converting them would gain nothing and lose the round-trip |
 | `https://…` bare | `Link` | C | magic links; GFM autolinks too |
 | `1)`, `a.`, `i.`, `#.` list markers | `OrderedList` with style | E | fancylists |
 | `--8<-- "file"` | `{include}(file)` (§@[sec:includes]) | E | deprecated, Appendix @[app:deprecations] |

@@ -169,6 +169,15 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
 - One-line display math (`$$x$$ {#eq:a}`) becomes a `MathBlock` when it is
   the whole paragraph; a `\[ … \]` paragraph likewise; `$$ … $$ {#eq:a}` with
   the attribute list on the closing fence is accepted by the tokenizer.
+- Smart symbols and straight quotes are read in `text_pieces`, the scan of
+  a decoded text run that already expands emoji shortcuts and progress bars
+  (`lower/sugar.rs`): a symbol becomes the character in the `Str` buffer, a
+  quoted phrase a `Quoted` node. Code, math, raw spans, destinations and
+  attribute values are other nodes and never reach the scan, and the
+  printer escapes a `"` that would pair when read back. The quote pattern
+  is TeXSmith's (`extensions/quotes.py`): non-greedy, no newline inside, a
+  backslash declines it; a pair that straddles inline markup is left
+  literal (C45).
 - An attribute list hugging an *empty* link (`[](){#id}`) takes the link:
   the pair lowers to the zero-width `Span` of `[]{#id}` with a `deprecated`
   fix, like the progress-bar case just above it in `lower_brace` (spec

@@ -111,6 +111,96 @@ pub fn shortcode(text: &str, at: usize) -> Option<(usize, Shortcode)> {
     Some((len + 2, kind))
 }
 
+/// The smart symbols of `pymdownx.smartsymbols` (spec Appendix "PyMdownX
+/// compatibility profile": `(c)`, `(tm)`, `-->`, `1/2` → `Str`), with the
+/// extension's own boundaries: an arrow is not part of a longer run of
+/// dashes, a fraction not part of a longer number, `c/o` a whole word.
+/// Returns the byte length of the spelling at `at` and the character it
+/// stands for. Ordinal numbers (`1st`) are not here: they produce a
+/// superscript, not a `Str` (design 02 §Text runs).
+const SYMBOLS: &[(&str, &str)] = &[
+    ("(tm)", "™"),
+    ("(c)", "©"),
+    ("(r)", "®"),
+    ("+/-", "±"),
+    ("=/=", "≠"),
+    ("<-->", "↔"),
+    ("-->", "→"),
+    ("<--", "←"),
+];
+
+const FRACTIONS: &[(&str, &str)] = &[
+    ("1/4", "¼"),
+    ("1/2", "½"),
+    ("3/4", "¾"),
+    ("1/3", "⅓"),
+    ("2/3", "⅔"),
+    ("1/5", "⅕"),
+    ("2/5", "⅖"),
+    ("3/5", "⅗"),
+    ("4/5", "⅘"),
+    ("1/6", "⅙"),
+    ("5/6", "⅚"),
+    ("1/8", "⅛"),
+    ("3/8", "⅜"),
+    ("5/8", "⅝"),
+    ("7/8", "⅞"),
+];
+
+pub fn smart_symbol(text: &str, at: usize) -> Option<(usize, &'static str)> {
+    let rest = &text[at..];
+    let before = text[..at].chars().next_back();
+    for (spelling, symbol) in SYMBOLS {
+        if !rest.starts_with(spelling) {
+            continue;
+        }
+        // `\<-{2}\>|(?<!-)-{2}\>|\<-{2}(?!-)`: a longer dash run is not
+        // an arrow.
+        if spelling.starts_with('-') && before == Some('-') {
+            continue;
+        }
+        if spelling.ends_with("--") && rest[spelling.len()..].starts_with('-') {
+            continue;
+        }
+        return Some((spelling.len(), symbol));
+    }
+    // `\bc/o\b`.
+    if rest.starts_with("c/o")
+        && !before.is_some_and(|c| c.is_alphanumeric() || c == '_')
+        && !rest[3..].starts_with(|c: char| c.is_alphanumeric() || c == '_')
+    {
+        return Some((3, "℅"));
+    }
+    // `(?<!\d)…(?!\d)`.
+    if before.is_some_and(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    FRACTIONS
+        .iter()
+        .find(|(spelling, _)| {
+            rest.starts_with(spelling)
+                && !rest[spelling.len()..].starts_with(|c: char| c.is_ascii_digit())
+        })
+        .map(|(spelling, symbol)| (spelling.len(), *symbol))
+}
+
+/// A straight double-quoted phrase at `at` in `text`: the byte range of
+/// the phrase between the quotes. TeXSmith's `quotes.py` pattern
+/// `(?<!\\)"([^"\n]+?)"`, which is what feeds `\enquote{…}` (spec §Quoted,
+/// SmartyPants). Single quotes are not paired: an apostrophe is not a
+/// quote and the legacy extension never touched them.
+pub fn quoted(text: &str, at: usize) -> Option<(usize, usize)> {
+    if !text[at..].starts_with('"') {
+        return None;
+    }
+    let inner = &text[at + 1..];
+    let end = inner.find('"')?;
+    if end == 0 || inner[..end].contains('\n') {
+        return None;
+    }
+    Some((at + 1, at + 1 + end))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,6 +225,34 @@ mod tests {
         assert!(progress_bar("[=45% \"open]").is_none());
         assert!(progress_bar("[=1/0]").is_none());
         assert!(progress_bar("[45%]").is_none());
+    }
+
+    #[test]
+    fn symbols() {
+        assert_eq!(smart_symbol("(c) x", 0), Some((3, "©")));
+        assert_eq!(smart_symbol("a (tm)", 2), Some((4, "™")));
+        assert_eq!(smart_symbol("(r)", 0), Some((3, "®")));
+        assert_eq!(smart_symbol("+/-", 0), Some((3, "±")));
+        assert_eq!(smart_symbol("=/=", 0), Some((3, "≠")));
+        assert_eq!(smart_symbol("a <--> b", 2), Some((4, "↔")));
+        assert_eq!(smart_symbol("a --> b", 2), Some((3, "→")));
+        assert_eq!(smart_symbol("a <-- b", 2), Some((3, "←")));
+        assert_eq!(smart_symbol("a ---> b", 3), None, "a longer dash run");
+        assert_eq!(smart_symbol("a <--- b", 2), None, "a longer dash run");
+        assert_eq!(smart_symbol("c/o Ada", 0), Some((3, "℅")));
+        assert_eq!(smart_symbol("abc/o", 2), None, "not a whole word");
+        assert_eq!(smart_symbol("1/2 cup", 0), Some((3, "½")));
+        assert_eq!(smart_symbol("11/2", 1), None, "part of a number");
+        assert_eq!(smart_symbol("1/25", 0), None, "part of a number");
+        assert_eq!(smart_symbol("1/7", 0), None, "no such fraction");
+    }
+
+    #[test]
+    fn quotes() {
+        assert_eq!(quoted("He said \"straight quotes\".", 8), Some((9, 24)));
+        assert_eq!(quoted("a \"b\" and \"c\"", 2), Some((3, 4)));
+        assert_eq!(quoted("a \"\" b", 2), None, "empty");
+        assert_eq!(quoted("a \"b", 2), None, "unclosed");
     }
 
     #[test]
