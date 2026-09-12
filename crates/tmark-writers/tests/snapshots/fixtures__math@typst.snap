@@ -11,7 +11,7 @@ Inline #mi(`a^2`) and #mi(`b^2`).
 ---requires---
 {
   "packages": [
-    "@preview/mitex:0.2.6"
+    "@preview/mitex:0.2.7"
   ],
   "fragments": [
     "ts-equations"

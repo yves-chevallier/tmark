@@ -5,8 +5,8 @@
 
 use super::escape;
 
-/// `@preview/mitex:0.2.6`.
-pub const MITEX_PACKAGE: &str = "@preview/mitex:0.2.6";
+/// `@preview/mitex:0.2.7`.
+pub const MITEX_PACKAGE: &str = "@preview/mitex:0.2.7";
 
 /// What a math node renders as.
 pub struct Rendered {

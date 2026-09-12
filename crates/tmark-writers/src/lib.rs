@@ -227,7 +227,7 @@ pub struct AssetRef {
 pub struct Requires {
     /// LaTeX packages structural output needs (`booktabs`, `csquotes`)
     /// plus those the named fragments imply (`Requires::close`); Typst
-    /// packages (`@preview/mitex:0.2.6`).
+    /// packages (`@preview/mitex:0.2.7`).
     pub packages: BTreeSet<String>,
     /// Fragment contracts named (`ts-code` provides `tscode`), rows of
     /// `tmark_ir::registry::FRAGMENTS`.
