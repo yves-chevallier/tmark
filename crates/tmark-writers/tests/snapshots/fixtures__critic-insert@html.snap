@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<p>The release is <span class="critic"><u>almost <strong>ready</strong></u></span> now.</p>
+<p>The release is <ins class="critic">almost <strong>ready</strong></ins> now.</p>
 
 ---requires---
 {

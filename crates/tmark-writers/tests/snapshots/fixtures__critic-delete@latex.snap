@@ -2,17 +2,19 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-A \sout{redundant} word, and \tscodeinline{\{-\allowbreak{}-\allowbreak{}not this-\allowbreak{}-\allowbreak{}\}} in code.
+A \tsdel{redundant} word, and \tscodeinline{\{-\allowbreak{}-\allowbreak{}not this-\allowbreak{}-\allowbreak{}\}} in code.
 
 ---requires---
 {
   "packages": [
     "fvextra",
     "tcolorbox",
-    "ulem"
+    "ulem",
+    "xcolor"
   ],
   "fragments": [
-    "ts-code"
+    "ts-code",
+    "ts-critic"
   ],
   "shell_escape": false,
   "assets": [],

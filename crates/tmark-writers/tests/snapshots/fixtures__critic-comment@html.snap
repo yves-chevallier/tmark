@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<p>The proof holds. <span class="critic"></span></p>
+<p>The proof holds.<span class="critic comment" data-comment="cite Knuth here"></span></p>
 
 ---requires---
 {

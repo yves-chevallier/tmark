@@ -2,4 +2,4 @@
 source: crates/tmark-writers/tests/web.rs
 expression: snapshot
 ---
-Call it <span class="critic">~~colour~~~><u>color</u></span> everywhere.
+Call it {~~colour~>color~~} everywhere.

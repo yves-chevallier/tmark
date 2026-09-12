@@ -174,13 +174,17 @@ two-repository change (R14 of its plan):
   replacement fragment against `provides`. The macro names (`\tskeys`,
   `tscode`, `\tsdivider`, `\tslogo`, `tsdiv`, `\tsicon`, …) are the API
   between the LaTeX writer and the fragments; `KEY_LABELS` spells the
-  keystrokes on both sides.
+  keystrokes on both sides. Critic markup (C49) made `ts-critic` a
+  contract the writers actually name: a document with `{++x++}`,
+  `{--x--}`, `{~~a~>b~~}` or `{>>note<<}` now carries `ts-critic` in
+  `Requires.fragments`, so the fragment must load for LaTeX *and* Typst.
 - **`texsmith.typ`.** The Typst writer emits `#ts-…` calls;
   `tmark_writers::TEXSMITH_TYP` is the default definition TeXSmith writes
   next to the `.typ`; a template redefines what it restyles. `ts-subfigure`
   and `ts-subnumber` (the images of a `::: figure`) joined the file with
-  the sub-figure numbering; a template that ships its own copy of
-  `texsmith.typ` needs them.
+  the sub-figure numbering, `ts-ins`, `ts-del`, `ts-subst` and
+  `ts-comment` with critic markup (C49); a template that ships its own
+  copy of `texsmith.typ` needs them.
 - **The `Resolved` capsule.** `resolve()` returns the view of
   `schema("resolved")` plus an opaque handle; TeXSmith calls `resolve`
   once per document and `write` once per slot body with the same handle,

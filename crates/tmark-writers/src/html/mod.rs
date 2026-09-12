@@ -1191,7 +1191,35 @@ impl Html<'_> {
         self.out.push("</span>");
     }
 
+    /// Critic markup: the `ins`, `del` elements the annotation means, and a
+    /// zero-width span for a comment — a reviewer's note is not published
+    /// content on the web, but a stylesheet can reveal `data-comment`.
+    fn critic(&mut self, kind: tmark_ir::Critic<'_>) {
+        match kind {
+            tmark_ir::Critic::Insert(content) => self.wrap_class("ins", "critic", content),
+            tmark_ir::Critic::Delete(content) => self.wrap_class("del", "critic", content),
+            tmark_ir::Critic::Substitute { old, new } => {
+                self.wrap_class("del", "critic", old);
+                self.wrap_class("ins", "critic", new);
+            }
+            tmark_ir::Critic::Comment(text) => self.out.push(&format!(
+                "<span class=\"critic comment\" data-comment=\"{}\"></span>",
+                escape::attr(text)
+            )),
+        }
+    }
+
+    fn wrap_class(&mut self, tag: &str, class: &str, content: &[Inline]) {
+        self.out.push(&format!("<{tag} class=\"{class}\">"));
+        self.inlines(content);
+        self.out.push(&format!("</{tag}>"));
+    }
+
     fn span(&mut self, n: &SpanNode) {
+        if let Some(kind) = tmark_ir::critic(n) {
+            self.critic(kind);
+            return;
+        }
         let mut open = String::from("<span");
         open.push_str(&self.attrs(&n.attrs, &[]));
         for (k, v) in &n.attrs.kv {
@@ -1334,7 +1362,11 @@ fn caption_matches(block: &Block, kind: CaptionKind) -> bool {
 pub fn is_zero_width(inline: &Inline) -> bool {
     match inline {
         Inline::Comment(_) | Inline::IndexEntry(_) | Inline::Aside(_) => true,
-        Inline::Span(s) => s.content.is_empty() && s.attrs.id.is_some(),
+        // A critic comment is a reviewer's note: zero width on the web.
+        Inline::Span(s) => {
+            (s.content.is_empty() && s.attrs.id.is_some())
+                || matches!(tmark_ir::critic(s), Some(tmark_ir::Critic::Comment(_)))
+        }
         Inline::RawInline(r) => r.format != "html",
         _ => false,
     }

@@ -1204,9 +1204,32 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// Critic markup back to its own spelling: `pymdownx.critic` is in the
+    /// standard extension set (spec §Conformance, Table "extensions"), so
+    /// the site renders the annotation itself.
+    fn critic(&mut self, f: &File, kind: tmark_ir::Critic<'_>) -> String {
+        match kind {
+            tmark_ir::Critic::Insert(content) => {
+                format!("{{++{}++}}", self.inlines_text(f, content))
+            }
+            tmark_ir::Critic::Delete(content) => {
+                format!("{{--{}--}}", self.inlines_text(f, content))
+            }
+            tmark_ir::Critic::Substitute { old, new } => format!(
+                "{{~~{}~>{}~~}}",
+                self.inlines_text(f, old),
+                self.inlines_text(f, new)
+            ),
+            tmark_ir::Critic::Comment(text) => format!("{{>>{text}<<}}"),
+        }
+    }
+
     /// `[x]{#id .c lang=fr}`: `<span>` with its attributes; `media=web`
     /// unwraps.
     fn span(&mut self, f: &File, s: &SpanNode) -> String {
+        if let Some(kind) = tmark_ir::critic(s) {
+            return self.critic(f, kind);
+        }
         let content = self.inlines_text(f, &s.content);
         if s.attrs.media() == Some("web") {
             return content;

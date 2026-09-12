@@ -53,3 +53,21 @@ Keep {mark}[this sentence] for the summary.
   ]
 }
 ```
+
+## latex
+
+```latex
+Keep \tsmark{this sentence} for the summary.
+```
+
+## typst
+
+```typst
+Keep #highlight[this sentence] for the summary.
+```
+
+## html
+
+```html
+<p>Keep <mark>this sentence</mark> for the summary.</p>
+```

@@ -51,3 +51,21 @@ The proof holds. {>>cite Knuth here<<}
   ]
 }
 ```
+
+## latex
+
+```latex
+The proof holds. \tscomment{cite Knuth here}
+```
+
+## typst
+
+```typst
+The proof holds. #ts-comment[cite Knuth here]
+```
+
+## html
+
+```html
+<p>The proof holds.<span class="critic comment" data-comment="cite Knuth here"></span></p>
+```

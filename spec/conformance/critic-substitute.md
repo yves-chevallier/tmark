@@ -68,3 +68,21 @@ Call it {~~colour~>color~~} everywhere.
   ]
 }
 ```
+
+## latex
+
+```latex
+Call it \tssubst{colour}{color} everywhere.
+```
+
+## typst
+
+```typst
+Call it #ts-subst[colour][color] everywhere.
+```
+
+## html
+
+```html
+<p>Call it <del class="critic">colour</del><ins class="critic">color</ins> everywhere.</p>
+```

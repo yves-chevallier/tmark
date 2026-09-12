@@ -66,3 +66,21 @@ A {--redundant--} word, and `{--not this--}` in code.
   ]
 }
 ```
+
+## latex
+
+```latex
+A \tsdel{redundant} word, and \tscodeinline{\{-\allowbreak{}-\allowbreak{}not this-\allowbreak{}-\allowbreak{}\}} in code.
+```
+
+## typst
+
+```typst
+A #ts-del[redundant] word, and `{--not this--}` in code.
+```
+
+## html
+
+```html
+<p>A <del class="critic">redundant</del> word, and <code>{--not this--}</code> in code.</p>
+```

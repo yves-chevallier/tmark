@@ -155,8 +155,10 @@ site's `book`, and gets back Markdown Material renders.
 It is not a writer: there is no body, no `Requires`, no source map. The
 lowering walks the tree and emits one `NodeEdit` per construct of the
 table, applied through `tmark_fmt::edit_many`, so **every byte outside a
-recognised construct is untouched** (mkdocstrings, tabs, icons, critic,
-`!!!` callouts, custom fences, `{{ macros }}` pass through). A construct
+recognised construct is untouched** (mkdocstrings, tabs, icons, `!!!`
+callouts, custom fences, `{{ macros }}` pass through; critic markup is a
+construct since C49 and is re-emitted in its own spelling, which
+`pymdownx.critic` renders). A construct
 kept as written still gets the splices of its children (a `@` reference
 inside an unclosed `::: pkg.mod`, a `#(fw:x)` in a pipe-table cell). The
 replacement text is:

@@ -2,12 +2,17 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-Call it #strike[colour]#underline[color] everywhere.
+Call it #ts-subst[colour][color] everywhere.
 
 ---requires---
 {
-  "packages": [],
-  "fragments": [],
+  "packages": [
+    "ulem",
+    "xcolor"
+  ],
+  "fragments": [
+    "ts-critic"
+  ],
   "shell_escape": false,
   "assets": [],
   "bibliography": false,

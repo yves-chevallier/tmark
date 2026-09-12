@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<p>Call it <span class="critic"><del>colour</del><u>color</u></span> everywhere.</p>
+<p>Call it <del class="critic">colour</del><ins class="critic">color</ins> everywhere.</p>
 
 ---requires---
 {

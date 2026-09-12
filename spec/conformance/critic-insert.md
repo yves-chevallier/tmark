@@ -69,3 +69,21 @@ The release is {++almost **ready**++} now.
   ]
 }
 ```
+
+## latex
+
+```latex
+The release is \tsins{almost \textbf{ready}} now.
+```
+
+## typst
+
+```typst
+The release is #ts-ins[almost *ready*] now.
+```
+
+## html
+
+```html
+<p>The release is <ins class="critic">almost <strong>ready</strong></ins> now.</p>
+```

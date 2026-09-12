@@ -162,3 +162,14 @@
   let matches = query(target)
   if matches.len() > 0 { counter(page).at(matches.first().location()).first() }
 }
+
+// ----------------------------------------------------------------- ts-critic
+
+// Critic markup (spec Appendix "PyMdownX compatibility profile"): the Typst
+// side of `\tsins`, `\tsdel`, `\tssubst`, `\tscomment`. The colours mirror
+// `ts-critic.sty`; `#ts-comment` typesets the reviewer's note, it is not a
+// source comment.
+#let ts-ins(body) = text(fill: rgb("1b7f3b"), underline(body))
+#let ts-del(body) = text(fill: rgb("b3261e"), strike(body))
+#let ts-subst(old, new) = [#ts-del(old) #ts-ins(new)]
+#let ts-comment(body) = text(fill: luma(110), emph[/\* #body \*/])

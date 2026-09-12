@@ -517,7 +517,36 @@ impl Latex<'_> {
     /// `Span`: an anchor (`\phantomsection\label`), a language switch
     /// (`\foreignlanguage`), a script run (`\tsscript`), an emoji
     /// (`\tsemoji`), else transparent.
+    /// Critic markup through the `ts-critic` contract
+    /// (fragment-contracts.md §1): `\tsins{…}`, `\tsdel{…}`,
+    /// `\tssubst{old}{new}`, `\tscomment{…}`. A critic comment is a
+    /// reviewer's annotation, not an author's `<!-- … -->`: it is typeset,
+    /// which is the whole point of building a review PDF.
+    fn critic(&mut self, kind: tmark_ir::Critic<'_>) {
+        self.req.fragment("ts-critic");
+        match kind {
+            tmark_ir::Critic::Insert(content) => self.wrap("tsins", content),
+            tmark_ir::Critic::Delete(content) => self.wrap("tsdel", content),
+            tmark_ir::Critic::Substitute { old, new } => {
+                self.out.push("\\tssubst{");
+                self.inlines(old);
+                self.out.push("}{");
+                self.inlines(new);
+                self.out.push("}");
+            }
+            tmark_ir::Critic::Comment(text) => {
+                self.out.push("\\tscomment{");
+                self.out.push(&escape::prose(text));
+                self.out.push("}");
+            }
+        }
+    }
+
     fn span(&mut self, n: &SpanNode) {
+        if let Some(kind) = tmark_ir::critic(n) {
+            self.critic(kind);
+            return;
+        }
         if let Some(id) = n.attrs.id() {
             self.out.push(&format!(
                 "\\phantomsection\\label{{{}}}",

@@ -456,7 +456,34 @@ impl Typst<'_> {
 
     /// A label after the content, `#text(lang: "en")[…]`, `#ts-script`,
     /// `#ts-emoji`.
+    /// Critic markup, the Typst side of the `ts-critic` contract
+    /// (`assets/texsmith.typ`): `#ts-ins`, `#ts-del`, `#ts-subst`,
+    /// `#ts-comment`.
+    fn critic(&mut self, kind: tmark_ir::Critic<'_>) {
+        self.req.fragment("ts-critic");
+        match kind {
+            tmark_ir::Critic::Insert(content) => self.call("ts-ins", content),
+            tmark_ir::Critic::Delete(content) => self.call("ts-del", content),
+            tmark_ir::Critic::Substitute { old, new } => {
+                self.out.push("#ts-subst[");
+                self.inlines(old);
+                self.out.push("][");
+                self.inlines(new);
+                self.out.push("]");
+            }
+            tmark_ir::Critic::Comment(text) => {
+                self.out.push("#ts-comment[");
+                self.out.push(&escape::markup(text));
+                self.out.push("]");
+            }
+        }
+    }
+
     fn span(&mut self, n: &SpanNode) {
+        if let Some(kind) = tmark_ir::critic(n) {
+            self.critic(kind);
+            return;
+        }
         let label = n.attrs.id().map(escape::label);
         if let Some(slug) = n.attrs.get("script") {
             self.req.fragment("ts-fonts");

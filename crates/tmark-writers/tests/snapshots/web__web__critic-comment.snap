@@ -2,4 +2,4 @@
 source: crates/tmark-writers/tests/web.rs
 expression: snapshot
 ---
-The proof holds. <span class="critic">cite Knuth here</span>
+The proof holds. {>>cite Knuth here<<}

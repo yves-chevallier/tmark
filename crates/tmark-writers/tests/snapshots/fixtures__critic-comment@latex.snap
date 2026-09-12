@@ -2,12 +2,17 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-The proof holds.
+The proof holds. \tscomment{cite Knuth here}
 
 ---requires---
 {
-  "packages": [],
-  "fragments": [],
+  "packages": [
+    "ulem",
+    "xcolor"
+  ],
+  "fragments": [
+    "ts-critic"
+  ],
   "shell_escape": false,
   "assets": [],
   "bibliography": false,
