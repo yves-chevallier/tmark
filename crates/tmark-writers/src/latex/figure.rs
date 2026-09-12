@@ -4,7 +4,7 @@
 //! inside a box, `center` and `\captionof{figure}`; a `::: figure` with
 //! several images becomes sub-figures.
 
-use tmark_ir::{plain_text, Block, Caption, Figure, Image, Inline};
+use tmark_ir::{plain_text, Block, Caption, Figure, Image};
 
 use super::escape;
 use super::Latex;
@@ -87,10 +87,20 @@ impl Latex<'_> {
             && caption.is_some()
             && alt_plain.chars().count() <= caption_plain.trim().chars().count())
         .then_some(alt);
-        let label = label
+        let mut labels: Vec<String> = label
             .map(str::to_string)
             .or_else(|| caption.and_then(|c| c.attrs.id.clone()))
-            .or_else(|| image.attrs.id.clone());
+            .or_else(|| image.attrs.id.clone())
+            .into_iter()
+            .collect();
+        // The lone image of a `::: figure` is the figure itself (spec
+        // §Image, Figure): its anchor names the same float as the
+        // container's, so both `\label`s go on the one caption.
+        if let (Some(own), true) = (image.attrs.id.clone(), label.is_some()) {
+            if !labels.contains(&own) {
+                labels.push(own);
+            }
+        }
         let include = format!(
             "\\includegraphics[width={}]{{{}}}",
             width(image.attrs.get("width"), "\\linewidth"),
@@ -119,7 +129,7 @@ impl Latex<'_> {
                 "\\captionof{figure}",
                 caption_text.as_deref(),
                 short.as_deref(),
-                label.as_deref(),
+                &labels,
                 caption,
             );
             self.out.push("\\end{center}\n");
@@ -134,21 +144,21 @@ impl Latex<'_> {
                 "\\caption",
                 caption_text.as_deref(),
                 short.as_deref(),
-                label.as_deref(),
+                &labels,
                 caption,
             );
             self.out.push("\\end{figure}\n");
         }
     }
 
-    /// `\caption[short]{long}\label{id}`, the label after the caption so it
-    /// captures the figure number; a bare `\label` without a caption.
+    /// `\caption[short]{long}\label{id}`, the labels after the caption so
+    /// they capture the figure number; bare `\label`s without a caption.
     fn caption_line(
         &mut self,
         command: &str,
         caption: Option<&str>,
         short: Option<&str>,
-        label: Option<&str>,
+        labels: &[String],
         node: Option<&Caption>,
     ) {
         if let Some(node) = node {
@@ -161,14 +171,14 @@ impl Latex<'_> {
                     self.out.push(&format!("[{short}]"));
                 }
                 self.out.push(&format!("{{{caption}}}"));
-                if let Some(label) = label {
+                for label in labels {
                     self.out
                         .push(&format!("\\label{{{}}}", escape::escape(label)));
                 }
                 self.out.push("\n");
             }
             None => {
-                if let Some(label) = label {
+                for label in labels {
                     self.out
                         .push(&format!("\\label{{{}}}\n", escape::escape(label)));
                 }
@@ -193,29 +203,9 @@ impl Latex<'_> {
             .id
             .clone()
             .or_else(|| caption.and_then(|c| c.attrs.id.clone()));
-        let images: Vec<&Image> = content
-            .iter()
-            .filter_map(|b| match b {
-                Block::Para(p) => Some(p.content.iter().filter_map(|i| match i {
-                    Inline::Image(img) => Some(img),
-                    _ => None,
-                })),
-                _ => None,
-            })
-            .flatten()
-            .collect();
-        let only_images = content.iter().all(|b| match b {
-            Block::Para(p) => p.content.iter().all(|i| {
-                matches!(
-                    i,
-                    Inline::Image(_)
-                        | Inline::SoftBreak(_)
-                        | Inline::LineBreak(_)
-                        | Inline::Space(_)
-                ) || matches!(i, Inline::Str(s) if s.text.trim().is_empty())
-            }),
-            _ => false,
-        });
+        // The images the resolution turned into sub-figures, in its own
+        // order (spec §Image, Figure).
+        let images = tmark_registry::figure_images(f);
         if let Some(Block::Table(t)) = content.first() {
             if content.len() == 1 {
                 let table = if t.attrs.id.is_none() && label.is_some() {
@@ -229,10 +219,10 @@ impl Latex<'_> {
                 return;
             }
         }
-        match (images.as_slice(), only_images) {
-            ([image], true) => self.figure_image(image, caption, None, label.as_deref()),
-            (_, true) if images.len() > 1 => self.subfigures(f, &images, caption, label.as_deref()),
-            _ => {
+        match images.as_slice() {
+            [image] => self.figure_image(image, caption, None, label.as_deref()),
+            [_, _, ..] => self.subfigures(f, &images, caption, label.as_deref()),
+            [] => {
                 // Arbitrary content: a float around the blocks.
                 self.req.package("float");
                 self.out.push("\\begin{figure}[H]\n\\centering\n");
@@ -243,7 +233,7 @@ impl Latex<'_> {
                     "\\caption",
                     text.as_deref(),
                     None,
-                    label.as_deref(),
+                    &label.iter().cloned().collect::<Vec<_>>(),
                     caption,
                 );
                 self.out.push("\\end{figure}\n");
@@ -293,21 +283,21 @@ impl Latex<'_> {
                 width(image.attrs.get("width"), "\\linewidth"),
                 escape::escape(strip_theme_variant(&image.src))
             ));
+            // Always a `\caption`, empty alt or not: `subcaption` prints
+            // the `(a)` marker from it and `\ref` then reads `2a` — the
+            // number the resolution gives the sub-figure.
             let alt = self.render_inlines(&image.alt);
-            if !alt.is_empty() {
-                self.out.push(&format!("\\caption{{{alt}}}"));
-            }
+            self.out.push(&format!("\\caption{{{alt}}}"));
             if let Some(id) = image.attrs.id() {
                 self.out.push(&format!("\\label{{{}}}", escape::escape(id)));
             }
-            if !alt.is_empty() || image.attrs.id().is_some() {
-                self.out.push("\n");
-            }
+            self.out.push("\n");
             self.out.push("\\end{subfigure}\n");
             self.out.end(image.meta.id);
         }
         let text = caption.map(|c| self.render_inlines(&c.content));
-        self.caption_line("\\caption", text.as_deref(), None, label, caption);
+        let labels: Vec<String> = label.map(str::to_string).into_iter().collect();
+        self.caption_line("\\caption", text.as_deref(), None, &labels, caption);
         self.out.push("\\end{figure}\n");
     }
 }

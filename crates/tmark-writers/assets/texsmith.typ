@@ -121,6 +121,34 @@
 #let ts-script(slug, body) = body
 #let ts-emoji(body) = body
 
+// ------------------------------------------------------------- subfigures
+
+// The images of a `::: figure` container are sub-figures (spec §Image,
+// Figure): the container keeps one figure number and each image takes it
+// with a letter, `2a`, `2b`. A sub-figure is therefore a figure of its own
+// `kind`, which leaves the image counter alone; the writer resets the
+// sub-figure counter before every container, so the letters restart.
+#let ts-subfigure(body, caption: none) = figure(
+  body,
+  caption: caption,
+  kind: "ts-subfigure",
+  supplement: none,
+  numbering: "(a)",
+)
+
+// `#ts-subnumber(<fig:left>)`: what a reference to a sub-figure shows —
+// the enclosing figure's number and the sub-figure's letter, read at the
+// sub-figure's own location (the two counters are separate, so `#ref`
+// alone would show the letter only).
+#let ts-subnumber(target) = context {
+  let matches = query(target)
+  if matches.len() > 0 {
+    let loc = matches.first().location()
+    numbering("1", ..counter(figure.where(kind: image)).at(loc))
+    numbering("a", ..counter(figure.where(kind: "ts-subfigure")).at(loc))
+  }
+}
+
 // --------------------------------------------------------------- references
 
 // `{page}` of a textual reference template: the page of a label.

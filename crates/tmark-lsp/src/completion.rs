@@ -209,6 +209,7 @@ fn host_name(host: Host) -> &'static str {
         Host::Header => "section",
         Host::Table => "table",
         Host::Figure => "figure",
+        Host::Subfigure => "subfigure",
         Host::Listing => "listing",
         Host::Equation => "equation",
         Host::Admonition => "admonition",

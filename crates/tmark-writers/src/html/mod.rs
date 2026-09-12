@@ -36,7 +36,7 @@ impl Writer for HtmlWriter {
             opts,
             out: Out::new(opts.source_map),
             req: Requires::default(),
-            numbers: number_labels(doc, res),
+            numbers: number_labels(res),
             notes: Vec::new(),
             abbr_keys: abbr::keys(doc),
             tex_logos: logos::enabled(doc),
@@ -57,35 +57,49 @@ impl Writer for HtmlWriter {
 
 /// Numbers of every label, by lower-cased id: the resolved number for a
 /// TMark-numbered series, a document-order count per prefix otherwise
-/// (HTML has no backend counter). Images inside a `::: figure` are
-/// sub-figures and take no number.
-pub(crate) fn number_labels(doc: &Document, res: &Resolved) -> BTreeMap<String, String> {
-    let mut subfigures = std::collections::BTreeSet::new();
-    tmark_ir::walk(doc, &mut |node| {
-        if let tmark_ir::NodeRef::Block(Block::Figure(f)) = node {
-            tmark_ir::walk_blocks(&f.content, &mut |inner| {
-                if let tmark_ir::NodeRef::Inline(Inline::Image(image)) = inner {
-                    subfigures.insert(image.meta.id);
-                }
-            });
-        }
-    });
+/// (HTML has no backend counter). A subfigure takes no number of its own:
+/// its container's, suffixed with its letter (spec §Image, Figure).
+pub(crate) fn number_labels(res: &Resolved) -> BTreeMap<String, String> {
     let mut counts: BTreeMap<String, u32> = BTreeMap::new();
     let mut out = BTreeMap::new();
+    let mut subfigures: Vec<&tmark_registry::Label> = Vec::new();
     for label in &res.labels.in_order {
         let Some(prefix) = &label.prefix else {
             continue;
         };
+        if label.subfigure.is_some() {
+            subfigures.push(label);
+            continue;
+        }
         let number = match refs::number(res, prefix, &label.key) {
             Some(n) => n,
             None => {
-                if label.host == tmark_registry::Host::Anchor || subfigures.contains(&label.node) {
+                if label.host == tmark_registry::Host::Anchor {
                     continue;
                 }
                 let n = counts.entry(prefix.to_ascii_lowercase()).or_insert(0);
                 *n += 1;
                 n.to_string()
             }
+        };
+        out.insert(label.id.to_ascii_lowercase(), number);
+    }
+    // The container may be labelled by the caption *after* it, so its own
+    // number is only known once the pass above is over.
+    for label in subfigures {
+        let Some(subfigure) = &label.subfigure else {
+            continue;
+        };
+        let Some(parent) = subfigure
+            .parent
+            .as_deref()
+            .and_then(|id| out.get(&id.to_ascii_lowercase()))
+        else {
+            continue;
+        };
+        let number = match &subfigure.letter {
+            Some(letter) => format!("{parent}{letter}"),
+            None => parent.clone(),
         };
         out.insert(label.id.to_ascii_lowercase(), number);
     }
@@ -427,6 +441,16 @@ impl Html<'_> {
             self.attrs(&attrs, &[]),
             self.src(&f.meta)
         ));
+        // The letters of the sub-figures, spelled as the resolution
+        // numbered them (spec §Image, Figure).
+        let letters: BTreeMap<tmark_ir::NodeId, String> = match tmark_registry::figure_images(f) {
+            images if images.len() > 1 => images
+                .iter()
+                .enumerate()
+                .map(|(n, image)| (image.meta.id, tmark_registry::subfigure_letter(n)))
+                .collect(),
+            _ => BTreeMap::new(),
+        };
         for block in content {
             match block {
                 Block::Para(p) => {
@@ -444,6 +468,11 @@ impl Html<'_> {
                         for image in images {
                             self.image(image);
                             self.out.push("\n");
+                            if let Some(letter) = letters.get(&image.meta.id) {
+                                self.out.push(&format!(
+                                    "<span class=\"subcaption\">({letter})</span>\n"
+                                ));
+                            }
                         }
                         continue;
                     }

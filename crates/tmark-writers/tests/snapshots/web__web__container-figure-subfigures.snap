@@ -1,0 +1,22 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="span" id="fig:trace">
+![Trace](trace.svg)
+<figcaption markdown="span"><span class="ts-caption-label">Figure 1:</span> A trace.</figcaption>
+</figure>
+
+
+
+<figure markdown="span" id="fig:views" class="ts-subfigures" style="--ts-cols:2">
+![Left](l.svg){#fig:left}
+<span class="ts-subcaption">(a)</span>
+![Right](r.svg){#fig:right}
+<span class="ts-subcaption">(b)</span>
+<figcaption markdown="span"><span class="ts-caption-label">Figure 2:</span> Two views.</figcaption>
+</figure>
+
+
+
+See [Figure 1](#fig:trace), [Figure 2](#fig:views) and [Figure 2a](#fig:left).

@@ -61,6 +61,12 @@ is `ref-ambiguous`.
    `MathBlock` → `eq`, theorem admonition → its declared counter); an explicit
    prefix must agree with the host or `prefix-host-mismatch` is raised.
    Duplicates raise `label-duplicate` with the other span as `related`.
+   An image inside a `::: figure` made of image paragraphs is a
+   *sub-figure* (spec §Image, Figure): host `Subfigure`, and
+   `Label::subfigure` records the container's label id and the letter.
+   Which images those are needs the block structure, which the flat walk
+   does not have, so the collector maps them per file before walking
+   (`collect::figure_images`, the same list the writers lay out and letter).
 3. **Allocate numbers** for TeXSmith-numbered series only (user counters,
    `thm` when TeXSmith numbers it). Backend-numbered series (`sec`, `fig`,
    `tbl`, `lst`, `eq`) get *no* number here: the backend numbers them. The
@@ -70,7 +76,10 @@ is `ref-ambiguous`.
    an input: `ResolveOptions { start: HashMap<Prefix, u32> }`, set by
    TeXSmith from the previous document's `next_start`. A medium with no
    backend to number the rest asks for it with `numbering: All`
-   (§Site-wide resolution below).
+   (§Site-wide resolution below). A sub-figure is skipped: it takes no
+   number of the series, and `Resolved::formatted` composes its
+   container's number with its letter (`2a`), so `next_start` counts one
+   figure per container.
 4. **Load sources.** `.bib` files named in `sources.bibliography` (parsed
    with the `biblatex` crate; entries kept as fields, no CSL here), inline
    pybtex-shaped entries, DOI shorthands recorded as *pending* (TeXSmith
@@ -129,7 +138,10 @@ keeps the backend's scoped numbering: `All` is never passed on the LaTeX
 path, so `Figure 3.2` in the PDF and `Figure 12` on the site are the same
 label with two spellings, which is the accepted cost.
 
-What is counted: labels, that is items with an id. A captioned figure
+What is counted: labels, that is items with an id, minus the sub-figures
+of a `::: figure`, which number under their container (step 3 above): a
+page with a plain figure and a container of two labelled images counts two
+figures, and `@fig:left` resolves to `2a`. A captioned figure
 without `{#fig:x}` is not a label and takes no number, whereas LaTeX would
 number it. The web lowering either gives such floats a synthetic id or
 leaves them unnumbered; it is its decision, not the registry's.

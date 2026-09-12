@@ -1,0 +1,21 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+![Trace](trace.svg){#fig:trace}
+
+/// caption
+A trace.
+///
+
+::: figure {cols=2}
+![Left](l.svg){#fig:left}
+![Right](r.svg){#fig:right}
+:::
+
+/// caption
+    attrs: {id: fig:views}
+Two views.
+///
+
+See @fig:trace, @fig:views and @fig:left.

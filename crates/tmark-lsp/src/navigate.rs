@@ -242,6 +242,7 @@ fn host_word(host: Host) -> &'static str {
         Host::Header => "section",
         Host::Table => "table",
         Host::Figure => "figure",
+        Host::Subfigure => "subfigure",
         Host::Listing => "listing",
         Host::Equation => "equation",
         Host::Admonition => "admonition",

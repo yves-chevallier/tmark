@@ -7,5 +7,5 @@ expression: snapshot
 <span class="ts-subcaption">(a)</span>
 ![Crash](crash.png){#fig:crash}
 <span class="ts-subcaption">(b)</span>
-<figcaption markdown="span"><span class="ts-caption-label">Figure 3:</span> Watchdog traces before and after the fix.</figcaption>
+<figcaption markdown="span"><span class="ts-caption-label">Figure 1:</span> Watchdog traces before and after the fix.</figcaption>
 </figure>

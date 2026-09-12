@@ -1113,6 +1113,19 @@ Figure: Watchdog traces before and after the fix. {#fig:traces}
 Renders "Figure 1" with "(a)", "(b)"; `@fig:crash` yields "figure 1b".
 Layout via `cols=` and `rows=`. Class D.
 
+The images are sub-figures when every block of the container is a
+paragraph of images only; a container holding a table, prose or a listing
+is a plain float and an image in it numbers like any other. A sub-figure
+takes *no number of the `fig` series of its own*: the container takes one
+number, and each image takes that number suffixed with a letter in
+document order, lower case (`1a`, `1b`, …; the letters wrap after `z`).
+An anchor on an image resolves to that number, so a figure count over a
+whole book or site advances once per container, not once per image. A
+container with a single image *is* that figure: the image's anchor and the
+container's name the same float and the same number, with no letter. A
+container with no anchor and no caption numbers nothing, and neither do
+its sub-figures.
+
 Diagram fences are the data directive `mermaid image`; a bare `mermaid` info
 string is sugar for it (class E under MkDocs Material's custom fence, D
 elsewhere). To *show* Mermaid source as a listing, write `mermaid code`:

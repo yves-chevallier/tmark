@@ -4,7 +4,9 @@ expression: snapshot
 ---
 <figure id="fig:traces">
 <img src="boot.png" alt="Boot" id="fig:boot" />
+<span class="subcaption">(a)</span>
 <img src="crash.png" alt="Crash" id="fig:crash" />
+<span class="subcaption">(b)</span>
 <figcaption><span class="caption-label">Figure 1</span> Watchdog traces before and after the fix.</figcaption>
 </figure>
 

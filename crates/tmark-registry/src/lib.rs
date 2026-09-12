@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use tmark_ir::{Diagnostic, Document, FileId};
 
 pub use bib::{Bib, BibEntry};
-pub use collect::{Host, IndexTable, Label, Labels};
+pub use collect::{figure_images, subfigure_letter, Host, IndexTable, Label, Labels, Subfigure};
 pub use counters::{Counter, Counters};
 pub use inventory::{CrossRefs, Inventory, InventoryEntry};
 #[cfg(feature = "fs")]
@@ -152,8 +152,24 @@ impl Resolved {
             .collect()
     }
 
-    /// The formatted number of a label, when its series numbered it.
+    /// The formatted number of a label, when its series numbered it. A
+    /// subfigure's is its container's number and its letter (`2a`); the
+    /// container's own number is never a subfigure's, so one level of
+    /// indirection is enough.
     pub(crate) fn formatted(&self, label: &Label) -> Option<String> {
+        let Some(subfigure) = &label.subfigure else {
+            return self.own_number(label);
+        };
+        let parent = self.labels.get(subfigure.parent.as_deref()?)?;
+        let number = self.own_number(parent)?;
+        Some(match &subfigure.letter {
+            Some(letter) => format!("{number}{letter}"),
+            None => number,
+        })
+    }
+
+    /// The number the label's own series allocated it.
+    fn own_number(&self, label: &Label) -> Option<String> {
         label
             .prefix
             .as_deref()

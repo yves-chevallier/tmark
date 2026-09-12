@@ -1,14 +1,14 @@
 //! Step 2 of the resolution: every definition of the document and of its
 //! includes, in document order (design 06 §Resolution algorithm).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tmark_ir::{
-    plain_text, walk, Attrs, Block, CaptionKind, Code, Diagnostic, Document, FileId, Inline,
-    NodeId, NodeRef, Span,
+    plain_text, walk, Attrs, Block, CaptionKind, Code, Diagnostic, Document, Figure, FileId, Image,
+    Inline, NodeId, NodeRef, Span,
 };
 
 use crate::counters::Counters;
@@ -21,6 +21,10 @@ pub enum Host {
     Header,
     Table,
     Figure,
+    /// An image labelled inside a `::: figure` container: a subfigure
+    /// (spec §Image, Figure). It counts in no series of its own; see
+    /// [`Label::subfigure`].
+    Subfigure,
     Listing,
     Equation,
     /// A theorem-like admonition; the counter is the declared one.
@@ -37,12 +41,38 @@ impl Host {
         match self {
             Host::Header => Some("sec"),
             Host::Table => Some("tbl"),
-            Host::Figure => Some("fig"),
+            Host::Figure | Host::Subfigure => Some("fig"),
             Host::Listing => Some("lst"),
             Host::Equation => Some("eq"),
             Host::Admonition | Host::CounterItem | Host::Anchor => None,
         }
     }
+}
+
+/// What makes a label a subfigure (spec §Image, Figure): the images of a
+/// `::: figure` container take no number of the `fig` series; their number
+/// is the container's, suffixed with a letter in document order.
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
+pub struct Subfigure {
+    /// The id of the container's label: its own `{#id}`, else the id of
+    /// the `Figure:` caption that captions it. `None` when the container
+    /// carries no label, in which case the subfigure has no number either.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    /// The letter appended to the container's number (`a`, `b`, …).
+    /// `None` for the lone image of a container: it *is* the figure, and
+    /// shares its number without a suffix.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letter: Option<String>,
+}
+
+/// The letter of the `n`-th subfigure of a container, 0-based: `a`, `b`, …
+/// The writers spell their `(a)` markers with the same function, so that
+/// the markers and the resolved numbers agree.
+pub fn subfigure_letter(n: usize) -> String {
+    char::from_u32('a' as u32 + (n % 26) as u32)
+        .unwrap_or('a')
+        .to_string()
 }
 
 /// A defined label: an `#id`, a counter item, a captioned float.
@@ -75,6 +105,9 @@ pub struct Label {
     /// replaces it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub implicit: bool,
+    /// Set for a [`Host::Subfigure`]: the container it numbers under.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subfigure: Option<Subfigure>,
 }
 
 /// All labels, by lower-cased id and in document order.
@@ -107,6 +140,9 @@ pub struct Collector<'a> {
     /// The included documents, parsed: their references resolve too.
     pub documents: Vec<(FileId, Document)>,
     pub diagnostics: Vec<Diagnostic>,
+    /// The subfigures of the document being walked, by image node: a
+    /// per-file map, since node ids are unique within one parse.
+    subfigures: HashMap<NodeId, Subfigure>,
 }
 
 impl<'a> Collector<'a> {
@@ -121,12 +157,18 @@ impl<'a> Collector<'a> {
             files: Vec::new(),
             documents: Vec::new(),
             diagnostics: Vec::new(),
+            subfigures: HashMap::new(),
         }
     }
 
     /// Collect `doc` (parsed from `path`), then its includes depth-first.
     pub fn collect(&mut self, doc: &Document, path: &Path) {
         self.seen.insert(path.to_path_buf());
+        // Which images are subfigures needs the block structure, which the
+        // flat walk below does not have; the includes are collected after
+        // it, each with its own map.
+        self.subfigures = HashMap::new();
+        subfigures(&doc.blocks, &mut self.subfigures);
         let mut includes: Vec<(Span, String, Option<String>)> = Vec::new();
         walk(doc, &mut |node: NodeRef| match node {
             NodeRef::Block(block) => self.block(block, &mut includes),
@@ -224,6 +266,7 @@ impl<'a> Collector<'a> {
                     number: None,
                     title: None,
                     implicit: false,
+                    subfigure: None,
                 });
             }
             Inline::IndexEntry(e) => {
@@ -249,6 +292,14 @@ impl<'a> Collector<'a> {
         title: Option<String>,
     ) {
         let Some(id) = attrs.id() else { return };
+        // An image inside a `::: figure` is a subfigure, whatever the
+        // caller passed (spec §Image, Figure).
+        let subfigure = self.subfigures.get(&node).cloned();
+        let host = if subfigure.is_some() {
+            Host::Subfigure
+        } else {
+            host
+        };
         let id_span = attrs.id_span.map(|s| s.0);
         let (prefix, key) = match id.split_once(':') {
             Some((p, k)) if !p.is_empty() && !k.is_empty() => (Some(p.to_string()), k.to_string()),
@@ -289,6 +340,7 @@ impl<'a> Collector<'a> {
             number: None,
             title,
             implicit: false,
+            subfigure,
         });
     }
 
@@ -318,6 +370,7 @@ impl<'a> Collector<'a> {
             number: None,
             title,
             implicit: true,
+            subfigure: None,
         });
     }
 
@@ -347,6 +400,130 @@ impl<'a> Collector<'a> {
         self.labels.by_id.insert(key, label.clone());
         self.labels.in_order.push(label);
     }
+}
+
+/// The images every `::: figure` of `blocks` turns into subfigures, by
+/// image node (spec §Image, Figure). A container made of image paragraphs
+/// only holds subfigures; anything else is a plain float whose images keep
+/// their own numbers, which is what the writers render too.
+fn subfigures(blocks: &[Block], out: &mut HashMap<NodeId, Subfigure>) {
+    for (i, block) in blocks.iter().enumerate() {
+        if let Block::Figure(figure) = block {
+            // The caption of a container may follow it (spec §Caption,
+            // attachment): the writers look for it in the same order.
+            let following = match blocks.get(i + 1) {
+                Some(Block::Caption(c)) if c.kind == CaptionKind::Figure => c.attrs.id(),
+                _ => None,
+            };
+            container(figure, following, out);
+        }
+        match block {
+            Block::BlockQuote(n) => subfigures(&n.content, out),
+            Block::Figure(n) => subfigures(&n.content, out),
+            Block::Admonition(n) => subfigures(&n.content, out),
+            Block::Div(n) => subfigures(&n.content, out),
+            Block::BulletList(n) => {
+                for item in &n.items {
+                    subfigures(&item.content, out);
+                }
+            }
+            Block::OrderedList(n) => {
+                for item in &n.items {
+                    subfigures(&item.content, out);
+                }
+            }
+            Block::DefinitionList(n) => {
+                for (_, definitions) in &n.items {
+                    for definition in definitions {
+                        subfigures(definition, out);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The images a `::: figure` container turns into subfigures, in document
+/// order (spec §Image, Figure): the images of its paragraphs when every
+/// block is a paragraph of images only, empty otherwise — a container with
+/// a table, prose or a listing in it is a plain float. The writers lay out
+/// and letter exactly this list, so their `(a)` markers and the resolved
+/// numbers agree.
+pub fn figure_images(figure: &Figure) -> Vec<&Image> {
+    let content = match figure.content.split_last() {
+        Some((Block::Caption(_), rest)) => rest,
+        _ => figure.content.as_slice(),
+    };
+    let paragraphs: Vec<Vec<&Image>> = content.iter().map(image_paragraph).collect();
+    if paragraphs.is_empty() || paragraphs.iter().any(|p| p.is_empty()) {
+        return Vec::new();
+    }
+    paragraphs.into_iter().flatten().collect()
+}
+
+/// One container: its images, the label they number under, and their
+/// letters.
+fn container(figure: &Figure, following: Option<&str>, out: &mut HashMap<NodeId, Subfigure>) {
+    let inner = match figure.content.split_last() {
+        Some((Block::Caption(c), _)) => c.attrs.id(),
+        _ => None,
+    };
+    let parent = figure
+        .attrs
+        .id()
+        .or(following)
+        .or(inner)
+        .map(str::to_string);
+    let images = figure_images(figure);
+    if images.is_empty() {
+        return;
+    }
+    if let [image] = images.as_slice() {
+        // A lone image is the figure itself: it shares the container's
+        // number, and is the container's own label when it has none.
+        if parent.is_some() {
+            out.insert(
+                image.meta.id,
+                Subfigure {
+                    parent,
+                    letter: None,
+                },
+            );
+        }
+        return;
+    }
+    for (n, image) in images.iter().enumerate() {
+        out.insert(
+            image.meta.id,
+            Subfigure {
+                parent: parent.clone(),
+                letter: Some(subfigure_letter(n)),
+            },
+        );
+    }
+}
+
+/// The images of a paragraph made of images only.
+fn image_paragraph(block: &Block) -> Vec<&Image> {
+    let Block::Para(p) = block else {
+        return Vec::new();
+    };
+    let only = p.content.iter().all(|i| match i {
+        Inline::Image(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) | Inline::Space(_) => true,
+        Inline::Str(s) => s.text.trim().is_empty(),
+        _ => false,
+    });
+    if !only {
+        return Vec::new();
+    }
+    p.content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Image(image) => Some(image),
+            _ => None,
+        })
+        .collect()
 }
 
 /// GitHub's heading slug (spec §Header): the plain title lower-cased,

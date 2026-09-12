@@ -144,13 +144,21 @@ two-repository change (R14 of its plan):
   keystrokes on both sides.
 - **`texsmith.typ`.** The Typst writer emits `#ts-…` calls;
   `tmark_writers::TEXSMITH_TYP` is the default definition TeXSmith writes
-  next to the `.typ`; a template redefines what it restyles.
+  next to the `.typ`; a template redefines what it restyles. `ts-subfigure`
+  and `ts-subnumber` (the images of a `::: figure`) joined the file with
+  the sub-figure numbering; a template that ships its own copy of
+  `texsmith.typ` needs them.
 - **The `Resolved` capsule.** `resolve()` returns the view of
   `schema("resolved")` plus an opaque handle; TeXSmith calls `resolve`
   once per document and `write` once per slot body with the same handle,
   chains `next_start` into the next document's `start`, and feeds
   `book` from the other pages' `book` lists. Numbers, label words and
   `Resolution` kinds are the registry's, never recomputed in Python (D4).
+  A sub-figure (spec §Image, Figure) is a label with `host: "subfigure"`
+  and a `subfigure: {parent, letter}` object; it has no number of its own,
+  its formatted number is the container's plus the letter (`2a`), and
+  `next_start` counts one figure per container. The new host value and
+  field are a `model.py` regeneration on their side.
 - **The `lower_web` shapes the MkDocs plugin relies on**: the return
   `{text, diagnostics, bibliography}`; the wrappers Material's extensions
   read (`<figure markdown="span">`, `<figure markdown="1"

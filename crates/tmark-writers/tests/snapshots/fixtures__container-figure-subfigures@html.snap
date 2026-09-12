@@ -1,0 +1,42 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<figure id="fig:trace">
+<img src="trace.svg" alt="Trace" id="fig:trace" />
+<figcaption>A trace.</figcaption>
+</figure>
+<figure id="fig:views">
+<img src="l.svg" alt="Left" id="fig:left" />
+<span class="subcaption">(a)</span>
+<img src="r.svg" alt="Right" id="fig:right" />
+<span class="subcaption">(b)</span>
+<figcaption><span class="caption-label">Figure 2</span> Two views.</figcaption>
+</figure>
+<p>See <a href="#fig:trace" class="reference">Figure 1</a>, <a href="#fig:views" class="reference">Figure 2</a> and <a href="#fig:left" class="reference">Figure 2a</a>.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "trace.svg",
+      "node": 2
+    },
+    {
+      "src": "l.svg",
+      "node": 9
+    },
+    {
+      "src": "r.svg",
+      "node": 13
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

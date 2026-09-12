@@ -1,0 +1,57 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{trace.svg}
+\caption[Trace]{A trace.}\label{fig:trace}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{l.svg}
+\caption{Left}\label{fig:left}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{r.svg}
+\caption{Right}\label{fig:right}
+\end{subfigure}
+\caption{Two views.}\label{fig:views}
+\end{figure}
+
+See Figure~\ref{fig:trace}, Figure~\ref{fig:views} and Figure~\ref{fig:left}.
+
+---requires---
+{
+  "packages": [
+    "float",
+    "graphicx",
+    "subcaption"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "trace.svg",
+      "node": 2
+    },
+    {
+      "src": "l.svg",
+      "node": 9
+    },
+    {
+      "src": "r.svg",
+      "node": 13
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

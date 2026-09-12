@@ -2,10 +2,11 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
+#counter(figure.where(kind: "ts-subfigure")).update(0)
 #figure(
   grid(columns: 2, gutter: 1em,
-    [#figure(image("boot.png"), caption: [Boot]) <fig:boot>],
-    [#figure(image("crash.png"), caption: [Crash]) <fig:crash>],
+    [#ts-subfigure(image("boot.png"), caption: [Boot]) <fig:boot>],
+    [#ts-subfigure(image("crash.png"), caption: [Crash]) <fig:crash>],
   ),
   caption: [Watchdog traces before and after the fix.],
 ) <fig:traces>

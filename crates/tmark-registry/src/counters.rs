@@ -229,6 +229,12 @@ impl Counters {
     /// scopes never reset here).
     pub fn allocate(&mut self, labels: &mut Labels) {
         for label in labels.in_order.iter_mut() {
+            // A subfigure numbers under its container (spec §Image,
+            // Figure): it takes no number of the series, so a container of
+            // two images advances `fig` once, not three times.
+            if label.subfigure.is_some() {
+                continue;
+            }
             let Some(prefix) = &label.prefix else {
                 continue;
             };

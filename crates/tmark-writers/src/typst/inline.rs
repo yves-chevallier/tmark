@@ -242,12 +242,27 @@ impl Typst<'_> {
             }
             match resolution {
                 Resolution::Label { prefix, number, .. } => {
+                    let subfigure = self
+                        .res
+                        .labels
+                        .get(&item.key)
+                        .and_then(|l| l.subfigure.clone());
                     let defined = self
                         .res
                         .labels
                         .get(&item.key)
                         .map(|l| l.id.clone())
                         .unwrap_or_else(|| item.key.clone());
+                    // Typst carries one label per element: the lone image
+                    // of a `::: figure` *is* the container's float, and
+                    // the container keeps the label (spec §Image, Figure).
+                    let defined = match &subfigure {
+                        Some(s) if s.letter.is_none() => s.parent.clone().unwrap_or(defined),
+                        _ => defined,
+                    };
+                    // A lettered sub-figure is numbered in a counter of
+                    // its own, so `#ref` alone would show `(a)`, not `2a`.
+                    let lettered = subfigure.is_some_and(|s| s.letter.is_some());
                     let label = escape::label(&defined);
                     match (&prefix, number) {
                         (Some(p), Some(number)) => {
@@ -258,6 +273,17 @@ impl Typst<'_> {
                                 &template,
                                 &escape::markup(&word),
                                 &escape::markup(&number),
+                            );
+                            self.out.push(&format!("#link(<{label}>)[{}]", text.trim()));
+                        }
+                        (Some(p), None) if lettered => {
+                            let template = refs::reference_template(self.res, p);
+                            let word =
+                                refs::label_word(self.res, p, &item.key, self.lang.as_deref());
+                            let text = refs::template(
+                                &template,
+                                &escape::markup(&word),
+                                &format!("#ts-subnumber(<{label}>)"),
                             );
                             self.out.push(&format!("#link(<{label}>)[{}]", text.trim()));
                         }

@@ -533,17 +533,9 @@ impl Typst<'_> {
             _ => (f.content.as_slice(), None),
         };
         let caption = caption.or(inner);
-        let images: Vec<&Image> = content
-            .iter()
-            .filter_map(|b| match b {
-                Block::Para(p) => Some(p.content.iter().filter_map(|i| match i {
-                    Inline::Image(img) => Some(img),
-                    _ => None,
-                })),
-                _ => None,
-            })
-            .flatten()
-            .collect();
+        // The images the resolution turned into sub-figures, in its own
+        // order (spec §Image, Figure).
+        let images = tmark_registry::figure_images(f);
         if let [Block::Table(t)] = content {
             let mut t = t.clone();
             if t.attrs.id.is_none() {
@@ -569,6 +561,11 @@ impl Typst<'_> {
             .and_then(|c| c.parse::<usize>().ok())
             .filter(|c| *c > 0)
             .unwrap_or(images.len().max(1));
+        if images.len() > 1 {
+            // The letters restart under every container.
+            self.out
+                .push("#counter(figure.where(kind: \"ts-subfigure\")).update(0)\n");
+        }
         self.out.push("#figure(\n");
         if images.is_empty() {
             let body = self.render_blocks_inline(content);
@@ -584,25 +581,16 @@ impl Typst<'_> {
                     node: image.meta.id,
                     attrs: image.attrs.kv.clone(),
                 });
+                // `ts-subfigure` is a figure of its own `kind`: it never
+                // advances the figure counter (one number per container,
+                // spec §Image, Figure) and its caption carries the `(a)`
+                // marker. The caption is always there, empty alt or not.
                 let alt = self.render_inlines(&image.alt);
-                let mut cell = format!("    figure({}", image_call(image));
-                if !alt.is_empty() {
-                    cell.push_str(&format!(", caption: [{alt}]"));
-                }
-                cell.push(')');
-                if let Some(id) = image.attrs.id() {
-                    cell = format!(
-                        "    [#figure({}{}) <{}>]",
-                        image_call(image),
-                        if alt.is_empty() {
-                            String::new()
-                        } else {
-                            format!(", caption: [{alt}]")
-                        },
-                        escape::label(id)
-                    );
-                }
-                cell.push_str(",\n");
+                let call = format!("ts-subfigure({}, caption: [{alt}])", image_call(image));
+                let cell = match image.attrs.id() {
+                    Some(id) => format!("    [#{call} <{}>],\n", escape::label(id)),
+                    None => format!("    {call},\n"),
+                };
                 self.out.push(&cell);
             }
             self.out.push("  ),\n");

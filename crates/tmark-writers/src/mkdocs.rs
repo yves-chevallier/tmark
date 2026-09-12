@@ -182,11 +182,7 @@ impl<'a> Lowerer<'a> {
         loader: &'a dyn Loader,
         opts: &'a WebOptions,
     ) -> Self {
-        let mut numbers = html::number_labels(doc, res);
-        subfigure_numbers(&doc.blocks, &mut numbers);
-        for (_, included) in &res.included {
-            subfigure_numbers(&included.blocks, &mut numbers);
-        }
+        let numbers = html::number_labels(res);
         let mut front_matter =
             serde_json::to_value(&doc.front_matter.keys).unwrap_or(serde_json::Value::Null);
         if let (serde_json::Value::Object(keys), serde_json::Value::Object(extra)) =
@@ -543,8 +539,10 @@ impl<'a> Lowerer<'a> {
             .id()
             .or(caption.and_then(|c| c.attrs.id()))
             .map(str::to_string);
-        let images: Vec<&Image> = content.iter().flat_map(image_paragraph).collect();
-        let all_images = content.iter().all(|b| !image_paragraph(b).is_empty());
+        // The images the resolution turned into sub-figures, in its own
+        // order: the `(a)` markers below carry the letters it gave them.
+        let images = tmark_registry::figure_images(figure);
+        let all_images = !images.is_empty();
         let mut out = String::from("<figure");
         out.push_str(if all_images {
             " markdown=\"span\""
@@ -577,7 +575,7 @@ impl<'a> Lowerer<'a> {
                     out.push_str(&format!(
                         "<span class=\"{}\">({})</span>\n",
                         self.class("subcaption"),
-                        letter(i)
+                        tmark_registry::subfigure_letter(i)
                     ));
                 }
             }
@@ -1514,95 +1512,6 @@ fn caption_matches(block: &Block, kind: CaptionKind) -> bool {
         (Block::Para(p), CaptionKind::Figure) => matches!(p.content.as_slice(), [Inline::Image(_)]),
         _ => false,
     }
-}
-
-/// The images of a paragraph made of images only.
-fn image_paragraph(block: &Block) -> Vec<&Image> {
-    let Block::Para(p) = block else {
-        return Vec::new();
-    };
-    let images: Vec<&Image> = p
-        .content
-        .iter()
-        .filter_map(|i| match i {
-            Inline::Image(image) => Some(image),
-            _ => None,
-        })
-        .collect();
-    let only = p.content.iter().all(|i| match i {
-        Inline::Image(_) | Inline::SoftBreak(_) | Inline::LineBreak(_) | Inline::Space(_) => true,
-        Inline::Str(s) => s.text.trim().is_empty(),
-        _ => false,
-    });
-    if only {
-        images
-    } else {
-        Vec::new()
-    }
-}
-
-/// `3b`: the sub-figures of every `::: figure` take the figure's number
-/// and a letter, whatever the resolution allocated them.
-fn subfigure_numbers(blocks: &[Block], numbers: &mut BTreeMap<String, String>) {
-    let mut i = 0;
-    while i < blocks.len() {
-        match &blocks[i] {
-            Block::Figure(figure) => {
-                let inner = match figure.content.last() {
-                    Some(Block::Caption(c)) => c.attrs.id(),
-                    _ => None,
-                };
-                let after = match blocks.get(i + 1) {
-                    Some(Block::Caption(c)) if c.kind == CaptionKind::Figure => c.attrs.id(),
-                    _ => None,
-                };
-                let parent = figure
-                    .attrs
-                    .id()
-                    .or(after)
-                    .or(inner)
-                    .and_then(|id| numbers.get(&id.to_ascii_lowercase()).cloned());
-                let images: Vec<&Image> = figure.content.iter().flat_map(image_paragraph).collect();
-                if images.len() > 1 {
-                    for (n, image) in images.iter().enumerate() {
-                        if let Some(id) = image.attrs.id() {
-                            match &parent {
-                                Some(parent) => {
-                                    numbers.insert(
-                                        id.to_ascii_lowercase(),
-                                        format!("{parent}{}", letter(n)),
-                                    );
-                                }
-                                None => {
-                                    numbers.remove(&id.to_ascii_lowercase());
-                                }
-                            }
-                        }
-                    }
-                }
-                subfigure_numbers(&figure.content, numbers);
-            }
-            Block::BlockQuote(q) => subfigure_numbers(&q.content, numbers),
-            Block::Div(d) => subfigure_numbers(&d.content, numbers),
-            Block::Admonition(a) => subfigure_numbers(&a.content, numbers),
-            Block::BulletList(l) => {
-                for item in &l.items {
-                    subfigure_numbers(&item.content, numbers);
-                }
-            }
-            Block::OrderedList(l) => {
-                for item in &l.items {
-                    subfigure_numbers(&item.content, numbers);
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-}
-
-fn letter(n: usize) -> char {
-    char::from_u32('a' as u32 + (n % 26) as u32).unwrap_or('a')
 }
 
 /// Header rows of a table model, one `<th>` per column of the level.

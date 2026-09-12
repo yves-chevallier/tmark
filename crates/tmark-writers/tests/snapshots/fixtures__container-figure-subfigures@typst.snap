@@ -1,0 +1,45 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#figure(
+  image("trace.svg"),
+  caption: [A trace.],
+) <fig:trace>
+
+#counter(figure.where(kind: "ts-subfigure")).update(0)
+#figure(
+  grid(columns: 2, gutter: 1em,
+    [#ts-subfigure(image("l.svg"), caption: [Left]) <fig:left>],
+    [#ts-subfigure(image("r.svg"), caption: [Right]) <fig:right>],
+  ),
+  caption: [Two views.],
+) <fig:views>
+
+See #ref(<fig:trace>, supplement: [Figure]), #ref(<fig:views>, supplement: [Figure]) and #link(<fig:left>)[Figure #ts-subnumber(<fig:left>)].
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "trace.svg",
+      "node": 2
+    },
+    {
+      "src": "l.svg",
+      "node": 9
+    },
+    {
+      "src": "r.svg",
+      "node": 13
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
