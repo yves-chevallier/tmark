@@ -73,6 +73,48 @@ fn citations_glossary_doi_and_ambiguity() {
 }
 
 #[test]
+fn glossary_declaration_accepts_both_spellings() {
+    // Flat: every key is a term, the definition a string or an object.
+    let flat = "---\npress:\n  declare:\n    glossary:\n      api: An interface\n      solid: {name: SOLID, description: Five principles}\n---\n\nSee @gls:api, @gls:solid and @gls:nope.\n";
+    let r = run(flat);
+    assert_eq!(codes(&r.diagnostics), vec!["ref-unresolved"]);
+    assert!(matches!(&r.refs[0].resolution, Resolution::Glossary { term } if term == "api"));
+    assert!(matches!(&r.refs[1].resolution, Resolution::Glossary { term } if term == "solid"));
+    assert_eq!(r.refs[2].resolution, Resolution::Unresolved);
+    assert_eq!(r.glossary["api"], "An interface");
+    assert_eq!(r.glossary["solid"], "SOLID");
+
+    // Structured: the terms live under `entries`, and `style` and `groups`
+    // are form rather than terms.
+    let structured = "---\npress:\n  declare:\n    glossary:\n      style: long\n      groups:\n        core: Core terms\n      entries:\n        api:\n          group: core\n          description: An interface\n---\n\nSee @gls:api, @gls:style and @gls:groups.\n";
+    let r = run(structured);
+    assert_eq!(
+        codes(&r.diagnostics),
+        vec!["ref-unresolved", "ref-unresolved"]
+    );
+    assert!(matches!(&r.refs[0].resolution, Resolution::Glossary { term } if term == "api"));
+    assert_eq!(r.refs[1].resolution, Resolution::Unresolved);
+    assert_eq!(r.refs[2].resolution, Resolution::Unresolved);
+    assert_eq!(r.glossary.keys().collect::<Vec<_>>(), vec!["api"]);
+
+    // The style and the groups stay in the front matter for the consumer
+    // that renders the per-group tables.
+    let doc = parse(structured, FileId::default()).document;
+    let glossary = &doc.front_matter.keys.press.declare.glossary;
+    assert_eq!(glossary.style.as_deref(), Some("long"));
+    assert_eq!(glossary.groups["core"].title, "Core terms");
+    assert_eq!(glossary.entries["api"].group.as_deref(), Some("core"));
+
+    // Mixed: a flat term beside the structured keys, and a flat key named
+    // like a structural one, which stays structural.
+    let mixed = "---\npress:\n  declare:\n    glossary:\n      style: long\n      entries:\n        api: An interface\n      doi: A digital object identifier\n---\n\nSee @gls:api and @gls:doi.\n";
+    let r = run(mixed);
+    assert!(r.diagnostics.is_empty());
+    assert_eq!(r.glossary["doi"], "A digital object identifier");
+    assert_eq!(r.glossary["api"], "An interface");
+}
+
+#[test]
 fn includes_and_inventories_load_through_the_loader() {
     let main = "---\npress:\n  sources:\n    crossrefs: {fwrev: build/fw.refs.json, gone: nope.json}\n---\n\n{include}(chapters/boot.md)\n\n{include}(chapters/missing.md)\n\nSee @sec:boot, @fwrev:fw:x and @fwrev:fw:y.\n";
     let loader = MemoryLoader::new()

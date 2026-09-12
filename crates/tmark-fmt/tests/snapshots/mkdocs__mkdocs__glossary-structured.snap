@@ -1,0 +1,18 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+press:
+  declare:
+    glossary:
+      style: long
+      groups:
+        core: Core terms
+      entries:
+        api:
+          group: core
+          description: An application programming interface.
+---
+
+An [](gls:api) of the core group, but [](gls:groups) is no term.

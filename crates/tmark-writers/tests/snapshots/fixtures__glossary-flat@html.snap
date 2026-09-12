@@ -1,0 +1,22 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>An <a href="#gls-api" class="glossary" title="An application programming interface.">api</a> built on <a href="#gls-solid" class="glossary" title="SOLID">solid</a>, but not <span class="unresolved">[?gls:nope]</span>.</p>
+
+---requires---
+{
+  "packages": [
+    "glossaries"
+  ],
+  "fragments": [
+    "ts-glossary"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

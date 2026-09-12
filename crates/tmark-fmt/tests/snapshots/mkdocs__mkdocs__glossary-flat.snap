@@ -1,0 +1,13 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+press:
+  declare:
+    glossary:
+      api: An application programming interface.
+      solid: {name: SOLID, description: Five design principles}
+---
+
+An [](gls:api) built on [](gls:solid), but not [](gls:nope).

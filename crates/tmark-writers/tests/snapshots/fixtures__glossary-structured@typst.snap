@@ -1,0 +1,22 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+An #ts-gls("api") of the core group, but \[?gls:groups\] is no term.
+
+---requires---
+{
+  "packages": [
+    "glossaries"
+  ],
+  "fragments": [
+    "ts-glossary"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

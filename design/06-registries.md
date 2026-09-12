@@ -239,8 +239,17 @@ reference), document links for includes.
   `citation-shadowed-by-footnote` diagnostic for that case is still not
   emitted. A `[^key]` that resolves nowhere is `ref-unresolved`, which is
   the loud outcome the spec wants (P4).
-- Glossary terms come from `declare.glossary`, `declare.acronyms` (term to
-  string or object with `name`/`description`) and the `*[KEY]: …` lines.
+- Glossary terms come from `declare.glossary`, `declare.acronyms` and the
+  `*[KEY]: …` lines. `declare.glossary` is typed
+  (`tmark_ir::frontmatter::GlossaryDecl`) and both spellings of spec
+  §Glossary and acronyms land in it: the flat mapping's keys and the keys
+  under `entries` are its `entries`, `style` and `groups` are form and stay
+  in the front matter for the template that prints the per-group tables
+  (C50). `collect::glossary` reads `entries` alone, case-folded, each term
+  mapping to its `name`, else its `description`, else its `long` form;
+  `declare.acronyms` (still a loose JSON mapping, term to string or object
+  with `name`/`description`) then the `*[KEY]: …` abbreviations are merged
+  over it, in that order.
 
 ## Implementation notes (milestone 3)
 

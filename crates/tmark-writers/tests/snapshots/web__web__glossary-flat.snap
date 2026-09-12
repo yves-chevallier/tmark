@@ -1,0 +1,13 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+press:
+  declare:
+    glossary:
+      api: An application programming interface.
+      solid: {name: SOLID, description: Five design principles}
+---
+
+An <abbr title="An application programming interface.">api</abbr> built on <abbr title="SOLID">solid</abbr>, but not [?gls:nope].

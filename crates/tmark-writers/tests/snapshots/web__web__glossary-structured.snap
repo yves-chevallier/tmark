@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+press:
+  declare:
+    glossary:
+      style: long
+      groups:
+        core: Core terms
+      entries:
+        api:
+          group: core
+          description: An application programming interface.
+---
+
+An <abbr title="An application programming interface.">api</abbr> of the core group, but [?gls:groups] is no term.
