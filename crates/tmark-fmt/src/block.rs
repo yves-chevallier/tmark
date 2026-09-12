@@ -119,8 +119,11 @@ fn block_with(out: &mut Out, b: &Block, alternate: bool) {
                         ..Context::default()
                     },
                 );
-                out.push("] ");
-                inlines(out, &p.content, Context::default());
+                out.push("]");
+                if !p.content.is_empty() {
+                    out.push(" ");
+                    inlines(out, &p.content, Context::default());
+                }
             } else {
                 inlines(
                     out,

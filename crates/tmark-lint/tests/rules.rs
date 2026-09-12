@@ -27,7 +27,7 @@ fn catalogue() {
     );
     assert_eq!(codes("# A\n\n### C\n\n## B\n"), vec!["heading-skip"]);
     assert_eq!(
-        codes("**Note.** Promoted.\n\n{lead}[Explicit.] Not reported.\n"),
+        codes("**Note.**\n\n{lead}[Explicit.] Not reported.\n"),
         vec!["lead-promotion"]
     );
     assert_eq!(

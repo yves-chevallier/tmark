@@ -2,6 +2,4 @@
 source: crates/tmark-writers/tests/web.rs
 expression: snapshot
 ---
-{lead}[Boot sequence.]
-
-**Leading bold:** the device powers the flash.
+{lead}[Boot sequence.] The device powers the flash before the SoC.

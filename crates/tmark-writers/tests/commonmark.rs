@@ -6,6 +6,11 @@
 //! `#[`, `---` … see the spec) or constructs the IR does not carry (raw
 //! HTML blocks, entity references, image titles); the test prints the
 //! score so a regression or a gain is visible.
+//!
+//! The fifteen "Emphasis and strong emphasis" examples whose whole
+//! paragraph is one strong span are a deviation of the same kind: the
+//! `paragraph.lead` feature (on by default, spec §Para) reads that shape
+//! as a lead-in, so the HTML writer marks it `<strong class="lead">`.
 
 use std::fs;
 use std::path::Path;
@@ -389,7 +394,6 @@ const PASSING: &[&str] = &[
     "Emphasis and strong emphasis (375)",
     "Emphasis and strong emphasis (376)",
     "Emphasis and strong emphasis (377)",
-    "Emphasis and strong emphasis (378)",
     "Emphasis and strong emphasis (379)",
     "Emphasis and strong emphasis (380)",
     "Emphasis and strong emphasis (381)",
@@ -402,8 +406,6 @@ const PASSING: &[&str] = &[
     "Emphasis and strong emphasis (391)",
     "Emphasis and strong emphasis (392)",
     "Emphasis and strong emphasis (393)",
-    "Emphasis and strong emphasis (394)",
-    "Emphasis and strong emphasis (395)",
     "Emphasis and strong emphasis (396)",
     "Emphasis and strong emphasis (397)",
     "Emphasis and strong emphasis (398)",
@@ -426,15 +428,6 @@ const PASSING: &[&str] = &[
     "Emphasis and strong emphasis (419)",
     "Emphasis and strong emphasis (420)",
     "Emphasis and strong emphasis (421)",
-    "Emphasis and strong emphasis (422)",
-    "Emphasis and strong emphasis (423)",
-    "Emphasis and strong emphasis (427)",
-    "Emphasis and strong emphasis (428)",
-    "Emphasis and strong emphasis (429)",
-    "Emphasis and strong emphasis (430)",
-    "Emphasis and strong emphasis (431)",
-    "Emphasis and strong emphasis (432)",
-    "Emphasis and strong emphasis (433)",
     "Emphasis and strong emphasis (434)",
     "Emphasis and strong emphasis (435)",
     "Emphasis and strong emphasis (436)",
@@ -457,11 +450,8 @@ const PASSING: &[&str] = &[
     "Emphasis and strong emphasis (455)",
     "Emphasis and strong emphasis (457)",
     "Emphasis and strong emphasis (459)",
-    "Emphasis and strong emphasis (460)",
     "Emphasis and strong emphasis (461)",
     "Emphasis and strong emphasis (463)",
-    "Emphasis and strong emphasis (464)",
-    "Emphasis and strong emphasis (466)",
     "Emphasis and strong emphasis (467)",
     "Emphasis and strong emphasis (469)",
     "Emphasis and strong emphasis (471)",

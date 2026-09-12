@@ -191,3 +191,37 @@ fn table_header_keeps_its_markup() {
         [Inline::Strong(_), Inline::Str(_)]
     ));
 }
+
+#[test]
+fn lead_promotion_is_the_whole_paragraph() {
+    // Spec §Para: the sugar promotes a paragraph that *is* one short strong
+    // span; a strong span that opens a paragraph stays a bold run-in, and a
+    // list item is never promoted. The role takes what follows it.
+    let out = blocks(
+        "**A whole paragraph in bold.**\n\n\
+         **Leading bold:** followed by text.\n\n\
+         - **macOS:** install it\n- **macOS**\n\n\
+         {lead}[Explicit.] Text after.\n\n\
+         {lead}[Alone.]\n",
+    );
+    let lead = |b: &Block| match b {
+        Block::Para(p) => p.lead.is_some(),
+        _ => false,
+    };
+    assert!(lead(&out[0]));
+    let Block::Para(p) = &out[0] else {
+        unreachable!()
+    };
+    assert!(p.content.is_empty());
+    assert!(!lead(&out[1]));
+    let Block::BulletList(list) = &out[2] else {
+        panic!("{:?}", out[2])
+    };
+    assert!(list.items.iter().all(|i| !lead(&i.content[0])));
+    assert!(lead(&out[3]));
+    let Block::Para(p) = &out[3] else {
+        unreachable!()
+    };
+    assert_eq!(p.content.len(), 1);
+    assert!(lead(&out[4]));
+}

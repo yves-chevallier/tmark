@@ -226,7 +226,10 @@ impl Html<'_> {
         if let Some(lead) = &p.lead {
             self.out.push("<strong class=\"lead\">");
             self.inlines(lead);
-            self.out.push("</strong> ");
+            self.out.push("</strong>");
+            if !p.content.is_empty() {
+                self.out.push(" ");
+            }
         }
         self.inlines(&p.content);
         self.out.push("</p>\n");

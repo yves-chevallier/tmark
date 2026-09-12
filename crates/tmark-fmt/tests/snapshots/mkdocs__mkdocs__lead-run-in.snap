@@ -2,14 +2,4 @@
 source: crates/tmark-fmt/tests/mkdocs.rs
 expression: mkdocs(&canonical)
 ---
-# Top
-
-### Skipped
-
-{lead}[Note.]
-
-Table: T. {#fig:t}
-
-| a   |
-| --- |
-| 1   |
+{lead}[Boot sequence.] The device powers the flash before the SoC.

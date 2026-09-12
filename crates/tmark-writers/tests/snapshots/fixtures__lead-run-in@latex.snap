@@ -2,9 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-#ts-lead[Boot sequence.]
-
-*Leading bold:* the device powers the flash.
+\tslead{Boot sequence.} The device powers the flash before the SoC.
 
 ---requires---
 {

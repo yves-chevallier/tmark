@@ -626,9 +626,16 @@ paragraph) has an explicit role:
 {lead}[Boot sequence.] The device powers the flash before the SoC…
 ```
 
-Sugar: a paragraph whose first inline is a strong span shorter than 80
+The role takes what follows it on the paragraph, whatever that is: the
+lead-in is what the author wrote between the brackets.
+
+Sugar: a paragraph whose *whole* content is a strong span shorter than 80
 characters is promoted to a lead-in when feature `paragraph.lead` is on (on
-by default, off under `strict`). The promotion is sugar, not magic: it is
+by default, off under `strict`). A strong span that merely opens a
+paragraph is a bold run-in and stays one — promoting it would move the rest
+of the sentence into a paragraph of its own, since `\tslead` breaks the
+paragraph around the lead-in. A list item is not promoted either: a
+bold-only item is a label. The promotion is sugar, not magic: it is
 named, switchable, and `tmark fmt` rewrites it to the role. Class C.
 Backends: `\tslead{…}`, a bold run-in, `<p><b class="lead">`.
 
@@ -1552,7 +1559,7 @@ Table: The feature registry. {#tbl:features}
 
 | Feature | Default | Effect |
 | ------- | ------- | ------ |
-| `paragraph.lead` | on | promote a leading short strong span to `{lead}[…]` (§@[sec:structure]) |
+| `paragraph.lead` | on | promote a paragraph that is one short strong span to `{lead}[…]` (§@[sec:structure]) |
 | `table.decimal-align` | on | align numeric right-aligned columns on the decimal point |
 | `tasklist.partial` | off | `- [.]` partial task items |
 | `figures.exec` | off | execute `python image` fences |

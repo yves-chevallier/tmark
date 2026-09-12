@@ -105,6 +105,9 @@ pub(crate) struct Lowerer {
     /// a paragraph, so the `paragraph.lead` promotion does not apply —
     /// taking a lead there would drop the strong span from the fragment.
     pub in_fragment: bool,
+    /// Lowering the blocks of a list item: the `paragraph.lead` sugar does
+    /// not fire there (spec §Para).
+    pub in_list_item: bool,
 }
 
 pub fn parse(text: &str, file: FileId) -> Parsed {
@@ -136,6 +139,7 @@ pub fn parse_with(text: &str, file: FileId, options: Options) -> Parsed {
         in_tabs: false,
         next_body_is_tabs: false,
         in_fragment: false,
+        in_list_item: false,
     };
     let ctx = Ctx {
         text,
