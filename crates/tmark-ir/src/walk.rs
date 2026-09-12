@@ -5,6 +5,7 @@
 
 use crate::node::{Block, Document, Inline, Row};
 use crate::span::{NodeId, Span};
+use crate::table::Column;
 
 /// A borrowed node handed to a walker.
 #[derive(Copy, Clone, Debug)]
@@ -30,8 +31,8 @@ impl NodeRef<'_> {
 }
 
 /// Visits every block and inline of the document in pre-order: the body,
-/// then the footnote definitions. Table cells, captions, admonition titles,
-/// image alt texts and index paths are descended into.
+/// then the footnote definitions. Table column titles and cells, captions,
+/// admonition titles, image alt texts and index paths are descended into.
 pub fn walk<'a>(doc: &'a Document, f: &mut impl FnMut(NodeRef<'a>)) {
     walk_blocks(&doc.blocks, f);
     for footnote in &doc.footnotes {
@@ -106,6 +107,20 @@ pub fn walk_blocks<'a>(blocks: &'a [Block], f: &mut impl FnMut(NodeRef<'a>)) {
     }
 }
 
+/// The inline titles of a column tree, in declaration order (`LeafColumn::title`,
+/// `ColumnGroup::title`): a header cell's markup, which a plain name cannot hold.
+fn walk_columns<'a>(columns: &'a [Column], f: &mut impl FnMut(NodeRef<'a>)) {
+    for column in columns {
+        match column {
+            Column::Leaf(leaf) => walk_inlines(&leaf.title, f),
+            Column::Group(group) => {
+                walk_inlines(&group.title, f);
+                walk_columns(&group.columns, f);
+            }
+        }
+    }
+}
+
 pub fn walk_inlines<'a>(inlines: &'a [Inline], f: &mut impl FnMut(NodeRef<'a>)) {
     for inline in inlines {
         walk_inline(inline, f);
@@ -143,6 +158,9 @@ fn walk_block<'a>(block: &'a Block, f: &mut impl FnMut(NodeRef<'a>)) {
             }
         }
         Block::Table(n) => {
+            // Column titles first (they are the header row), then the body:
+            // a pass that rewrites inlines must see a header cell's markup.
+            walk_columns(&n.model.columns, f);
             for row in n.model.rows.iter().chain(&n.model.footer) {
                 if let Row::Data(row) = row {
                     for cell in &row.cells {
