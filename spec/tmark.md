@@ -223,7 +223,11 @@ caption lines are hosts; so is an anonymous span, written Pandoc-style as
 piece of text rather than a new kind of node: an anchor on a phrase
 (`[this claim]{#claim:one}`), the language of a quotation
 (`[this taylor]{lang=en}`), or media restriction (`[web only]{media=web}`).
-A span with no attributes is just brackets, as in CommonMark.
+A span with no attributes is just brackets, as in CommonMark. An *empty*
+link hugging an attribute list (`[](){#id}`, the MkDocs/autorefs anchor
+idiom) is the same anchor written the long way: an empty link is no link,
+so it reads as the span and is deprecated in favour of it (Appendix
+@[app:deprecations]).
 
 Three attributes are universal, accepted on every host:
 
@@ -1854,6 +1858,7 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | `--8<-- "file"` | `{include}(file)` | draft 3 | fmt |
 | `@https://doi.org/…` | `@doi:…` | draft 3 | indefinite (sugar) |
 | `[](gls:term)` | `@gls:term` | draft 2 | fmt |
+| `[](){#id}` anchor | `[]{#id}` | draft 3 | fmt |
 | bare `mermaid` fence | `mermaid image` | draft 3 | indefinite (MkDocs renders it) |
 | `Table:` line before the table | `Table:` line after | draft 3 | indefinite (Pandoc accepts both); open question 6 |
 | `!!!` / `???` callouts | `::: type {…}` | draft 2 | indefinite (MkDocs Material renders them) |

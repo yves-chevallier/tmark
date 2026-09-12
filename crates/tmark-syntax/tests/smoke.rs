@@ -225,3 +225,34 @@ fn lead_promotion_is_the_whole_paragraph() {
     assert_eq!(p.content.len(), 1);
     assert!(lead(&out[4]));
 }
+
+#[test]
+fn empty_link_with_attributes_is_an_anchor() {
+    // Spec §Attributes: `[](){#id}` is the anchor `[]{#id}`, deprecated.
+    let parsed = parse("[](){ #myanchor }\n\n[label](){#a}\n", FileId::default());
+    let Block::Para(p) = &parsed.document.blocks[0] else {
+        panic!("{:?}", parsed.document.blocks)
+    };
+    let [Inline::Span(span)] = p.content.as_slice() else {
+        panic!("{:?}", p.content)
+    };
+    assert_eq!(span.attrs.id.as_deref(), Some("myanchor"));
+    assert!(span.content.is_empty());
+    let deprecated: Vec<&str> = parsed
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == tmark_ir::Code::Deprecated)
+        .filter_map(|d| d.fix.as_ref().map(|f| f.replacement.as_str()))
+        .collect();
+    assert_eq!(deprecated, ["[]{#myanchor}"]);
+
+    // A link with a label is a link: the list still finds no host.
+    let Block::Para(p) = &parsed.document.blocks[1] else {
+        panic!("{:?}", parsed.document.blocks)
+    };
+    assert!(matches!(p.content.first(), Some(Inline::Link(_))));
+    assert!(parsed
+        .diagnostics
+        .iter()
+        .any(|d| d.code == tmark_ir::Code::AttrNoHost));
+}

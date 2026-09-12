@@ -628,6 +628,35 @@ impl Lowerer {
                         return None;
                     }
                 }
+                // `[](){#id}`: an empty link hugging an attribute list is
+                // the MkDocs/autorefs anchor idiom. An empty link is no
+                // link; what the author wrote is an anchor, which is the
+                // zero-width span `[]{#id}` (spec §Attributes) — deprecated
+                // in favour of that spelling.
+                if let Some(Inline::Link(link)) = out.last() {
+                    let empty = link.content.is_empty()
+                        && matches!(&link.target, Target::Url(url) if url.is_empty())
+                        && link.title.is_none();
+                    if empty && link.meta.span.end == span.start {
+                        let Some(Inline::Link(link)) = out.pop() else {
+                            unreachable!()
+                        };
+                        let whole = link.meta.span.join(span);
+                        self.deprecated_with_fix(
+                            whole,
+                            "[](){…}",
+                            "[]{…}",
+                            format!("[]{}", attrs_text(&attrs)),
+                        );
+                        let meta = self.meta(whole);
+                        out.push(Inline::Span(SpanNode {
+                            meta,
+                            content: Vec::new(),
+                            attrs,
+                        }));
+                        return None;
+                    }
+                }
                 if last {
                     trim_trailing_space(out);
                     return Some((attrs, span));

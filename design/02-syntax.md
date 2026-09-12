@@ -169,6 +169,10 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
 - One-line display math (`$$x$$ {#eq:a}`) becomes a `MathBlock` when it is
   the whole paragraph; a `\[ … \]` paragraph likewise; `$$ … $$ {#eq:a}` with
   the attribute list on the closing fence is accepted by the tokenizer.
+- An attribute list hugging an *empty* link (`[](){#id}`) takes the link:
+  the pair lowers to the zero-width `Span` of `[]{#id}` with a `deprecated`
+  fix, like the progress-bar case just above it in `lower_brace` (spec
+  §Attributes, parity finding F5).
 - Pandoc's `[@key, locator; -@key2]` is tokenised as a reference when the
   first item holds an `@`; the lowering strips the `@`s.
 - The `paragraph.lead` promotion applies to a paragraph whose whole content
