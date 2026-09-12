@@ -6,3 +6,7 @@ package-lock.json
 __pycache__/
 .pytest_cache/
 *.so
+
+# A `ln -s /home/ycr/tmark vendor/tmark` run from the wrong directory once
+# created a self-referential symlink here; keep it out.
+/tmark
