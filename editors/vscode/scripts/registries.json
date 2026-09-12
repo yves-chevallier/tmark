@@ -146,6 +146,7 @@
         "\\tslead",
         "\\tsmark",
         "\\tsdivider",
+        "\\tsrule",
         "\\tsepigraph",
         "\\tsaside",
         "\\tsprogress",
@@ -162,7 +163,7 @@
         "graphicx"
       ],
       "shell_escape": false,
-      "description": "lead-ins, highlight, divider, epigraph, asides, progress bars, TeX logos, generic containers"
+      "description": "lead-ins, highlight, divider, in-container rule, epigraph, asides, progress bars, TeX logos, generic containers"
     },
     {
       "name": "ts-callouts",

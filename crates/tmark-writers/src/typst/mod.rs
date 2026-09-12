@@ -40,6 +40,7 @@ impl Writer for TypstWriter {
             abbr_keys: abbr::keys(doc),
             tex_logos: logos::enabled(doc),
             lang: refs::language(opts.lang.as_deref(), doc, res),
+            container: 0,
         };
         w.blocks(&doc.blocks);
         w.req.close();
@@ -65,9 +66,23 @@ pub(crate) struct Typst<'a> {
     pub(crate) tex_logos: bool,
     /// The language of the label words (`refs::language`).
     lang: Option<String>,
+    /// Depth inside a container: anything that is not the document's
+    /// top-level block sequence (block quote, callout, figure, div, tab,
+    /// list item, cell, aside, footnote). A `HorizontalRule` there is
+    /// `#ts-rule()`: Typst refuses a page break inside a container
+    /// (spec §HorizontalRule, challenge C48).
+    container: usize,
 }
 
 impl Typst<'_> {
+    /// Runs `f` one container deep (see `container`).
+    fn contained<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.container += 1;
+        let out = f(self);
+        self.container -= 1;
+        out
+    }
+
     pub(crate) fn blocks(&mut self, blocks: &[Block]) {
         let mut first = true;
         let mut i = 0;
@@ -122,7 +137,11 @@ impl Typst<'_> {
             Block::DefinitionList(d) => self.definition_list(d),
             Block::HorizontalRule(_) => {
                 self.req.fragment("ts-typesetting");
-                self.out.push("#ts-divider()\n");
+                self.out.push(if self.container > 0 {
+                    "#ts-rule()\n"
+                } else {
+                    "#ts-divider()\n"
+                });
             }
             Block::Table(t) => self.table(t, config, caption),
             Block::TableConfig(_) => {}
@@ -292,7 +311,7 @@ impl Typst<'_> {
             return;
         }
         self.out.push("#quote(block: true)[\n");
-        self.blocks(&q.content);
+        self.contained(|w| w.blocks(&q.content));
         self.out.ensure_newline();
         self.out.push("]\n");
     }
@@ -362,6 +381,10 @@ impl Typst<'_> {
 
     /// The first paragraph on the marker's line, the rest indented.
     fn item_body(&mut self, content: &[Block]) {
+        self.contained(|w| w.item_body_inner(content));
+    }
+
+    fn item_body_inner(&mut self, content: &[Block]) {
         self.out.push_prefix("  ");
         let (first, rest) = match content.split_first() {
             Some((Block::Para(p), rest)) => {
@@ -421,7 +444,7 @@ impl Typst<'_> {
         args.extend(attr_args(&a.attrs, &["collapsed"]));
         self.out
             .push(&format!("#ts-callout({})[\n", args.join(", ")));
-        self.blocks(&a.content);
+        self.contained(|w| w.blocks(&a.content));
         self.out.ensure_newline();
         self.out.push("]\n");
     }
@@ -441,13 +464,13 @@ impl Typst<'_> {
                 }
             }
             // Print has no interaction: the tabs follow each other (spec §Tabs).
-            "tabs" => self.blocks(&d.content),
+            "tabs" => self.contained(|w| w.blocks(&d.content)),
             name => {
                 self.req.fragment("ts-typesetting");
                 let mut args = vec![format!("\"{}\"", escape::string(name))];
                 args.extend(attr_args(&d.attrs, &[]));
                 self.out.push(&format!("#ts-div({})[\n", args.join(", ")));
-                self.blocks(&d.content);
+                self.contained(|w| w.blocks(&d.content));
                 self.out.ensure_newline();
                 self.out.push("]\n");
             }
@@ -617,6 +640,10 @@ impl Typst<'_> {
 
     /// Blocks as one content run, paragraphs separated by `#parbreak()`.
     pub(crate) fn render_blocks_inline(&mut self, blocks: &[Block]) -> String {
+        self.contained(|w| w.render_blocks_inline_body(blocks))
+    }
+
+    fn render_blocks_inline_body(&mut self, blocks: &[Block]) -> String {
         let mut parts: Vec<String> = Vec::new();
         for block in blocks {
             if media::block_skipped(block, Media::Print) {

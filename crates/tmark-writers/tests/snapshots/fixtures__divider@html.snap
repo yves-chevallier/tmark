@@ -5,6 +5,11 @@ expression: snapshot
 <p>First page.</p>
 <hr />
 <p>Second page.</p>
+<blockquote>
+<p>Before the rule.</p>
+<hr class="rule" />
+<p>After the rule.</p>
+</blockquote>
 
 ---requires---
 {

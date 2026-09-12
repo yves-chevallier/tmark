@@ -8,6 +8,14 @@ First page.
 
 Second page.
 
+#quote(block: true)[
+Before the rule.
+
+#ts-rule()
+
+After the rule.
+]
+
 ---requires---
 {
   "packages": [

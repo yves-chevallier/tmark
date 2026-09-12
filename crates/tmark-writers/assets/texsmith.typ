@@ -11,8 +11,14 @@
 // `\tslead{…}`: a run-in lead.
 #let ts-lead(body) = strong(body)
 
-// `\tsdivider`: the `---` divider; paged media break the page.
+// `\tsdivider`: the `---` divider at the top level of the document; paged
+// media break the page.
 #let ts-divider() = pagebreak(weak: true)
+
+// `\tsrule`: the same `---` inside a container (quote, callout, figure,
+// div, list item, cell, aside, note). It separates without breaking: Typst
+// refuses a page break inside a container outright.
+#let ts-rule() = block(width: 100%, above: 0.8em, below: 0.8em, line(length: 100%, stroke: 0.4pt + luma(60%)))
 
 // `\tsepigraph[source={…}]{…}`.
 #let ts-epigraph(body, source: none) = align(right)[

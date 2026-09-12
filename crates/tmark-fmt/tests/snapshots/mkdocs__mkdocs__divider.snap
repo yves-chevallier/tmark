@@ -7,3 +7,9 @@ First page.
 ---
 
 Second page.
+
+> Before the rule.
+>
+> ---
+>
+> After the rule.

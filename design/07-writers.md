@@ -270,7 +270,7 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   `tmark_ir::registry::FRAGMENTS` into `Requires.packages`.
 - `assets/texsmith.typ`, exposed as `tmark_writers::TEXSMITH_TYP`: a
   default definition for every `#ts-…` function the Typst writer emits
-  (`ts-lead`, `ts-divider`, `ts-epigraph`, `ts-aside`, `ts-div`,
+  (`ts-lead`, `ts-divider`, `ts-rule`, `ts-epigraph`, `ts-aside`, `ts-div`,
   `ts-callout`, `ts-code`, `ts-task`, `ts-keys`, `ts-gls`, `ts-acr`,
   `ts-index`, `ts-script`, `ts-emoji`, `ts-page`). TeXSmith writes it next
   to the `.typ`; a body compiles with `#import "texsmith.typ": *` (plus
@@ -320,7 +320,7 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
 | Links, anchors, textual template | done | done (`{page}` → `#ts-page`, not in the contract yet) | done |
 | Raw, comments, zero-width collapse, media | done | done | done |
 | `Div` dispatch (`epigraph`, `code`, `tsdiv`) | done | done | done |
-| `Include`, `\tsdivider` | done | done | done |
+| `Include`, `\tsdivider` (top level) / `\tsrule` (in a container) | done | done | done (`<hr>` / `<hr class="rule">`) |
 | Scripts, emoji (`\tsscript`, `\tsemoji`) | done, untested on a corpus | done | plain spans |
 | Progress bars (`\tsprogress[thin]{0.45}{label}`) | done | done (`#ts-progress`) | done (`<progress>` in a `.progress` span) |
 | `multicolumn`/`div` containers | via `tsdiv` | via `#ts-div` | `<div class="multicolumn">`, `<div class="…">` |
@@ -420,6 +420,17 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   `inlines()` call, so nested content is collapsed at its own level.
 - `in_box` (LaTeX) is what decides `\captionof`; `in_cell` decides
   `\newline` for a hard break.
+- `container` (all three writers) counts how deep the writer is inside a
+  container — block quote, callout, figure, `:::` div or tab, list item,
+  table cell, aside, footnote: anything that is not the document's
+  top-level block sequence. Every recursion into contained blocks goes
+  through `contained(|w| …)`, which bumps the counter and restores it,
+  so a new container is one wrapped call and never a forgotten
+  decrement. A `HorizontalRule` reads it: `\tsdivider` / `#ts-divider()`
+  / `<hr>` at depth 0, `\tsrule` / `#ts-rule()` / `<hr class="rule">`
+  deeper (spec §HorizontalRule, challenge C48). Typst *rejects* a page
+  break inside a container, so this is a hard requirement there, not a
+  matter of taste.
 - `render_blocks_inline` joins paragraphs with `\par ` (LaTeX) and
   `#parbreak()` (Typst); a footnote with a list inside renders the list
   environment inline, which LaTeX accepts.

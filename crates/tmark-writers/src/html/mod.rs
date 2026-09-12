@@ -41,6 +41,7 @@ impl Writer for HtmlWriter {
             abbr_keys: abbr::keys(doc),
             tex_logos: logos::enabled(doc),
             lang: refs::language(opts.lang.as_deref(), doc, res),
+            container: 0,
         };
         w.blocks(&doc.blocks);
         w.footnotes();
@@ -121,9 +122,22 @@ struct Html<'a> {
     pub(crate) tex_logos: bool,
     /// The language of the label words (`refs::language`).
     lang: Option<String>,
+    /// Depth inside a container: anything that is not the document's
+    /// top-level block sequence (block quote, callout, figure, div, tab,
+    /// list item, cell, aside, footnote). A `HorizontalRule` there is
+    /// `<hr class="rule" />`, the separator twin of the page-breaking
+    /// divider (spec §HorizontalRule, challenge C48).
+    container: usize,
 }
 
 impl Html<'_> {
+    /// Runs `f` one container deep (see `container`).
+    fn contained<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.container += 1;
+        let out = f(self);
+        self.container -= 1;
+        out
+    }
     fn src(&self, meta: &Meta) -> String {
         if self.opts.source_map {
             format!(
@@ -188,7 +202,11 @@ impl Html<'_> {
             Block::BulletList(l) => self.bullet_list(l),
             Block::OrderedList(l) => self.ordered_list(l),
             Block::DefinitionList(d) => self.definition_list(d),
-            Block::HorizontalRule(_) => self.out.push("<hr />\n"),
+            Block::HorizontalRule(_) => self.out.push(if self.container > 0 {
+                "<hr class=\"rule\" />\n"
+            } else {
+                "<hr />\n"
+            }),
             Block::Table(t) => self.table(t, caption),
             Block::TableConfig(_) => {}
             Block::Caption(c) => self.caption(c),
@@ -315,7 +333,7 @@ impl Html<'_> {
             self.attrs(&q.attrs, &[]),
             self.src(&q.meta)
         ));
-        self.blocks(&q.content);
+        self.contained(|w| w.blocks(&q.content));
         self.out.push("</blockquote>\n");
     }
 
@@ -342,6 +360,10 @@ impl Html<'_> {
     /// A list is tight when no item holds more than one block besides a
     /// trailing nested list (`tmark-fmt` uses the same approximation).
     fn items(&mut self, items: &[ListItem]) {
+        self.contained(|w| w.items_body(items));
+    }
+
+    fn items_body(&mut self, items: &[ListItem]) {
         let tight = items.iter().all(|i| tight_item(&i.content));
         for item in items {
             self.out.push("<li>");
@@ -374,6 +396,10 @@ impl Html<'_> {
     }
 
     fn definition_list(&mut self, d: &DefinitionList) {
+        self.contained(|w| w.definition_list_body(d));
+    }
+
+    fn definition_list_body(&mut self, d: &DefinitionList) {
         self.out.push(&format!("<dl{}>\n", self.src(&d.meta)));
         for (term, definitions) in &d.items {
             self.out.push("<dt>");
@@ -454,6 +480,7 @@ impl Html<'_> {
                 .collect(),
             _ => BTreeMap::new(),
         };
+        self.container += 1;
         for block in content {
             match block {
                 Block::Para(p) => {
@@ -484,6 +511,7 @@ impl Html<'_> {
                 other => self.block(other, None),
             }
         }
+        self.container -= 1;
         if let Some(caption) = caption {
             self.figcaption(caption);
         }
@@ -535,7 +563,7 @@ impl Html<'_> {
             }
         }
         self.out.push(&format!("</{title_tag}>\n"));
-        self.blocks(&a.content);
+        self.contained(|w| w.blocks(&a.content));
         self.out.push(&format!("</{tag}>\n"));
     }
 
@@ -579,7 +607,7 @@ impl Html<'_> {
                 self.attrs(&attrs, &["tabbed-block"]),
                 self.src(&tab.meta)
             ));
-            self.blocks(&tab.content);
+            self.contained(|w| w.blocks(&tab.content));
             self.out.push("</div>\n");
         }
         self.out.push("</div>\n</div>\n");
@@ -603,7 +631,7 @@ impl Html<'_> {
             self.attrs(&d.attrs, classes),
             self.src(&d.meta)
         ));
-        self.blocks(&d.content);
+        self.contained(|w| w.blocks(&d.content));
         self.out.push("</div>\n");
     }
 
@@ -624,7 +652,7 @@ impl Html<'_> {
         };
         self.out
             .push(&format!("<aside{class}{}>\n", self.src(meta)));
-        self.blocks(&aside.content);
+        self.contained(|w| w.blocks(&aside.content));
         self.out.push("</aside>\n");
     }
 
@@ -770,7 +798,7 @@ impl Html<'_> {
         td.push_str(&align_attr(align));
         td.push('>');
         self.out.push(&td);
-        self.inlines(&cell.content);
+        self.contained(|w| w.inlines(&cell.content));
         self.out.push("</td>\n");
     }
 
@@ -1149,6 +1177,7 @@ impl Html<'_> {
             None => String::new(),
         };
         self.out.push(&format!("<span role=\"note\"{class}>"));
+        self.container += 1;
         for (i, block) in n.content.iter().enumerate() {
             if i > 0 {
                 self.out.push(" ");
@@ -1158,6 +1187,7 @@ impl Html<'_> {
                 other => self.block(other, None),
             }
         }
+        self.container -= 1;
         self.out.push("</span>");
     }
 
@@ -1197,7 +1227,7 @@ impl Html<'_> {
                 }
             } else {
                 self.out.push("\n");
-                self.blocks(content);
+                self.contained(|w| w.blocks(content));
             }
             self.out.push(&format!(
                 " <a href=\"#fnref-{}\" class=\"footnote-backref\">↩</a></li>\n",

@@ -479,7 +479,7 @@ Table: Class X deviations from GFM. {#tbl:deviations}
 | # | Syntax | GFM meaning | TMark meaning | Rationale |
 | - | ------ | ----------- | ------------- | --------- |
 | X1 | `__text__` | bold | small caps | `__` duplicates `**`; academic writing needs small caps far more than a second bold. Visible, not silent: small caps look nothing like bold. Disabled by the `strict` profile. |
-| X2 | `---` (thematic break) | horizontal rule | page break (paged media) | See §@[sec:structure]. Semantically it stays a divider; the paged writers emit `\tsdivider` / `#ts-divider()`, a page break unless the template redefines it; the web shows `<hr>`. Disabled by the `strict` profile. |
+| X2 | `---` (thematic break) | horizontal rule | page break (paged media) at the top level, separator in a container | See §@[sec:structure]. Semantically it stays a divider; at the top level of the document the paged writers emit `\tsdivider` / `#ts-divider()`, a page break unless the template redefines it, and the web shows `<hr>`. Inside a container the same node is `\tsrule` / `#ts-rule()` / `<hr class="rule">`, a separator that never breaks the page. Disabled by the `strict` profile. |
 | X3 | `~x~` | strikethrough (single tilde) | subscript | PyMdownX tilde, long-established in the MkDocs world; the only class-E construct GFM assigns a different meaning to. |
 | X4 | `@word` | literal | reference or citation | Guarded: never fires inside e-mails, URLs, or code; `\@` escapes. Identical to Pandoc's behaviour with `--citeproc`. |
 | X5 | `#[…]`, `#(…)` | literal | index entry, counter item | `#[` or `#(` followed by a non-space never occurs in prose; `\#` escapes. No further guard is needed now that `#{…}` is gone. |
@@ -697,13 +697,26 @@ separate node. Class C.
 `---` on its own line, blank lines around, is a *divider* node
 (`HorizontalRule`). The syntax keeps its CommonMark semantics ("section
 divider"); what a divider looks like is form, so no writer chooses it
-itself: the LaTeX writer emits `\tsdivider`, the Typst writer
-`#ts-divider()`, and the `ts-typesetting` fragment defines both as a page
-break (`\clearpage`, `#pagebreak()`), which a template redefines at will (a
-fleuron, a blank line, nothing). The HTML writer emits `<hr>`: the web shows
-a rule and never a page break. The paged default is the one opinionated
-part (X2). There is no line-break role: Markdown's hard break (trailing
-`\`) exists, and a backend-specific break is a raw passthrough:
+itself: at the top level of the document the LaTeX writer emits
+`\tsdivider`, the Typst writer `#ts-divider()`, and the `ts-typesetting`
+fragment defines both as a page break (`\clearpage`, `#pagebreak()`), which
+a template redefines at will (a fleuron, a blank line, nothing). The HTML
+writer emits `<hr>`: the web shows a rule and never a page break. The paged
+default is the one opinionated part (X2).
+
+A divider *inside a container* — a block quote, a callout, a figure, a
+`:::` div or tab, a list item, a table cell, an aside, a footnote: anything
+that is not the document's top-level block sequence — separates, it does
+not page-break. Breaking the page there would tear the container in two,
+and Typst refuses it outright ("pagebreaks are not allowed inside of
+containers"). The writers know their own nesting and emit the second
+contract of `ts-typesetting`: `\tsrule`, `#ts-rule()`, `<hr class="rule">`,
+a full-width rule with the surrounding skips, restylable exactly like
+`\tsdivider` and never a page break (challenge C48). One node, two
+contracts; the author writes `---` in both places.
+
+There is no line-break role: Markdown's hard break (trailing `\`) exists,
+and a backend-specific break is a raw passthrough:
 `{raw latex}(\newpage)`.
 
 #### Foreign directive
@@ -1759,7 +1772,7 @@ Table: Divergences from draft 1. {#tbl:draft1}
 | ------- | -------------- | --- |
 | Two universal primitives, `{heading 1}[x]` | Four families over a CommonMark substrate | False purity; conflated inline and block; nobody writes headings as roles. |
 | `__x__` = underline | `__x__` = small caps (X1), underline role-only | Matches the shipping implementation; underline is poor print typography. |
-| `---` "recycled into page break" | Divider node; paged writers emit `\tsdivider`, a page break by default | Same behaviour, honest semantics: the mapping is form, not syntax. |
+| `---` "recycled into page break" | Divider node; at the top level the paged writers emit `\tsdivider`, a page break by default, and `\tsrule` inside a container | Same behaviour, honest semantics: the mapping is form, not syntax — and a container cannot hold a page break. |
 | `!!! equation #id` | `$$ … $$ {#eq:id}` | Admonitions are callouts; attribute anchors are lighter (Quarto-proven). |
 | Citations `@https://doi.org/…` | `@doi:…` in place, or a front-matter key | Reversed in draft 3: `doi` is a predeclared prefix, so the guard on URLs is untouched and the DOI form fits the registry model. |
 | `[](gls:solid)` | `@gls:solid` | One reference mechanism; `gls` is just a predeclared prefix. |

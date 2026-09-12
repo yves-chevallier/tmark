@@ -151,11 +151,12 @@ impl Typst<'_> {
         if title.is_empty() {
             return escape::markup(name.unwrap_or(""));
         }
-        self.render_inlines(title).replace('\n', " ")
+        self.contained(|w| w.render_inlines(title))
+            .replace('\n', " ")
     }
 
     fn cell(&mut self, cell: &Cell) -> String {
-        let body = self.render_inlines(&cell.content);
+        let body = self.contained(|w| w.render_inlines(&cell.content));
         let body = body.replace('\n', " ");
         let mut args: Vec<String> = Vec::new();
         if cell.cols > 1 {

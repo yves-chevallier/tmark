@@ -347,7 +347,7 @@ impl Latex<'_> {
     fn cell_text(&mut self, cell: &Cell) -> String {
         let was = self.in_cell;
         self.in_cell = true;
-        let text = self.render_inlines(&cell.content);
+        let text = self.contained(|w| w.render_inlines(&cell.content));
         self.in_cell = was;
         text.trim().to_string()
     }
@@ -360,7 +360,7 @@ impl Latex<'_> {
         }
         let was = self.in_cell;
         self.in_cell = true;
-        let text = self.render_inlines(title);
+        let text = self.contained(|w| w.render_inlines(title));
         self.in_cell = was;
         text.trim().to_string()
     }

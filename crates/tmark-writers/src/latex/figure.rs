@@ -226,7 +226,7 @@ impl Latex<'_> {
                 // Arbitrary content: a float around the blocks.
                 self.req.package("float");
                 self.out.push("\\begin{figure}[H]\n\\centering\n");
-                self.blocks(content);
+                self.contained(|w| w.blocks(content));
                 self.out.ensure_newline();
                 let text = caption.map(|c| self.render_inlines(&c.content));
                 self.caption_line(

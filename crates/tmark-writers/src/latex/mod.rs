@@ -45,6 +45,7 @@ impl Writer for LatexWriter {
             req: Requires::default(),
             in_box: 0,
             in_cell: false,
+            container: 0,
             acronyms: BTreeMap::new(),
             abbr_keys: abbr::keys(doc),
             lang: refs::language(opts.lang.as_deref(), doc, res),
@@ -75,6 +76,12 @@ pub(crate) struct Latex<'a> {
     in_box: usize,
     /// Inside a table cell.
     in_cell: bool,
+    /// Depth inside a container: anything that is not the document's
+    /// top-level block sequence (block quote, callout, figure, div, tab,
+    /// list item, cell, aside, footnote). A `HorizontalRule` there is
+    /// `\tsrule`, never the page-breaking `\tsdivider` (spec
+    /// §HorizontalRule, challenge C48).
+    container: usize,
     /// Acronym term → `\tsacr` key, first seen first.
     acronyms: BTreeMap<String, String>,
     /// Acronym keys substituted in running text (`common::abbr`).
@@ -86,6 +93,14 @@ pub(crate) struct Latex<'a> {
 }
 
 impl Latex<'_> {
+    /// Runs `f` one container deep (see `container`).
+    fn contained<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.container += 1;
+        let out = f(self);
+        self.container -= 1;
+        out
+    }
+
     // ------------------------------------------------------------ blocks
 
     /// Writes blocks separated by one blank line; a caption (and a
@@ -359,7 +374,7 @@ impl Latex<'_> {
         }
         self.req.package("csquotes");
         self.out.push("\\begin{displayquote}\n");
-        self.blocks(&q.content);
+        self.contained(|w| w.blocks(&q.content));
         self.out.ensure_newline();
         self.out.push("\\end{displayquote}\n");
     }
@@ -434,6 +449,10 @@ impl Latex<'_> {
     /// One `\item`: the first paragraph on the marker's line, a nested
     /// list on its own line (`writer.py:694`), other blocks after a blank.
     fn item(&mut self, marker: &str, content: &[Block]) {
+        self.contained(|w| w.item_body(marker, content));
+    }
+
+    fn item_body(&mut self, marker: &str, content: &[Block]) {
         self.out.push(marker);
         let (lead, inline, rest): (Option<&Vec<Inline>>, Option<&[Inline]>, &[Block]) =
             match content.split_first() {
@@ -481,10 +500,16 @@ impl Latex<'_> {
         self.out.push("\\end{description}\n");
     }
 
-    /// `\tsdivider` (decisions.md X2).
+    /// `\tsdivider` at the top level (decisions.md X2), `\tsrule` inside a
+    /// container: a page break there would tear the container apart (spec
+    /// §HorizontalRule, challenge C48).
     fn horizontal_rule(&mut self) {
         self.req.fragment("ts-typesetting");
-        self.out.push("\\tsdivider\n");
+        self.out.push(if self.container > 0 {
+            "\\tsrule\n"
+        } else {
+            "\\tsdivider\n"
+        });
     }
 
     /// A caption with no float next to it: its text, with its anchor.
@@ -511,7 +536,7 @@ impl Latex<'_> {
         self.out
             .push(&format!("\\begin{{tscallout}}[{}]\n", keys.join(", ")));
         self.in_box += 1;
-        self.blocks(&a.content);
+        self.contained(|w| w.blocks(&a.content));
         self.in_box -= 1;
         self.out.ensure_newline();
         self.out.push("\\end{tscallout}\n");
@@ -524,7 +549,7 @@ impl Latex<'_> {
         match d.name.as_str() {
             "epigraph" => self.epigraph(&d.content, d.attrs.get("source")),
             // Print has no interaction: the tabs of a set follow each other,
-            "tabs" => self.blocks(&d.content),
+            "tabs" => self.contained(|w| w.blocks(&d.content)),
             "code" => {
                 let keys = self.code_keys(None, &d.attrs, caption, None, Some("pygments"));
                 self.begin_code(&keys);
@@ -551,7 +576,7 @@ impl Latex<'_> {
                     self.out.push(&format!("[{}]", keys.join(", ")));
                 }
                 self.out.push("\n");
-                self.blocks(&d.content);
+                self.contained(|w| w.blocks(&d.content));
                 self.out.ensure_newline();
                 self.out.push("\\end{tsdiv}\n");
             }
@@ -635,6 +660,10 @@ impl Latex<'_> {
     /// Blocks rendered aside as one run: paragraphs joined by `\par `
     /// (footnotes, asides, epigraphs).
     pub(crate) fn render_blocks_inline(&mut self, blocks: &[Block]) -> String {
+        self.contained(|w| w.render_blocks_inline_body(blocks))
+    }
+
+    fn render_blocks_inline_body(&mut self, blocks: &[Block]) -> String {
         let mut parts: Vec<String> = Vec::new();
         for block in blocks {
             if media::block_skipped(block, Media::Print) {
