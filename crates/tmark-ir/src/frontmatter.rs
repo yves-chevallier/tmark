@@ -181,9 +181,10 @@ pub struct Declare {
     pub counters: BTreeMap<String, CounterDecl>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub admonitions: BTreeMap<String, AdmonitionDecl>,
-    /// Structure owned by TeXSmith for now; kept as JSON.
-    #[serde(skip_serializing_if = "Value::is_null")]
-    pub glossary: Value,
+    /// Spec §Glossary and acronyms: both accepted spellings of the
+    /// declaration land in the same struct.
+    #[serde(skip_serializing_if = "GlossaryDecl::is_empty")]
+    pub glossary: GlossaryDecl,
     /// Structure owned by TeXSmith for now; kept as JSON.
     #[serde(skip_serializing_if = "Value::is_null")]
     pub acronyms: Value,
@@ -193,7 +194,7 @@ impl Declare {
     pub fn is_empty(&self) -> bool {
         self.counters.is_empty()
             && self.admonitions.is_empty()
-            && self.glossary.is_null()
+            && self.glossary.is_empty()
             && self.acronyms.is_null()
     }
 }
@@ -232,6 +233,168 @@ pub struct AdmonitionDecl {
     /// Counter prefix of a theorem-type admonition.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub counter: Option<String>,
+}
+
+/// The glossary declaration, `declare.glossary`. Spec §Glossary and
+/// acronyms: two spellings reach this one struct.
+///
+/// The *flat* spelling is a mapping of term to definition
+/// (`api: An interface`, or `api: {name, description}`); the *structured*
+/// one names its parts (`style`, `groups`, `entries`) and keeps the terms
+/// under `entries`. The two may be mixed: `style`, `groups` and `entries`
+/// are structural wherever they appear at the top level, every other key
+/// there is a term. A term of one of those three names is therefore only
+/// writable under `entries` — where it wins over a flat key of the same
+/// name. `glossary: long` (TeXSmith 0.6) names a style and no term.
+///
+/// `style` and `groups` are not terms and never reach the glossary
+/// registry: they are form, read from here by the consumer that renders
+/// the per-group tables (TeXSmith's `ts-glossary` fragment).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, JsonSchema)]
+#[serde(default)]
+pub struct GlossaryDecl {
+    /// A `glossaries`-package style name (`long`, `altlist`, …).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    /// Group key to its heading; a template prints one table per group.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub groups: BTreeMap<String, GlossaryGroup>,
+    /// The terms, whichever spelling declared them.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub entries: BTreeMap<String, GlossaryEntry>,
+}
+
+impl GlossaryDecl {
+    pub fn is_empty(&self) -> bool {
+        self.style.is_none() && self.groups.is_empty() && self.entries.is_empty()
+    }
+
+    /// Reads either spelling out of a YAML value. Anything that is neither
+    /// a mapping nor a style string declares nothing: the front matter of
+    /// a document is never rejected over the shape of this key.
+    fn from_value(value: &Value) -> Self {
+        let mut out = GlossaryDecl::default();
+        match value {
+            Value::String(style) => out.style = non_empty(style),
+            Value::Object(map) => {
+                if let Some(Value::String(style)) = map.get("style") {
+                    out.style = non_empty(style);
+                }
+                if let Some(Value::Object(groups)) = map.get("groups") {
+                    for (key, value) in groups {
+                        out.groups
+                            .insert(key.clone(), GlossaryGroup::from_value(value));
+                    }
+                }
+                if let Some(Value::Object(entries)) = map.get("entries") {
+                    for (key, value) in entries {
+                        out.entries
+                            .insert(key.clone(), GlossaryEntry::from_value(value));
+                    }
+                }
+                for (key, value) in map {
+                    if GLOSSARY_STRUCTURAL_KEYS.contains(&key.as_str()) {
+                        continue;
+                    }
+                    out.entries
+                        .entry(key.clone())
+                        .or_insert_with(|| GlossaryEntry::from_value(value));
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+}
+
+/// The keys of the structured spelling; never terms at the top level.
+const GLOSSARY_STRUCTURAL_KEYS: [&str; 3] = ["style", "groups", "entries"];
+
+impl<'de> Deserialize<'de> for GlossaryDecl {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(GlossaryDecl::from_value(&Value::deserialize(d)?))
+    }
+}
+
+/// A glossary group: `core: Core terms` or `core: {title: Core terms}`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, JsonSchema)]
+pub struct GlossaryGroup {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+}
+
+impl GlossaryGroup {
+    fn from_value(value: &Value) -> Self {
+        let title = match value {
+            Value::String(title) => title.clone(),
+            Value::Object(map) => map
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            _ => String::new(),
+        };
+        GlossaryGroup { title }
+    }
+}
+
+/// A glossary term. `api: An interface` sets `description`; the object
+/// form takes `name` (the short form), `description`, `long` and the
+/// `group` the entry belongs to.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, JsonSchema)]
+#[serde(default)]
+pub struct GlossaryEntry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The expanded form of an acronym, when it differs from the
+    /// description.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub long: Option<String>,
+    /// Key of the `groups` entry this term is listed under.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+}
+
+impl GlossaryEntry {
+    fn from_value(value: &Value) -> Self {
+        match value {
+            Value::Null => GlossaryEntry::default(),
+            Value::String(text) => GlossaryEntry {
+                description: non_empty(text),
+                ..GlossaryEntry::default()
+            },
+            Value::Object(map) => {
+                let field = |key: &str| map.get(key).and_then(Value::as_str).and_then(non_empty);
+                GlossaryEntry {
+                    name: field("name"),
+                    description: field("description"),
+                    long: field("long"),
+                    group: field("group"),
+                }
+            }
+            other => GlossaryEntry {
+                description: Some(other.to_string()),
+                ..GlossaryEntry::default()
+            },
+        }
+    }
+
+    /// What `@gls:term` resolves to: the short `name`, else the
+    /// description, else the long form.
+    pub fn definition(&self) -> &str {
+        self.name
+            .as_deref()
+            .or(self.description.as_deref())
+            .or(self.long.as_deref())
+            .unwrap_or_default()
+    }
+}
+
+fn non_empty(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
 /// `sources`: where references resolve. Spec §Bibliography, §Cross-document
@@ -484,6 +647,64 @@ mod tests {
         // The explicit `callouts.style` wins over a deprecated spelling.
         let fm = parse("press:\n  callout_style: a\n  callouts: {style: b}\n").unwrap();
         assert_eq!(fm.extra["press"]["callouts"]["style"], "b");
+    }
+
+    #[test]
+    fn glossary_reads_both_spellings() {
+        // Flat: every key is a term.
+        let fm = parse("press:\n  declare:\n    glossary:\n      api: An interface\n      solid: {name: SOLID, description: Five principles}\n").unwrap();
+        let g = &fm.keys.press.declare.glossary;
+        assert!(g.style.is_none() && g.groups.is_empty());
+        assert_eq!(g.entries["api"].definition(), "An interface");
+        assert_eq!(g.entries["solid"].definition(), "SOLID");
+
+        // Structured: the terms sit under `entries`, `style` and `groups`
+        // are form and never terms.
+        let fm = parse("press:\n  declare:\n    glossary:\n      style: long\n      groups:\n        core: {title: Core terms}\n      entries:\n        api: {group: core, description: An interface, long: Application Programming Interface}\n").unwrap();
+        let g = &fm.keys.press.declare.glossary;
+        assert_eq!(g.style.as_deref(), Some("long"));
+        assert_eq!(g.groups["core"].title, "Core terms");
+        assert_eq!(g.entries.keys().collect::<Vec<_>>(), vec!["api"]);
+        assert_eq!(g.entries["api"].group.as_deref(), Some("core"));
+        assert_eq!(
+            g.entries["api"].long.as_deref(),
+            Some("Application Programming Interface")
+        );
+
+        // Mixed: the structural keys win over a flat key of the same name.
+        let fm = parse("glossary:\n  style: long\n  entries: {api: An interface}\n  doi: A digital object identifier\n").unwrap();
+        let g = &fm.keys.press.declare.glossary;
+        assert_eq!(fm.deprecated, vec!["glossary"]);
+        assert_eq!(g.entries["api"].definition(), "An interface");
+        assert_eq!(g.entries["doi"].definition(), "A digital object identifier");
+
+        // A bare string names a style; anything else declares nothing and
+        // never fails the front matter.
+        assert_eq!(
+            parse("press:\n  declare:\n    glossary: altlist\n")
+                .unwrap()
+                .keys
+                .press
+                .declare
+                .glossary
+                .style
+                .as_deref(),
+            Some("altlist")
+        );
+        assert!(parse("press:\n  declare:\n    glossary: [a, b]\n")
+            .unwrap()
+            .keys
+            .press
+            .declare
+            .is_empty());
+
+        // Both spellings serialise to the structured one and round trip.
+        let json = serde_json::to_value(&fm).unwrap();
+        assert_eq!(
+            json["keys"]["press"]["declare"]["glossary"]["entries"]["api"]["description"],
+            "An interface"
+        );
+        assert_eq!(serde_json::from_value::<FrontMatter>(json).unwrap(), fm);
     }
 
     #[test]

@@ -166,7 +166,12 @@ two-repository change (R14 of its plan):
   regeneration on their side; a renamed one breaks their passes. The
   parity-triage round added one: `LeafColumn.title` / `ColumnGroup.title`
   (the header of a table column as inline Markdown, finding F3), so
-  `texsmith/ir/model.py` and the schema hash must be regenerated.
+  `texsmith/ir/model.py` and the schema hash must be regenerated. C50
+  changed one: `press.declare.glossary` is no longer a loose JSON value but
+  `GlossaryDecl {style, groups, entries}`, whichever spelling the author
+  used — so `passes/glossary.py`, which normalised the structured section
+  into a flat mapping before resolution, is reading a typed object now and
+  has nothing left to normalise.
 - **`Requires` and `FRAGMENTS`.** A writer names the contracts it used
   in `Requires.fragments` and the structural packages in
   `Requires.packages`; TeXSmith's fragment loader reads

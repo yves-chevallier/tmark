@@ -1555,9 +1555,51 @@ The HTML spec is maintained by the W3C.
 ```
 
 Substitution is strict and case-sensitive, applies only to defined keys, and
-maps to `glossaries`' `\acrshort`. Structured declaration (groups, per-group
-tables) lives under `declare.glossary` and `declare.acronyms`. Glossary
-references are `@gls:term` (§@[sec:references]). Wikipedia-backed entries
+maps to `glossaries`' `\acrshort`.
+
+Terms are declared under `declare.glossary`, in either of two spellings. The
+flat one maps a term to its definition, a string or an object with `name`
+and `description`:
+
+```yaml
+press:
+  declare:
+    glossary:
+      api: An application programming interface.
+      solid: {name: SOLID, description: Five design principles}
+```
+
+The structured one names its parts: `style`, a `glossaries` style; `groups`,
+a group key to the heading of the table that lists it; and the terms under
+`entries`, each with a `description`, an optional `long` form and the
+`group` it belongs to.
+
+```yaml
+press:
+  declare:
+    glossary:
+      style: long
+      groups:
+        core: Core terms
+      entries:
+        api:
+          group: core
+          description: An application programming interface.
+```
+
+Both spellings declare the same thing: `@gls:term` (§@[sec:references])
+resolves against the terms of either, and a term neither declares is
+`ref-unresolved`. `style` and `groups` are form rather than terms — they are
+read where they stand by the template that prints the per-group tables, and
+never reach the glossary registry. The spellings may be mixed: `style`,
+`groups` and `entries` are structural wherever they appear at the top level
+of the mapping, and every other key there is a term. A term named after one
+of the three is therefore written under `entries`, where it wins over a flat
+key of the same name; `glossary: <style>` names a style and no term, and a
+`declare.glossary` that is neither a mapping nor a string declares nothing.
+`declare.acronyms` keeps its own flat term-to-definition mapping.
+
+Wikipedia-backed entries
 (auto-fetch summaries from `[SOLID](https://en.wikipedia.org/wiki/SOLID)`
 links) are opt-in: `features: {glossary.wikipedia: true}` (P4).
 

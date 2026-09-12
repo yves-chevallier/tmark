@@ -558,26 +558,29 @@ fn is_combining_mark(c: char) -> bool {
     )
 }
 
-/// Glossary and acronym terms: `declare.glossary`, `declare.acronyms`
-/// (mappings term → definition) and the `*[KEY]: …` abbreviations.
+/// Glossary and acronym terms: the terms of `declare.glossary` — whichever
+/// of the two spellings declared them (`tmark_ir::frontmatter::GlossaryDecl`;
+/// its `style` and `groups` are form, not terms) —, `declare.acronyms`
+/// (a mapping term → definition) and the `*[KEY]: …` abbreviations.
 pub fn glossary(doc: &Document) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     let declare = &doc.front_matter.keys.press.declare;
-    for value in [&declare.glossary, &declare.acronyms] {
-        if let serde_json::Value::Object(map) = value {
-            for (term, def) in map {
-                let text = match def {
-                    serde_json::Value::String(s) => s.clone(),
-                    serde_json::Value::Object(o) => o
-                        .get("name")
-                        .or_else(|| o.get("description"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string(),
-                    other => other.to_string(),
-                };
-                out.insert(term.to_ascii_lowercase(), text);
-            }
+    for (term, entry) in &declare.glossary.entries {
+        out.insert(term.to_ascii_lowercase(), entry.definition().to_string());
+    }
+    if let serde_json::Value::Object(map) = &declare.acronyms {
+        for (term, def) in map {
+            let text = match def {
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Object(o) => o
+                    .get("name")
+                    .or_else(|| o.get("description"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                other => other.to_string(),
+            };
+            out.insert(term.to_ascii_lowercase(), text);
         }
     }
     for abbr in &doc.abbreviations {
