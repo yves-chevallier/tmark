@@ -1,30 +1,16 @@
 //! `compat-unsupported`: PyMdownX spellings the parser recognises but does
 //! not implement yet (spec Appendix "PyMdownX compatibility profile",
-//! milestone 5), reported instead of silently left as text (P4): critic
-//! markup, wiki links and fancy list markers. Each scan is deliberately
-//! narrow: a miss is literal text, as before; a false positive would be a
-//! wrong warning on prose. Content tabs, progress bars, emoji and icon
-//! shortcodes, `^^x^^` and `[TOC]` were implemented by the C31–C42 wave
-//! and left this file.
+//! milestone 5), reported instead of silently left as text (P4): wiki
+//! links and fancy list markers. Each scan is deliberately narrow: a miss
+//! is literal text, as before; a false positive would be a wrong warning
+//! on prose. Content tabs, progress bars, emoji and icon shortcodes,
+//! `^^x^^` and `[TOC]` were implemented by the C31–C42 wave, critic markup
+//! by C49 (`tmark_ir::critic`, `lower/inline.rs`), and each left this
+//! file.
 
 use tmark_ir::{Code, Inline, Span};
 
 use super::Lowerer;
-
-/// Critic markup, which the tokenizer hands over as a brace group:
-/// `{++ins++}`, `{--del--}`, `{~~a~>b~~}`, `{==hl==}`, `{>>comment<<}`
-/// (`value` is the text between the braces).
-fn is_critic(value: &str) -> bool {
-    [
-        ("++", "++"),
-        ("--", "--"),
-        ("~~", "~~"),
-        ("==", "=="),
-        (">>", "<<"),
-    ]
-    .iter()
-    .any(|(open, close)| value.len() >= 4 && value.starts_with(open) && value.ends_with(close))
-}
 
 /// A recognised but unimplemented spelling inside a text run: `(start,
 /// end, what)` as byte offsets into `text`.
@@ -101,13 +87,6 @@ impl Lowerer {
         }
     }
 
-    /// Report a literal brace group that is critic markup.
-    pub fn compat_scan_brace(&mut self, value: &str, span: Span) {
-        if is_critic(value) {
-            self.compat_unsupported(span, "critic markup");
-        }
-    }
-
     /// Report a paragraph that starts an unimplemented block spelling
     /// (fancy list markers); `source` is the paragraph's source, whose
     /// leading backslash means literal text.
@@ -144,8 +123,6 @@ mod tests {
             .collect();
         assert_eq!(found, ["wiki link `[[…]]`"]);
         assert!(scan_text("plain [x] {k=v} 1:2 note: text").is_empty());
-        assert!(is_critic("--del--") && is_critic(">>c<<") && is_critic("~~a~>b~~"));
-        assert!(!is_critic("--") && !is_critic("k=v") && !is_critic("--a++"));
     }
 
     #[test]

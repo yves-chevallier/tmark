@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-A \{--deleted--\} word, a [[Wiki Page]].
+A word, a [[Wiki Page]].
 
 a. first fancy item
 

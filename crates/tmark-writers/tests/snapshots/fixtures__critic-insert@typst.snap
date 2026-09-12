@@ -2,9 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-A word, a \[\[Wiki Page\]\].
-
-a. first fancy item
+The release is #underline[almost *ready*] now.
 
 ---requires---
 {

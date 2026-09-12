@@ -9,6 +9,8 @@
 //! - [`span`]: files, byte spans, node ids, line index (spec §Round-trip and
 //!   source spans).
 //! - [`attrs`]: attribute lists (spec §Attributes).
+//! - [`critic`]: critic markup, the `Span{.critic}` shapes (spec Appendix
+//!   "PyMdownX compatibility profile").
 //! - [`node`]: `Document`, `Block`, `Inline` and supporting types (spec §Node
 //!   catalogue).
 //! - [`table`]: the semantic table model (spec §Table).
@@ -26,6 +28,7 @@
 #![forbid(unsafe_code)]
 
 pub mod attrs;
+pub mod critic;
 pub mod diagnostic;
 pub mod emoji;
 pub mod frontmatter;
@@ -37,6 +40,7 @@ pub mod walk;
 pub mod yaml_edit;
 
 pub use attrs::Attrs;
+pub use critic::{critic, Critic};
 pub use diagnostic::{Code, Diagnostic, Fix, Severity, Stage};
 pub use frontmatter::{
     AdmonitionDecl, Author, CounterDecl, Declare, Epigraph, FrontMatter, FrontMatterError, Keys,

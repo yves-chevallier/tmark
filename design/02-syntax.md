@@ -67,7 +67,7 @@ Reference: spec §Four syntactic families, §Two sigils, §Lexical grammar.
 | Math `$…$`, `$$…$$`, `\(…\)`, `\[…\]` | §Math | inline/block | Vendored math construct plus the two LaTeX-habit delimiters. |
 | Moustache `{{ key }}` | §Front matter | lowering | Text scan in lowering; produces `Var` inline. Not inside code. |
 | Comment `<!-- -->` | §Comment | block/inline | HTML construct; lowering produces `Comment` for the comment form only, `RawInline`/`RawBlock` with `format = "html"` for other HTML. |
-| Critic markup | Appendix | inline | Deferred to milestone 5 (compat profile). Until then literal text plus `compat-unsupported` (`lower/compat.rs`), like tabs, progress bars, wiki links, shortcodes, fancy list markers and `[TOC]` (design 05). |
+| Critic markup | Appendix "Critic markup" | lowering | Recognised from the literal brace group the tokenizer already hands over (`tmark_ir::critic::spelling`, `lower/inline.rs`): `{++x++}`, `{--x--}`, `{~~old~>new~~}` and `{>>note<<}` are a `Span{.critic}` around `Underline` / `Strikeout` / the pair / `Comment`, `{==x==}` a plain `Highlight`. The inner text is re-parsed as inline content (`Lowerer::lower_inline_slice`). Challenge C49. |
 | Escapes `\@`, `\#` | §Lexical grammar | inline | Added to the escape construct's character set. |
 | Tabs `=== "Title"` | §Tabs | block | New construct: the line plus its four-space-indented body; consecutive tab lines lower to one `Div{name=tabs}` of `Div{name=tab, title}`, the same nodes as `:::: tabs` / `::: tab`. |
 | Layout containers `multicolumn`, `div`, `tabs`, `tab` | §Div | block | Names of the container registry: no `container-unknown`. An HTML block whose opening tag carries `markdown` lowers to `Div{name=tag}` with `id`/`class` as attrs and its body parsed as Markdown (`markdown="span"`: inlines). |
@@ -210,7 +210,7 @@ example number in `crates/tmark-syntax/tests/commonmark_exceptions.rs`.
   (attrs only) and `^^x^^` (literal when off; the lint hints). TeX logos
   and implicit ids are not the parser's.
 - Not implemented yet, deliberately: grid tables (listing with lang
-  `grid table`), critic markup, wiki links, inline footnotes
+  `grid table`), wiki links, inline footnotes
   `^[…]` (the spelling is still the deprecated citation group; a `^[…]`
   that is not a key list is literal text), fancy list styles (milestone
   5), and `Space` nodes (see 03).

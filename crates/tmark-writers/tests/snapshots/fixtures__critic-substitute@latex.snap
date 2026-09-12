@@ -2,13 +2,13 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-A word, a \[\[Wiki Page\]\].
-
-a. first fancy item
+Call it \sout{colour}\uline{color} everywhere.
 
 ---requires---
 {
-  "packages": [],
+  "packages": [
+    "ulem"
+  ],
   "fragments": [],
   "shell_escape": false,
   "assets": [],

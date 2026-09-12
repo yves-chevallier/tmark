@@ -686,11 +686,13 @@ No other spelling qualifies, and the reason is P3 read strictly. The
 degradation of a comment must be invisibility, and the HTML comment is the
 one construct every Markdown renderer hides. A `::: comment` container or a
 `{comment}(…)` role would display its content on GitHub, which for a
-private note is worse than any unstyled fallback. Critic's `{>>note<<}`
-normalises to this node (Appendix @[app:pymdownx]). Annotations meant to be
+private note is worse than any unstyled fallback. Annotations meant to be
 read by reviewers in a draft build (to-dos, change tracking) are not
-comments: they are visible content in one rendering mode and belong to a
-separate node. Class C.
+comments: they are visible content in one rendering mode. Critic's
+`{>>note<<}` is exactly that, so it holds this node inside the annotating
+`Span{.critic}` of Appendix @[app:pymdownx] rather than standing as a bare
+comment: the class is the separate node the previous sentence asks for.
+Class C.
 
 #### HorizontalRule
 
@@ -1828,9 +1830,10 @@ Table: Divergences from draft 1. {#tbl:draft1}
 
 The constructs in Table @[tbl:compat] are accepted when `compat.pymdownx` is
 on (the default), normalise to ordinary IR nodes, and are never emitted by
-the canonical printer. They are listed here so that the core spec stays
-short; they are not TMark constructs, they are spellings TMark tolerates
-because MkDocs users already type them.
+the canonical printer — except critic markup, which has no other spelling
+(see below). They are listed here so that the core spec stays short; they
+are not TMark constructs, they are spellings TMark tolerates because MkDocs
+users already type them.
 
 Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 
@@ -1848,7 +1851,7 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | `<div class="x" markdown>` | `::: div {.x}` (§@[sec:containers]) | E | `md_in_html`; kept indefinitely, emitted by the `mkdocs` profile |
 | `{: .cls #id}` | `{.cls #id}` | E | Python-Markdown `attr_list` colon; deprecated |
 | `[[Page Title]]`, optional label after a vertical bar | `Link` to the project file | D | wiki links |
-| critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Underline`, `Strikeout`, `Highlight`, `Comment` | E | not shown literally here: the extension fires even inside code spans |
+| critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Span{.critic}` holding `Underline`, `Strikeout`, the two in order, or `Comment`; the highlight is a plain `Highlight` | E | see below; the printer emits the critic spelling, and nothing fires inside code, where the extension does |
 | `:smile:` | `Str` holding the character | E | emoji, GitHub's name table; the printer emits the character (§@[sec:inline]) |
 | `:material-…:`, `:fontawesome-…:`, `:octicons-…:`, `:simple-…:` | `Span{.icon media=web}` | D | Material icons; print drops them, hint `icon-web-only` (§@[sec:inline]) |
 | `(c)`, `(tm)`, `(r)`, `c/o`, `+/-`, `=/=`, `-->`, `<--`, `<-->`, `1/2` … | `Str` holding the character | E | smart symbols; the ordinal-number form (`1st`) is *not* applied: it is a superscript, not a `Str` |
@@ -1866,6 +1869,33 @@ columns:
   - {width: 1.6cm}
   - {align: left, width: X}
 ```
+
+#### Critic markup {#app:critic}
+
+`{++x++}`, `{--x--}`, `{~~old~>new~~}` and `{>>note<<}` are *annotations*: a
+reviewer's insertion, deletion, substitution and note, which a paged
+rendering typesets so the change can be read. Each is a `Span` whose single
+class is `critic`, holding the node this catalogue already has — an
+`Underline`, a `Strikeout`, the `Strikeout` and the `Underline` of a
+substitution in source order, a `Comment` — so that nothing is added to the
+node catalogue and a consumer that ignores the class still renders the
+inner node. The class is what tells a reviewer's mark from an author's own
+underline, strikeout or note: only the annotation reaches `\tsins`,
+`\tsdel`, `\tssubst` and `\tscomment`. A critic comment is therefore
+visible where a `<!-- … -->` is stripped (§@[sec:structure], Comment); the
+web writer keeps it zero width, since a published page is not a review.
+
+`{==x==}` is critic's spelling of `pymdownx.mark` and nothing more: it
+lowers to the plain `Highlight` of `==x==` and prints as `{mark}[x]`.
+
+The content between the delimiters is inline content, read on one line, so
+markup inside an annotation is markup. None of the five fires inside a code
+span, a fenced block, math, a raw block or a link destination, which is
+where TMark parts from `pymdownx.critic` (the extension fires in code too).
+The critic spelling is what the printer emits, in every profile: there is
+no other spelling for an annotation, and inventing one would degrade from
+class E — `pymdownx.critic` is in the standard extension set — to a literal
+brace group on a foreign renderer.
 
 ### Deprecation schedule {#app:deprecations}
 

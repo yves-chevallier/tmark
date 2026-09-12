@@ -422,6 +422,42 @@ impl Lowerer {
         }
     }
 
+    /// Parse and lower a contiguous slice of `ctx`'s text as inline
+    /// content: critic markup's inner text (spec Appendix "PyMdownX
+    /// compatibility profile"), which the brace group hands over raw.
+    /// `at` is the slice's offset in `ctx.text`, so every span maps back to
+    /// the file. Content that is not one paragraph (a slice that reads as a
+    /// list or a heading on its own) is literal text, never dropped.
+    pub fn lower_inline_slice(&mut self, value: &str, at: usize, ctx: &Ctx) -> Vec<Inline> {
+        let span = Span::new(
+            self.file,
+            ctx.map.translate(at) as u32,
+            ctx.map.translate(at + value.len()) as u32,
+        );
+        if value.is_empty() {
+            return Vec::new();
+        }
+        let Ok(tree) = self.tree(value) else {
+            return vec![self.literal_text(span, value.to_string())];
+        };
+        let map = OffsetMap::nested(vec![(0, at)], ctx.map.clone());
+        let inner = Ctx { text: value, map };
+        let mut document = Document::default();
+        let was_fragment = std::mem::replace(&mut self.in_fragment, true);
+        let blocks = self.lower_blocks(
+            tree.children().map_or(&[], Vec::as_slice),
+            &inner,
+            &mut document,
+        );
+        self.in_fragment = was_fragment;
+        let mut blocks = blocks.into_iter();
+        match (blocks.next(), blocks.next()) {
+            (Some(tmark_ir::Block::Para(para)), None) => para.content,
+            (Some(tmark_ir::Block::Plain(plain)), None) => plain.content,
+            _ => vec![self.literal_text(span, value.to_string())],
+        }
+    }
+
     /// Parse and lower re-parsed content (a container or admonition body)
     /// whose `stops` map it back to `ctx`.
     pub fn lower_content(

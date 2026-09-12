@@ -2,6 +2,4 @@
 source: crates/tmark-fmt/tests/mkdocs.rs
 expression: mkdocs(&canonical)
 ---
-A word, a [[Wiki Page]].
-
-a. first fancy item
+The proof holds. {>>cite Knuth here<<}

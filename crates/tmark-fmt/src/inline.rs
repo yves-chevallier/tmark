@@ -229,6 +229,14 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push("]");
         }
         Inline::Span(n) => {
+            if let Some(kind) = tmark_ir::critic(n) {
+                // `Span{.critic}` prints the critic spelling (spec Appendix
+                // "PyMdownX compatibility profile", challenge C49): it is
+                // the only spelling, and class E under `pymdownx.critic`,
+                // so both profiles emit it.
+                critic(out, kind, ctx);
+                return;
+            }
             if let Some(shortcode) = icon_shortcode(n) {
                 // `Span{.icon media=web}` prints as the shortcode it holds
                 // (spec §Emoji and icon shortcodes).
@@ -342,6 +350,34 @@ fn mkdocs_inline(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char
         Inline::Aside(n) => mkdocs::aside(out, n, ctx),
         Inline::RawInline(n) => mkdocs::raw_inline(out, n),
         _ => false,
+    }
+}
+
+/// Critic markup: `{++ins++}`, `{--del--}`, `{~~old~>new~~}` and
+/// `{>>note<<}` (spec Appendix "PyMdownX compatibility profile"). The
+/// highlight `{==x==}` is a plain `Highlight` and prints as its role.
+fn critic(out: &mut Out, kind: tmark_ir::Critic<'_>, ctx: Context) {
+    let ctx = Context {
+        block_start: false,
+        ..ctx
+    };
+    let mut wrap = |open: &str, content: &[Inline], close: &str| {
+        out.push(open);
+        inlines(out, content, ctx);
+        out.push(close);
+    };
+    match kind {
+        tmark_ir::Critic::Insert(content) => wrap("{++", content, "++}"),
+        tmark_ir::Critic::Delete(content) => wrap("{--", content, "--}"),
+        tmark_ir::Critic::Substitute { old, new } => {
+            wrap("{~~", old, "~>");
+            wrap("", new, "~~}");
+        }
+        tmark_ir::Critic::Comment(text) => {
+            out.push("{>>");
+            out.push(text);
+            out.push("<<}");
+        }
     }
 }
 

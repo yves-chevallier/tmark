@@ -2,9 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-A word, a \[\[Wiki Page\]\].
-
-a. first fancy item
+<p>A <span class="critic"><del>redundant</del></span> word, and <code>{--not this--}</code> in code.</p>
 
 ---requires---
 {

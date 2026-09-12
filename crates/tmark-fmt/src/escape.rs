@@ -187,10 +187,11 @@ fn general_escape(c: char, prev: Option<char>, next: Option<char>, ctx: Context)
         ']' => ctx.in_group || matches!(next, Some('(' | '{' | '[' | ':')),
         // Image opener; `!!!` at a line start is handled by the line rules.
         '!' => next.is_none() || next == Some('['),
-        // A brace group: role head, attribute list or moustache.
-        '{' => {
-            next.is_some_and(|n| n.is_alphanumeric() || matches!(n, '_' | '-' | '#' | '.' | '{'))
-        }
+        // A brace group: role head, attribute list, moustache, or the
+        // critic comment `{>>…<<}` (the other critic openers are escaped by
+        // the `~`, `=` and `+` rules above).
+        '{' => next
+            .is_some_and(|n| n.is_alphanumeric() || matches!(n, '_' | '-' | '#' | '.' | '{' | '>')),
         // Spec §Two sigils: `@` refers, guarded by X4.
         '@' => (next.is_none() || next == Some('[') || is_alnum(next)) && !guards_at(prev),
         // Spec §Two sigils: `#[`, `#(`, and the deprecated `#{`.

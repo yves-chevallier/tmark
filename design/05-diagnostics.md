@@ -141,13 +141,14 @@ spelling is safe, guessing a label for an unresolved reference is not.
   (`` `counters` is deprecated, write `press.declare.counters` ``);
   `frontmatter::deprecated_key_target` is the one table.
 - `compat-unsupported` (warning, parse stage, `tmark-syntax/src/lower/compat.rs`)
-  replaces silence for the PyMdownX spellings milestone 5 will implement:
-  content tabs (`=== "Title"` paragraphs), critic markup (a literal brace
-  group `{--…--}`, `{++…++}`, `{~~…~~}`, `{==…==}`, `{>>…<<}`), progress
-  bars (`[=n% "label"]`), wiki links (`[[…]]`), emoji and icon shortcodes
-  (`:smile:`, `:material-…:`, not inside a word), `^^…^^` without
-  `inline.insert`, lower-case fancy list markers (`a.`, `iv.`, `#.`, `1)`)
-  and `[TOC]` at a paragraph start. It is a new code rather than
+  replaces silence for the PyMdownX spellings milestone 5 will implement.
+  The wave that introduced it covered content tabs (`=== "Title"`
+  paragraphs), critic markup, progress bars (`[=n% "label"]`), wiki links
+  (`[[…]]`), emoji and icon shortcodes (`:smile:`, `:material-…:`, not
+  inside a word), `^^…^^` without `inline.insert`, lower-case fancy list
+  markers (`a.`, `iv.`, `#.`, `1)`) and `[TOC]` at a paragraph start; what
+  is left today is the wiki link and the fancy list marker, each other
+  spelling having become a construct. It is a new code rather than
   `strict-x-construct` because these are not X-class deviations under a
   profile: they are constructs of the compatibility appendix that every
   profile will accept once implemented, and the strict profile must keep
@@ -193,9 +194,12 @@ IR can hold the offending shape (design 03 §Tables):
 ## Implementation notes (C31–C42 wave)
 
 - `compat-unsupported` now covers only what is still unimplemented:
-  critic markup, wiki links and fancy list markers (`lower/compat.rs`;
-  fixture `diag-compat-unsupported`). Content tabs, progress bars, emoji
-  and icon shortcodes, `^^x^^` and `[TOC]` left it with their constructs.
+  wiki links and fancy list markers (`lower/compat.rs`; fixture
+  `diag-compat-unsupported`). Content tabs, progress bars, emoji and icon
+  shortcodes, `^^x^^` and `[TOC]` left it with their constructs, and
+  critic markup with challenge C49 (fixtures `critic-*`): the five
+  spellings lower, so reporting them would be a warning on working
+  syntax.
 - `deprecated` for the attribute colon `{: …}` and the progress fraction
   `[=a/b "…"]` carries its own text fix (`Lowerer::deprecated_with_fix`):
   their spans are not a node's (the brace on a host, the head before the

@@ -208,9 +208,9 @@ yet.
 ## M5 — Bindings, compatibility, polish
 
 - `tmark-py` wheel and `tmark-wasm`; TeXSmith depends on the wheel.
-- PyMdownX compatibility profile completed (critic markup, wiki links,
-  fancy list markers; smart symbols are done). Each remaining spelling
-  is reported as `compat-unsupported` today (`lower/compat.rs`);
+- PyMdownX compatibility profile completed (wiki links, fancy list
+  markers; smart symbols and critic markup are done). Each remaining
+  spelling is reported as `compat-unsupported` today (`lower/compat.rs`);
   implementing one means replacing its scan with the construct and
   updating fixture `diag-compat-unsupported`.
 - Dialect import (`tmark fmt` on GFM/MyST/Pandoc admonitions and crossrefs).
@@ -245,16 +245,24 @@ runs on; the compatibility profile and the deletion on TeXSmith's side
   and runs the pytest suite on every push. TeXSmith installs the crate
   as a path dependency (`vendor/tmark` → this checkout; `uv sync` builds
   the wheel through maturin).
-- `compat-unsupported` still covers exactly three spellings: critic
-  markup, wiki links and fancy list markers (`lower/compat.rs`, fixture
-  `diag-compat-unsupported`); tabs, progress bars, shortcodes, `^^x^^`
-  and `[TOC]` left it with the C31–C42 wave.
+- `compat-unsupported` covers two spellings: wiki links and fancy list
+  markers (`lower/compat.rs`, fixture `diag-compat-unsupported`); tabs,
+  progress bars, shortcodes, `^^x^^` and `[TOC]` left it with the C31–C42
+  wave, critic markup with C49.
+- Critic markup is implemented (challenge C49, fixtures `critic-insert`,
+  `critic-delete`, `critic-substitute`, `critic-highlight`,
+  `critic-comment`): the five spellings lower from the literal brace
+  group, the printer emits them in both profiles, and the three writers
+  render the four annotations through the `ts-critic` contract
+  (`\tsins`, `\tsdel`, `\tssubst`, `\tscomment`; `#ts-ins`, `#ts-del`,
+  `#ts-subst`, `#ts-comment`; `ins`, `del` and a zero-width span).
 
 Remaining for M5:
 
-1. **Critic markup, wiki links, fancy list markers**: the three
+1. **Wiki links, fancy list markers**: the two remaining
    `compat-unsupported` scans become constructs (spec appendix rows, a
-   fixture each), and `OrderedList` gains its style.
+   fixture each), and `OrderedList` gains its style. Critic markup is
+   done (C49).
 2. **Dialect import** (`tmark fmt` on GFM/MyST/Pandoc spellings): not
    started. Smart symbols and straight quotes landed with the parity
    triage (finding F6, fixture `inline-smart-symbols`, challenge C45).

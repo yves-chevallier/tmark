@@ -3,6 +3,7 @@
 //! the attention sugar. Spec §Inline text, §Roles, §Attributes, §Two sigils.
 
 use tmark_ir::{
+    critic,
     registry::{self, ArgStyle},
     Aside, Attrs, Block, Code, CodeInline, Comment, CounterItem, Emph, Highlight, Image,
     IndexEntry, Inline, Keystroke, LineBreak, Link, Math, Note, Plain, ProgressBar, QuoteKind,
@@ -698,13 +699,128 @@ impl Lowerer {
             }
             BraceKind::Role(head) => self.lower_role(node, head, nodes, index, ctx, out),
             BraceKind::Literal => {
-                self.compat_scan_brace(&node.value, span);
-                out.push(
-                    self.literal_text(span, decode_escapes(ctx.slice(node.position.as_ref()))),
-                );
+                if !self.lower_critic(node, ctx, span, out) {
+                    out.push(
+                        self.literal_text(span, decode_escapes(ctx.slice(node.position.as_ref()))),
+                    );
+                }
             }
         }
         None
+    }
+
+    /// Critic markup (spec Appendix "PyMdownX compatibility profile",
+    /// challenge C49), which the tokenizer hands over as a literal brace
+    /// group: `{++ins++}`, `{--del--}`, `{~~old~>new~~}`, `{==mark==}` and
+    /// `{>>note<<}`. The four annotations are a `Span{.critic}` around the
+    /// node the appendix names — `Underline`, `Strikeout`, the pair of the
+    /// two, `Comment` — so that a writer can tell a reviewer's mark from an
+    /// author's own underline or note and reach the `ts-critic` contract;
+    /// `{==x==}` is critic's spelling of `pymdownx.mark` and lowers to the
+    /// plain `Highlight` that `==x==` produces. The inner text is re-parsed
+    /// as inline content, so markup inside an annotation is markup. Returns
+    /// whether the group was critic markup.
+    ///
+    /// Nothing fires inside a code span, a fence, math, a raw block or a
+    /// link destination: the brace group is a text construct (C14), which
+    /// is where TMark parts from PyMdownX. The strict profile rejects the
+    /// appendix, so the group stays literal there.
+    fn lower_critic(
+        &mut self,
+        node: &tmark_markdown::mdast::TmarkBrace,
+        ctx: &Ctx,
+        span: Span,
+        out: &mut Vec<Inline>,
+    ) -> bool {
+        if self.options.strict {
+            return false;
+        }
+        let (Some(spelling), Some(position)) =
+            (critic::spelling(&node.value), node.position.as_ref())
+        else {
+            return false;
+        };
+        // The text between the braces starts one byte after `{`.
+        let base = position.start.offset + 1;
+        let meta = self.meta(span);
+        let attrs = Attrs {
+            classes: vec![critic::CLASS.to_string()],
+            ..Attrs::new()
+        };
+        let content = match spelling {
+            critic::Spelling::Highlight(start, end) => {
+                let content = self.lower_inline_slice(&node.value[start..end], base + start, ctx);
+                out.push(Inline::Highlight(Highlight { meta, content }));
+                return true;
+            }
+            critic::Spelling::Insert(start, end) => {
+                vec![self.critic_underline(node, ctx, base, start, end)]
+            }
+            critic::Spelling::Delete(start, end) => {
+                vec![self.critic_strikeout(node, ctx, base, start, end)]
+            }
+            critic::Spelling::Substitute {
+                old: (old_start, old_end),
+                new: (new_start, new_end),
+            } => vec![
+                self.critic_strikeout(node, ctx, base, old_start, old_end),
+                self.critic_underline(node, ctx, base, new_start, new_end),
+            ],
+            critic::Spelling::Comment(start, end) => {
+                let text = &node.value[start..end];
+                let inner = self.slice_span(ctx, base + start, text);
+                let meta = self.meta(inner);
+                vec![Inline::Comment(Comment {
+                    meta,
+                    text: text.to_string(),
+                })]
+            }
+        };
+        out.push(Inline::Span(SpanNode {
+            meta,
+            content,
+            attrs,
+        }));
+        true
+    }
+
+    /// The source span of `text` at offset `at` in `ctx`.
+    fn slice_span(&self, ctx: &Ctx, at: usize, text: &str) -> Span {
+        Span::new(
+            self.file,
+            ctx.map.translate(at) as u32,
+            ctx.map.translate(at + text.len()) as u32,
+        )
+    }
+
+    fn critic_underline(
+        &mut self,
+        node: &tmark_markdown::mdast::TmarkBrace,
+        ctx: &Ctx,
+        base: usize,
+        start: usize,
+        end: usize,
+    ) -> Inline {
+        let text = &node.value[start..end];
+        let inner = self.slice_span(ctx, base + start, text);
+        let meta = self.meta(inner);
+        let content = self.lower_inline_slice(text, base + start, ctx);
+        Inline::Underline(Underline { meta, content })
+    }
+
+    fn critic_strikeout(
+        &mut self,
+        node: &tmark_markdown::mdast::TmarkBrace,
+        ctx: &Ctx,
+        base: usize,
+        start: usize,
+        end: usize,
+    ) -> Inline {
+        let text = &node.value[start..end];
+        let inner = self.slice_span(ctx, base + start, text);
+        let meta = self.meta(inner);
+        let content = self.lower_inline_slice(text, base + start, ctx);
+        Inline::Strikeout(Strikeout { meta, content })
     }
 
     fn lower_role(

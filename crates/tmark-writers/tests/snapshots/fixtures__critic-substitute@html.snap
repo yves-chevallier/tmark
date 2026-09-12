@@ -2,9 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-A word, a \[\[Wiki Page\]\].
-
-a. first fancy item
+<p>Call it <span class="critic"><del>colour</del><u>color</u></span> everywhere.</p>
 
 ---requires---
 {

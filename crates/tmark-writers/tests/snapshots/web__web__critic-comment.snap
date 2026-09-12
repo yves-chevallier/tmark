@@ -2,6 +2,4 @@
 source: crates/tmark-writers/tests/web.rs
 expression: snapshot
 ---
-A word, a [[Wiki Page]].
-
-a. first fancy item
+The proof holds. <span class="critic">cite Knuth here</span>
