@@ -1431,7 +1431,15 @@ file's own directory by default; `base=` overrides. Fenced code takes
 render time and never pasted, so a fence inside the file is text. The
 PyMdownX snippet `--8<-- "file"` is accepted as sugar (class E) and
 deprecated: it pastes text before parsing, which breaks on nested fences,
-and it never rebases paths. Draft 2 rejected an include role as "block
+and it never rebases paths. Its marker is PyMdownX's own, `-{2,}8<-{2,}`:
+two or more dashes on each side, the two sides free to differ, so
+`---8<---` and `--8<----` are the same spelling as `--8<--` and none of
+them is a horizontal rule. A `;` before the marker is PyMdownX's escape:
+the line includes nothing and is the text it spells, less one `;`, with no
+diagnostic, since writing the marker is not the deprecated act. Both rules
+hold for a fence whose body is one snippet line, and there the `;` is also
+what the canonical printer writes, a fence body having no backslash escape
+of its own. Draft 2 rejected an include role as "block
 semantics in inline position"; a role alone in a paragraph is a block role,
 the same distinction Pandoc draws between a lone Span and a Div, and the
 two defects of the snippet syntax outweigh the purity argument. Class D.
@@ -1835,7 +1843,7 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | `--`, `---`, `...` | `Str`, as typed | E | both backends typeset the ASCII spelling as the dash and the ellipsis; converting them would gain nothing and lose the round-trip |
 | `https://…` bare | `Link` | C | magic links; GFM autolinks too |
 | `1)`, `a.`, `i.`, `#.` list markers | `OrderedList` with style | E | fancylists |
-| `--8<-- "file"` | `{include}(file)` (§@[sec:includes]) | E | deprecated, Appendix @[app:deprecations] |
+| `--8<-- "file"`, any `-{2,}8<-{2,}` marker; `;` before it escapes | `{include}(file)` (§@[sec:includes]) | E | deprecated, Appendix @[app:deprecations]; an escaped line is text, less one `;` |
 | `[TOC]` | `RawBlock{format=markdown}` (§@[sec:structure]) | E | kept verbatim, emitted by the printer alone: the table of contents is `press.toc` in print and the site's own on the web |
 
 ```yaml table-config
@@ -1869,7 +1877,7 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | `{index}[…]{b}` / `{i}` | `{index main=true}[…]` / content markup | draft 3 | fmt |
 | `{margin}[…]`, `{margin}[…]{l}` / `{r}` / `{o}` / `{i}` | `{aside}[…]`, `{aside side=left}[…]` | draft 3 | fmt |
 | `::: margin` | `::: aside` | draft 3 | fmt |
-| `--8<-- "file"` | `{include}(file)` | draft 3 | fmt |
+| `--8<-- "file"` snippet, marker `-{2,}8<-{2,}` | `{include}(file)` | draft 3 | fmt |
 | `@https://doi.org/…` | `@doi:…` | draft 3 | indefinite (sugar) |
 | `[](gls:term)` | `@gls:term` | draft 2 | fmt |
 | `[](){#id}` anchor | `[]{#id}` | draft 3 | fmt |

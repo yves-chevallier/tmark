@@ -740,6 +740,98 @@ pub fn deprecation(id: &str) -> Option<&'static Deprecation> {
     DEPRECATIONS.iter().find(|d| d.id == id)
 }
 
+/// The marker of a PyMdownX snippet line (deprecation `snippet`), and the
+/// rest of `line` after it.
+///
+/// `pymdownx.snippets` writes the marker `-{2,}8<-{2,}`: two or more
+/// dashes on each side, so `--8<--`, `---8<---` and the asymmetric
+/// `--8<---` are one and the same spelling. Only the two-dash form was
+/// ever recognised here, and every occurrence in TeXSmith's own corpus
+/// uses three.
+fn snippet_marker(line: &str) -> Option<&str> {
+    let dashes = |s: &str| s.len() - s.trim_start_matches('-').len();
+    let open = dashes(line);
+    if open < 2 {
+        return None;
+    }
+    let rest = line[open..].strip_prefix("8<")?;
+    let close = dashes(rest);
+    (close >= 2).then(|| &rest[close..])
+}
+
+/// The path of a PyMdownX snippet line (spec Appendix "Deprecation
+/// schedule", row `snippet`), when `line` is exactly one: the marker, then
+/// the path quoted, or bare without whitespace. The bare marker alone
+/// (PyMdownX's block form) has no path and is not one.
+pub fn snippet_path(line: &str) -> Option<&str> {
+    let rest = snippet_marker(line.trim())?.trim();
+    let path = rest.trim_matches('"');
+    let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
+    (!path.is_empty() && !path.contains('\n') && (quoted || !rest.contains(char::is_whitespace)))
+        .then_some(path)
+}
+
+/// A snippet line disabled by PyMdownX's escape: one or more `;` before
+/// the marker. The line includes nothing; it reaches the document as text
+/// with exactly one `;` dropped, which is what this returns.
+pub fn snippet_escape(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let semicolons = trimmed.len() - trimmed.trim_start_matches(';').len();
+    if semicolons == 0 || snippet_path(&trimmed[semicolons..]).is_none() {
+        return None;
+    }
+    let indent = &line[..line.len() - trimmed.len()];
+    Some(format!("{indent}{}", &trimmed[1..]))
+}
+
+#[cfg(test)]
+mod snippet_tests {
+    use super::{snippet_escape, snippet_path};
+
+    #[test]
+    fn dash_counts() {
+        for line in [
+            "--8<-- \"f.py\"",
+            "---8<--- \"f.py\"",
+            "--8<--- \"f.py\"",
+            "-----8<-- \"f.py\"",
+            "  --8<--\t\"f.py\"  ",
+        ] {
+            assert_eq!(snippet_path(line), Some("f.py"), "{line}");
+        }
+        assert_eq!(snippet_path("--8<- \"f.py\""), None);
+        assert_eq!(snippet_path("-8<-- \"f.py\""), None);
+        assert_eq!(snippet_path("--8< \"f.py\""), None);
+        // The bare marker is PyMdownX's block form, not a file include.
+        assert_eq!(snippet_path("--8<--"), None);
+        assert_eq!(snippet_path("---8<---"), None);
+        // A bare path may not hold whitespace; a quoted one may.
+        assert_eq!(snippet_path("---8<--- a b.py"), None);
+        assert_eq!(snippet_path("---8<--- \"a b.py\""), Some("a b.py"));
+        assert_eq!(snippet_path("---8<--- f.py"), Some("f.py"));
+    }
+
+    #[test]
+    fn escapes() {
+        assert_eq!(
+            snippet_escape(";---8<--- \"f.py\"").as_deref(),
+            Some("---8<--- \"f.py\"")
+        );
+        // PyMdownX drops exactly one `;` of `;*`.
+        assert_eq!(
+            snippet_escape(";;--8<-- \"f.py\"").as_deref(),
+            Some(";--8<-- \"f.py\"")
+        );
+        assert_eq!(
+            snippet_escape("  ;--8<-- \"f.py\"").as_deref(),
+            Some("  --8<-- \"f.py\"")
+        );
+        // Only a snippet line is escapable: `;` before anything else is text.
+        assert_eq!(snippet_escape(";[^1]: a note"), None);
+        assert_eq!(snippet_escape("--8<-- \"f.py\""), None);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Fragment contracts
 // ---------------------------------------------------------------------------

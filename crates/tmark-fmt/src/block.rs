@@ -3,8 +3,8 @@
 //! normalises").
 
 use tmark_ir::{
-    Align, Attrs, Block, Cell, Column, ColumnConfig, Document, Inline, ListItem, Row, Table,
-    TableConfig, TableModel, TableSettings, Task,
+    registry, Align, Attrs, Block, Cell, Column, ColumnConfig, Document, Inline, ListItem, Row,
+    Table, TableConfig, TableModel, TableSettings, Task,
 };
 
 use crate::attrs;
@@ -171,7 +171,20 @@ fn block_with(out: &mut Out, b: &Block, alternate: bool) {
                 }
             }
             info.push_str(&fence_attrs(&c.options, |_| true));
-            fence(out, info.trim(), &c.text);
+            // A body that is one snippet line would be read back as
+            // `include="file"` (spec Appendix "Deprecation schedule"). The
+            // `;` PyMdownX escapes it with is the only escape a fence body
+            // has, so a listing that *shows* a snippet line prints one.
+            let escaped;
+            let mut text = &c.text;
+            if c.options.get("include").is_none()
+                && (registry::snippet_path(text.trim()).is_some()
+                    || registry::snippet_escape(text).is_some())
+            {
+                escaped = format!(";{text}");
+                text = &escaped;
+            }
+            fence(out, info.trim(), text);
         }
         Block::BlockQuote(q) => {
             out.push("> ");

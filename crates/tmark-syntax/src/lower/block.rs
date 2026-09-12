@@ -94,6 +94,14 @@ impl Lowerer {
                 let lowered = self.lower_inlines(&p.children, ctx);
                 let mut content = lowered.inlines;
                 let source = ctx.slice(p.position.as_ref());
+                // A `;` before the marker disables the snippet (PyMdownX's
+                // escape): the line is the text it spells, less one `;`,
+                // and includes nothing. Taken after the inlines are lowered
+                // because that is where the preprocessor leaves it: what
+                // follows the `;` went through the reader like any text.
+                if registry::snippet_escape(source).is_some() {
+                    drop_snippet_escape(&mut content);
+                }
                 self.compat_scan_paragraph(&content, source, span);
                 let lead = self.take_lead(&mut content, source);
                 if let Some((attrs, attrs_span)) = lowered.tail_attrs {
@@ -443,7 +451,8 @@ impl Lowerer {
                 attrs: Attrs::new(),
             }));
         }
-        if let Some(path) = snippet_path(source) {
+        if let Some(path) = registry::snippet_path(source) {
+            let path = path.to_string();
             let span = self.span(ctx, p.position.as_ref());
             self.deprecated(span, "--8<-- \"file\"", "{include}(file)");
             let meta = self.meta(span);
@@ -538,10 +547,21 @@ impl Lowerer {
         // is the `include="file"` option (spec §Listing; Appendix
         // "Deprecation schedule").
         if node == "code" && options.get("include").is_none() {
-            if let Some(path) = snippet_path(code.value.trim()) {
+            // The escape again: a listing that shows a snippet line rather
+            // than including it. The `;` is the only escape a fence body
+            // has, so the printer writes it back (`tmark-fmt`).
+            if let Some(text) = registry::snippet_escape(&code.value) {
+                return Block::CodeBlock(CodeBlock {
+                    meta,
+                    text,
+                    lang: Some(info.lang.clone()),
+                    options,
+                });
+            }
+            if let Some(path) = registry::snippet_path(code.value.trim()) {
                 self.deprecated(span, "--8<-- \"file\" in a fence", "include=\"file\"");
                 let mut options = options;
-                options.kv.push(("include".to_string(), path));
+                options.kv.push(("include".to_string(), path.to_string()));
                 return Block::CodeBlock(CodeBlock {
                     meta,
                     text: String::new(),
@@ -1263,14 +1283,15 @@ fn take_partial_task(content: &mut [Block]) -> Option<Task> {
     Some(Task::Partial)
 }
 
-/// The path of a PyMdownX snippet line `--8<-- "file"` (quoted, or bare
-/// without whitespace), when `line` is exactly one.
-fn snippet_path(line: &str) -> Option<String> {
-    let rest = line.trim().strip_prefix("--8<--")?.trim();
-    let path = rest.trim_matches('"');
-    let quoted = rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2;
-    (!path.is_empty() && !path.contains('\n') && (quoted || !rest.contains(char::is_whitespace)))
-        .then(|| path.to_string())
+/// Drop the `;` that disabled a snippet line, once the line has lowered
+/// to inlines: it is the first character of the first text run.
+fn drop_snippet_escape(content: &mut [Inline]) {
+    if let Some(Inline::Str(s)) = content.first_mut() {
+        let indent = s.text.len() - s.text.trim_start().len();
+        if s.text[indent..].starts_with(';') {
+            s.text.remove(indent);
+        }
+    }
 }
 
 /// The `stops` of a collected body whose first `skip` bytes are dropped.
