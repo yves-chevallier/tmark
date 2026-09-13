@@ -156,7 +156,10 @@ belong in the allow-list or §4).
 ### The cross-repository contract now in force
 
 TeXSmith's `tmark-migration` branch depends on these; changing one is a
-two-repository change (R14 of its plan):
+two-repository change (R14 of its plan). **ADR 0008 (proposed) would replace
+the first of them**: TeXSmith would stop mirroring the IR and ask for
+resolutions instead. It is not started, and must not land before
+`texsmith-migration` merges.
 
 - **The IR JSON and its schema hash.** Documents cross as JSON with
   `"tmark": "<version>"` first and `"diagnostics"` last; TeXSmith
