@@ -1,8 +1,37 @@
 # ADR 0008 — Resolution requests instead of a mirrored IR
 
-**Status:** proposed. Cross-repository: needs TeXSmith's
-`specs/refactoring/07-resolution-contract.md` accepted with it, and must not
-land before `texsmith-migration` merges.
+**Status:** **rejected as drafted.** Superseded by TeXSmith's
+`specs/refactoring/07-synthesis.md`, which five independent analyses produced.
+
+The load-bearing claim below — that TeXSmith stops holding a tree, so its IR
+mirror goes — does not hold, and the sentence that breaks it is in this ADR:
+*"A replacement is IR, serialised as the schema already defines it."* To answer
+a patch the host must **construct** IR, so it keeps the node types, the field
+names, the id space and the span rules. Measured: ~500-600 of the mirror's
+generated lines survive, and a field added to `Image` or `Div` is still a
+two-repository change. Three of the eleven passes cannot fit the shape at all
+(`RefItem` carries no id, so citation items are unaddressable; the asset pass
+inserts a *sibling* block; the script pass needs a whole-document text query).
+
+What survives and should be taken up separately:
+
+- **`sections` / `outline`** — a query, no patches, three users (`slots`,
+  `title`, `headings`). It deletes the host's tree *walk*, not ten lines of
+  partition. Worth its own small ADR.
+- **Id and span custody.** `IdAllocator.floor` and the host's span rules are
+  core invariants the host re-derives with nothing enforcing them. A span
+  copied onto synthesised text is a location that exists and is wrong. Worth
+  fixing narrowly, whatever else happens.
+- **The rule this ADR needed and lacked:** a response carries an answer — a
+  path, a key, a font name, a token stream, a typed failure — **never a tree**.
+  If requests are ever revisited, that is the first line.
+
+Before any of it: TeXSmith's mirror should simply be generated here and shipped
+in the wheel. `pyproject.toml` already sets `python-source = "python"` and
+`scripts/gen_stubs.py` already generates Python from Rust. That removes this
+ADR's entire stated cost for about a day, with no new protocol.
+
+The original text follows, unedited, as the record of what was proposed.
 
 **Context.** TeXSmith's passes do the work the pure core cannot: read a file,
 fetch a DOI, run a converter, ask Pygments to highlight, look up a font's
