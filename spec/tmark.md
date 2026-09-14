@@ -938,7 +938,10 @@ Pandoc's citation grammar for labels and bibliography keys alike:
 The brackets are optional and follow the sigil. Bare `@key` takes one word
 of `[A-Za-z0-9_:.-]`; trailing sentence punctuation stays out. The bracketed
 form `@[…]` is required as soon as the reference contains a space: a
-locator, a suffix, or several keys separated by `;`. Inside the brackets the
+locator, a suffix, or several keys separated by `;`. A lone key may be
+written `@[key]` too; for a label it is the same reference, for a citation
+§Cite says when the brackets carry a meaning, and the canonical printer
+keeps them as written. Inside the brackets the
 item grammar is Pandoc's: optional prefix text, optional `-`, the key,
 optional suffix or locator. A capitalised prefix (`@Fig:x`) capitalises the
 label word (pandoc-crossref convention); prefixes are otherwise
@@ -992,15 +995,28 @@ As shown by @[ein05, p. 33], and elsewhere @[see ein05, pp. 33-35; AI2027, ch. 1
 Suppress the author: @[-ein05].
 ```
 
-`@key` is the in-text (narrative) citation, `@[key, locator]` the
-parenthetical one, `@[-key]` suppresses the author. Locators follow Pandoc:
+`@key` and `@[key]` are the short citation the bibliography style gives
+(`[3]`, or `Einstein 1905` in an author-year style); `@[key, locator]` adds
+a locator and `@[-key]` suppresses the author. The bracketed form is always
+parenthetical. The feature `citations.narrative` (off; Table
+@[tbl:features]) makes the *bare* form the narrative citation instead —
+"Einstein [3]", "Einstein (1905)" — for a document written in that voice;
+the bracketed form does not move, so an author who turns the switch on
+writes `@[key]` for the occasional parenthetical citation. `@key` and
+`@[key]` are therefore one node with a spelling flag (`Ref.bracketed`) that
+the print writers read only under the switch (C51). Locators follow Pandoc:
 a recognised locator word (`p.`, `pp.`, `ch.`, `sec.`, `§`…) followed by a
 range, or free suffix text. The item grammar is Pandoc's, the bracket
 position is TMark's (`@[` rather than `[@`), so that one rule covers bare and
 bracketed forms: brackets appear when there is a space. Pandoc's
 `[@key, locator]` is accepted for import. This is Typst's one-`@`-for-all
-model. Sugar: `[^key]` and `^[k1,k2]` (citations as
-footnotes, shipping, deprecated; Appendix @[app:deprecations]). While they
+model, default form included: a bare `@key` is `#cite(<key>)` as Typst
+renders it (`form: "normal"`), `\cite{key}` under biblatex, and the switch
+adds `form: "prose"` / `\textcite`. The web has one built-in author-year
+form, parenthetical, and does not read the switch. Sugar: `[^key]` and
+`^[k1,k2]` (citations as footnotes, shipping, deprecated; Appendix
+@[app:deprecations]); they are the short form, so their fix to `@key` /
+`@[k1; k2]` renders as they did. While they
 last, the footnote-versus-citation shadowing rule is preserved (a real
 footnote with the same key wins) and linted against. Footnotes themselves
 (`[^1]` with a definition) are untouched.
@@ -1015,7 +1031,9 @@ Front-matter keys stay the readable choice for a source cited many times.
 
 Resolution order for any `@key`: declared counter prefix (`doi` and `gls`
 included), then bibliography. A key present in two registries is a hard
-warning. Class X. Backends: `\cite` with biblatex, `#cite`, CSL via citeproc.
+warning. Class X. Backends: `\cite` with biblatex (`\textcite` for a bare
+key under `citations.narrative`), `#cite` (`form: "prose"`), CSL via
+citeproc.
 
 #### CounterItem
 
@@ -1648,6 +1666,7 @@ Table: The feature registry. {#tbl:features}
 | `glossary.wikipedia` | off | fetch glossary summaries from Wikipedia links |
 | `inline.insert` | off | `^^x^^` as `{underline}[x]` (Appendix @[app:pymdownx]) |
 | `typography.tex-logos` | on | set the TeX logo words of §@[sec:inline] as logos |
+| `citations.narrative` | off | a bare `@key` is the narrative citation (`\textcite`, `form: "prose"`); `@[key]` stays parenthetical (§@[sec:references], Cite) |
 | `compat.pymdownx` | on | accept the Appendix @[app:pymdownx] sugar; off under `strict` |
 
 Extension points other than features:

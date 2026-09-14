@@ -493,6 +493,12 @@ pub const FEATURES: &[Feature] = &[
         "set the TeX logo words (`TEX_LOGOS`) as logos in the writers",
     ),
     mk_feature(
+        "citations.narrative",
+        false,
+        "Cite",
+        "render a bare `@key` as the narrative citation (`\\textcite`, `form: \"prose\"`); `@[key]` stays parenthetical",
+    ),
+    mk_feature(
         "compat.pymdownx",
         true,
         "PyMdownX compatibility profile",
@@ -1121,7 +1127,8 @@ mod tests {
         assert!(admonition("solution").is_none());
         assert!(feature("paragraph.lead").unwrap().default);
         assert!(!feature("figures.exec").unwrap().default);
-        assert_eq!(FEATURES.len(), 8);
+        assert_eq!(FEATURES.len(), 9);
+        assert!(!feature("citations.narrative").unwrap().default);
         assert!(feature("typography.tex-logos").unwrap().default);
         assert_eq!(deprecation("margin-role").unwrap().horizon, Horizon::Fmt);
         assert_eq!(deprecation("tabbed").unwrap().horizon, Horizon::Indefinite);
