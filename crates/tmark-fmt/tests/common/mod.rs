@@ -33,6 +33,59 @@ pub fn canonical(text: &str) -> Option<String> {
     None
 }
 
+/// Every fenced block under `## input` of a fixture, in order.
+pub fn inputs(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut section = false;
+    let mut fence: Option<(usize, String)> = None;
+    for line in text.lines() {
+        if let Some((len, body)) = fence.as_mut() {
+            let trimmed = line.trim_end();
+            if trimmed.starts_with('`')
+                && trimmed.chars().all(|c| c == '`')
+                && trimmed.len() >= *len
+            {
+                let (_, body) = fence.take().unwrap();
+                out.push(body);
+            } else {
+                body.push_str(line);
+                body.push('\n');
+            }
+        } else if let Some(title) = line.strip_prefix("## ") {
+            section = title.trim() == "input";
+        } else if section && line.starts_with("```") {
+            fence = Some((
+                line.chars().take_while(|c| *c == '`').count(),
+                String::new(),
+            ));
+        }
+    }
+    out
+}
+
+/// Every conformance fixture's input blocks: `(name, index, input)`, in
+/// file order.
+pub fn fixture_inputs() -> Vec<(String, usize, String)> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/conformance");
+    let mut out = Vec::new();
+    let mut paths: Vec<_> = fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    paths.sort();
+    for path in paths {
+        if path.file_name().unwrap() == "README.md" {
+            continue;
+        }
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let text = fs::read_to_string(&path).unwrap();
+        for (i, input) in inputs(&text).into_iter().enumerate() {
+            out.push((name.clone(), i + 1, input));
+        }
+    }
+    out
+}
+
 /// Every conformance fixture with a canonical block: `(name, canonical)`,
 /// in file order.
 pub fn fixtures() -> Vec<(String, String)> {

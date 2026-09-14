@@ -1,0 +1,5 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Write \[=45% \"Review"] for a bar, \[=100%] for a full one; [=x%] is text.

@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+Write \[=45% "Review"\] for a bar, \[=100%\] for a full one; \[=x%\] is text.
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

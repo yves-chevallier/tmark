@@ -15,6 +15,8 @@
 //! character is that character); under-escaping breaks it, so ties go to
 //! the escape.
 
+use tmark_ir::sugar;
+
 use crate::out::Out;
 
 /// Where a run of text is printed.
@@ -49,6 +51,7 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     let mut pending: Option<usize> = None;
     let mut forced = autolink_escapes(&chars);
     forced.extend(quote_escapes(&chars));
+    forced.extend(sugar_escapes(text));
     for (i, &c) in chars.iter().enumerate() {
         let next_c = chars.get(i + 1).copied().or(next);
         if c == '\n' {
@@ -99,6 +102,36 @@ fn quote_escapes(chars: &[char]) -> Vec<usize> {
             }
         }
         i += 1;
+    }
+    out
+}
+
+/// Character positions of the inline sugar `tmark_ir::sugar` recognises
+/// in a text run (spec §ProgressBar, Appendix "PyMdownX compatibility
+/// profile"): the `[` of a progress bar spelling, the first punctuation
+/// character of a smart symbol (`\(c)`, `\-->`, `\+/-`, `1\/2`, `c\/o`).
+/// A spelling that reached the printer inside a `Str` is one the author
+/// escaped, and the parser keeps a spelling literal when any character of
+/// it is escaped in the source, so one backslash per spelling is enough.
+fn sugar_escapes(text: &str) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    let mut index = 0;
+    while i < text.len() {
+        if text[i..].starts_with("[=") && sugar::progress_bar(&text[i..]).is_some() {
+            out.push(index);
+        }
+        if let Some((len, _)) = sugar::smart_symbol(text, i) {
+            let spelling = &text[i..i + len];
+            if let Some(at) = spelling.chars().position(|c| c.is_ascii_punctuation()) {
+                out.push(index + at);
+            }
+            i += len;
+            index += spelling.chars().count();
+            continue;
+        }
+        i += text[i..].chars().next().map_or(1, char::len_utf8);
+        index += 1;
     }
     out
 }
@@ -323,6 +356,26 @@ mod tests {
         assert_eq!(esc("mailto:me@x.y"), "mailto\\:me\\@x.y");
         assert_eq!(esc("mail me@example.com"), "mail me\\@example.com");
         assert_eq!(esc("a@b and ftp://x"), "a@b and ftp://x");
+    }
+
+    #[test]
+    fn sugar_is_defused() {
+        // Spec §ProgressBar and the appendix's smart symbols: a `Str`
+        // spelled like one is literal text that must stay literal.
+        assert_eq!(
+            esc("A [=50% \"x\"] B [=50%]"),
+            "A \\[=50% \\\"x\"] B \\[=50%]"
+        );
+        assert_eq!(esc("[=x%] and [x]"), "[=x%] and [x]");
+        assert_eq!(
+            esc("(c) (tm) (r) +/- =/= <--> --> <--"),
+            "\\(c) \\(tm) \\(r) \\+/- \\=/= \\<--> \\--> \\<--"
+        );
+        assert_eq!(
+            esc("1/2 cup, c/o Ada, 11/2, 1/7"),
+            "1\\/2 cup, c\\/o Ada, 11/2, 1/7"
+        );
+        assert_eq!(esc("a ---> b"), "a ---> b");
     }
 
     #[test]
