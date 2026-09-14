@@ -87,7 +87,10 @@ every key optional: `media` (`print` | `web`), `lang`, `code` {`engine`
 (`pygments` | `minted` | `listings` | `verbatim`), `inline_plain`,
 `inline_breaks`}, `latex` {`legacy_accents`}, `headings` {`base_level`,
 `numbered`}, `refs` {`textual_print`, `textual_web`}, `numbering` (prefix →
-`backend` | `tmark`), `typst` {`math` (`mitex` | `native`)}, `source_map`.
+`backend` | `tmark`), `typst` {`math` (`mitex` | `native`)}, `citations`
+{`narrative`: `True` renders a bare `@key` as the narrative citation,
+`False` as the short one, `None` follows the front matter's
+`citations.narrative` feature}, `source_map`.
 Keys are checked against the default options at every level (an unknown
 key is a `TypeError` naming its path, `numbering` keys being free) and
 the values decoded by serde (a bad enum value is a `ValueError`), so the

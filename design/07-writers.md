@@ -59,9 +59,10 @@ not a base class.
 
 `WriterOptions` is a plain struct: `media: Print | Web`, `profile` (for
 CommonMark), `code: { engine, inline_breaks }`, `refs.textual` templates per
-medium, `lang`, and `numbering: Backend | Tmark` per series. Anything
-requiring knowledge of a template is not an option; it is a fragment
-contract.
+medium, `lang`, `numbering: Backend | Tmark` per series, and
+`citations.narrative` (an override of the front matter's feature, the
+precedence of `lang`). Anything requiring knowledge of a template is not
+an option; it is a fragment contract.
 
 ## Mapping rules that are not obvious
 
@@ -89,9 +90,18 @@ contract.
   which is what keeps a French reference (`Table 1`) agreeing with the
   caption babel prints; LaTeX's own `\caption` numbering stays babel's
   business and the writer never translates it.
-- **Citations.** `\cite`/`\parencite`/`\textcite` with locators, `#cite`
-  in Typst, `<a>` plus a bibliography list in HTML rendered from the entry
-  fields with a minimal built-in style (author-year); CSL is TeXSmith's.
+- **Citations.** A bare `@key` is the short citation the style gives
+  (`\cite{key}`, `#cite(<key>)`), the same as `@[key]`; `\textcite` /
+  `form: "prose"` are written for a `+key` item and, under the feature
+  `citations.narrative`, for a bare key (`refs::narrative`:
+  `WriterOptions::citations.narrative`, else the front matter's feature,
+  else the registry default — the precedence of `lang` without the
+  resolution level, which does not read the switch). Locators as
+  `\cite[pre][post]{k}` / `supplement:`, `-key` as `\citeyear` /
+  `form: "year"`. HTML: `<a>` plus a bibliography list rendered from the
+  entry fields with a minimal built-in style (author-year), one
+  parenthetical form that reads neither switch nor flag; CSL is
+  TeXSmith's. Spec §Cite, C51.
 - **Zero-width nodes.** Comments, index entries, anchors, counter
   definitions that print nothing, asides: the writer collapses surrounding
   whitespace and removes it before punctuation (spec §Attributes). This is a
@@ -190,7 +200,9 @@ replacement text is:
   the HTML writer's author-year style (`common::refs::author_year`,
   `html::bibliography_entry`) with a `## References` list appended to the
   page and returned alone in `Lowered.bibliography`, or Pandoc `[@key]`
-  with `citations: Passthrough`;
+  with `citations: Passthrough` — `@key` (Pandoc's narrative form) for a
+  `+key` item and, under the front matter's `citations.narrative`, for a
+  bare key; `WebOptions` has no override;
 - `!!! type cls "title"` (`???`, `???+` when `collapsed`) for a `:::`
   callout the `!!!` line can carry, its body re-indented by `Out`;
 - the lowered text of the included file for `{include}(f)` (its
@@ -254,8 +266,9 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
 - `lib.rs`: `Writer`, `Backend` (`html`, `latex`, `typst`), `Media`,
   `WriterOptions { media, lang, code {engine, inline_plain,
   inline_breaks}, latex {legacy_accents}, headings {base_level, numbered},
-  refs {textual_print, textual_web}, numbering, typst {math}, source_map
-  }`, `Body { text, map, requires }`, `Requires` (design fields plus
+  refs {textual_print, textual_web}, numbering, typst {math}, citations
+  {narrative}, source_map }`, `Body { text, map, requires }`, `Requires`
+  (design fields plus
   `citations`, `acronyms`), `SourceMap` (serialises as `[[start, end,
   node], …]`), `write(doc, res, backend, opts)`, `writer(backend)`. All
   serde-derived: `tmark-py` and `tmark write --map` hand the JSON over.
@@ -344,10 +357,13 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   (`Figure~\ref{fig:x}`); a TMark-numbered one renders the text inside
   `\hyperref[key]{…}`. A capitalised prefix capitalises the label word;
   a lower-case one keeps the declared word.
-- Citations: a bracketed group → `\cite{k1,k2}` (locators as
-  `\cite[pre][post]{k}`), a bare `@key` → `\textcite{key}` (and
-  `ts-bibliography` in `Requires.fragments` for the fallback),
-  `-@key` → `\citeyear`. Typst: `#cite(<k>, form: "prose")` for bare.
+- Citations: `\cite{k1,k2}` for consecutive plain items of one form
+  (locators as `\cite[pre][post]{k}`), `\textcite` for a `+key` item and
+  for a bare `@key` under `citations.narrative` (then `ts-bibliography`
+  in `Requires.fragments` for the fallback), `-key` → `\citeyear`.
+  Typst: `#cite(<k>)`, `form: "prose"` and `form: "year"` on the same
+  rule. Before C51 a bare key was `\textcite` unconditionally, which
+  turned the migrated `[^key]` ("[3]") into a narrative citation.
 - An `Image` alone in a paragraph is a figure; its alt is the caption when
   no caption line follows (legacy `render_images`), and the short caption
   when one does and the alt is not longer. Inside `tscallout`/`tscode`
