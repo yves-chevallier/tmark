@@ -87,10 +87,13 @@ fn hugging_citations_get_a_space() {
 /// (spec §Cite, C51), so the printer must not rewrite the spelling.
 #[test]
 fn a_lone_bracketed_key_keeps_its_brackets() {
-    let text = "Cite @[ein05] and @ein05, not [^ein05].\n";
+    let text = "Cite @[ein05] and @ein05, not [^ein05]; @[+ein05, p. 3; -ko20].\n";
     let doc = parse(text, FileId::default()).document;
+    let printed = format(&doc, Profile::Canonical);
     assert_eq!(
-        format(&doc, Profile::Canonical),
-        "Cite @[ein05] and @ein05, not @ein05.\n"
+        printed,
+        "Cite @[ein05] and @ein05, not @ein05; @[+ein05, p. 3; -ko20].\n"
     );
+    let failures = roundtrip("flags", &printed);
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }

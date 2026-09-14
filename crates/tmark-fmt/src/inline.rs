@@ -553,6 +553,7 @@ fn reference(out: &mut Out, items: &[RefItem], bracketed: bool) {
             && item.prefix.is_none()
             && item.suffix.is_none()
             && !item.suppress_author
+            && !item.narrative
             && is_bare_key(&item.key)
         {
             out.push("@");
@@ -571,6 +572,8 @@ fn reference(out: &mut Out, items: &[RefItem], bracketed: bool) {
             }
             if item.suppress_author {
                 s.push('-');
+            } else if item.narrative {
+                s.push('+');
             }
             s.push_str(&item.key);
             if let Some(suffix) = &item.suffix {

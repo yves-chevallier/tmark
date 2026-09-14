@@ -939,11 +939,12 @@ The brackets are optional and follow the sigil. Bare `@key` takes one word
 of `[A-Za-z0-9_:.-]`; trailing sentence punctuation stays out. The bracketed
 form `@[…]` is required as soon as the reference contains a space: a
 locator, a suffix, or several keys separated by `;`. A lone key may be
-written `@[key]` too; for a label it is the same reference, for a citation
-§Cite says when the brackets carry a meaning, and the canonical printer
-keeps them as written. Inside the brackets the
-item grammar is Pandoc's: optional prefix text, optional `-`, the key,
-optional suffix or locator. A capitalised prefix (`@Fig:x`) capitalises the
+written `@[key]` too: an item list of one item, which for a label is the
+same reference and for a citation is the short form whatever the document
+default (§Cite); the canonical printer keeps the brackets as written.
+Inside the brackets the item grammar is Pandoc's: optional prefix text, an
+optional flag (`-`, or `+` for a citation, §Cite), the key, optional suffix
+or locator. A capitalised prefix (`@Fig:x`) capitalises the
 label word (pandoc-crossref convention); prefixes are otherwise
 case-insensitive. Sugar: Pandoc's own `[@key, locator; @key2]`, accepted for
 import and never emitted.
@@ -995,25 +996,33 @@ As shown by @[ein05, p. 33], and elsewhere @[see ein05, pp. 33-35; AI2027, ch. 1
 Suppress the author: @[-ein05].
 ```
 
-`@key` and `@[key]` are the short citation the bibliography style gives
-(`[3]`, or `Einstein 1905` in an author-year style); `@[key, locator]` adds
-a locator and `@[-key]` suppresses the author. The bracketed form is always
-parenthetical. The feature `citations.narrative` (off; Table
-@[tbl:features]) makes the *bare* form the narrative citation instead —
-"Einstein [3]", "Einstein (1905)" — for a document written in that voice;
-the bracketed form does not move, so an author who turns the switch on
-writes `@[key]` for the occasional parenthetical citation. `@key` and
-`@[key]` are therefore one node with a spelling flag (`Ref.bracketed`) that
-the print writers read only under the switch (C51). Locators follow Pandoc:
-a recognised locator word (`p.`, `pp.`, `ch.`, `sec.`, `§`…) followed by a
-range, or free suffix text. The item grammar is Pandoc's, the bracket
-position is TMark's (`@[` rather than `[@`), so that one rule covers bare and
-bracketed forms: brackets appear when there is a space. Pandoc's
-`[@key, locator]` is accepted for import. This is Typst's one-`@`-for-all
-model, default form included: a bare `@key` is `#cite(<key>)` as Typst
-renders it (`form: "normal"`), `\cite{key}` under biblatex, and the switch
-adds `form: "prose"` / `\textcite`. The web has one built-in author-year
-form, parenthetical, and does not read the switch. Sugar: `[^key]` and
+One rule covers both spellings. A bare `@key` is one key in the document's
+default form; `@[…]` is an explicit item list — items separated by `;`,
+each an optional prefix, an optional flag, the key and an optional locator
+or suffix — and reads as written whatever the default. The default form of
+a bare key is the short citation the bibliography style gives (`[3]`, or
+`Einstein 1905` in an author-year style); the feature `citations.narrative`
+(off; Table @[tbl:features]) makes it the narrative one — "Einstein [3]",
+"Einstein (1905)" — for a document written in that voice. Inside the
+brackets a plain item is the short, parenthetical citation, `+key` the
+narrative one and `-key` the year alone, so both forms are always
+spellable: `@[+ein05]` reads "Einstein [3]" in a document whose bare keys
+are short, `@[ein05]` reads "[3]" in one whose bare keys are narrative, and
+`@[+ein05, p. 33]` carries its locator. `@key` and `@[key]` are therefore
+one node (`Ref`) whose `bracketed` flag is a spelling the print writers
+read only under the switch, and whose items carry `narrative` for `+`
+(C51). Locators follow Pandoc: a recognised locator word (`p.`, `pp.`,
+`ch.`, `sec.`, `§`…) followed by a range, or free suffix text. The item
+grammar is Pandoc's, the bracket position is TMark's (`@[` rather than
+`[@`), so that one rule covers bare and bracketed forms: brackets appear
+when there is a space, a flag or a locator. Pandoc's `[@key, locator]` is
+accepted for import; Pandoc's bare `@key` is its narrative form, which is
+what the web lowering for `mkdocs-bibtex` writes for a narrative citation
+and `[@key]` for a short one. This is Typst's one-`@`-for-all model,
+default form included: a bare `@key` is `#cite(<key>)` as Typst renders it
+(`form: "normal"`), `\cite{key}` under biblatex; the switch and `+` add
+`form: "prose"` / `\textcite`. The web has one built-in author-year form,
+parenthetical, and reads neither. Sugar: `[^key]` and
 `^[k1,k2]` (citations as footnotes, shipping, deprecated; Appendix
 @[app:deprecations]); they are the short form, so their fix to `@key` /
 `@[k1; k2]` renders as they did. While they
@@ -1031,9 +1040,9 @@ Front-matter keys stay the readable choice for a source cited many times.
 
 Resolution order for any `@key`: declared counter prefix (`doi` and `gls`
 included), then bibliography. A key present in two registries is a hard
-warning. Class X. Backends: `\cite` with biblatex (`\textcite` for a bare
-key under `citations.narrative`), `#cite` (`form: "prose"`), CSL via
-citeproc.
+warning. Class X. Backends: `\cite` with biblatex (`\textcite` for a
+`+key` item and for a bare key under `citations.narrative`), `#cite`
+(`form: "prose"`), CSL via citeproc.
 
 #### CounterItem
 
@@ -1666,7 +1675,7 @@ Table: The feature registry. {#tbl:features}
 | `glossary.wikipedia` | off | fetch glossary summaries from Wikipedia links |
 | `inline.insert` | off | `^^x^^` as `{underline}[x]` (Appendix @[app:pymdownx]) |
 | `typography.tex-logos` | on | set the TeX logo words of §@[sec:inline] as logos |
-| `citations.narrative` | off | a bare `@key` is the narrative citation (`\textcite`, `form: "prose"`); `@[key]` stays parenthetical (§@[sec:references], Cite) |
+| `citations.narrative` | off | a bare `@key` is the narrative citation (`\textcite`, `form: "prose"`); `@[key]` stays parenthetical, `@[+key]` is narrative either way (§@[sec:references], Cite) |
 | `compat.pymdownx` | on | accept the Appendix @[app:pymdownx] sugar; off under `strict` |
 
 Extension points other than features:

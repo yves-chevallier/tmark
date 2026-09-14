@@ -219,7 +219,8 @@ fn is_ref_key(s: &str) -> bool {
 
 /// Parses the items of a bracketed reference (`see ein05, pp. 33-35; -AI2027`):
 /// Pandoc's item grammar, one item per `;`, each with an optional prefix, an
-/// optional `-`, the key and an optional suffix after the first `,`. A `@`
+/// optional flag (`-` suppresses the author, `+` makes the item narrative,
+/// spec §Cite), the key and an optional suffix after the first `,`. A `@`
 /// before a key (Pandoc's `[@key]` import form) is accepted and dropped.
 /// `key_span` is relative to `inner`; the caller relocates it.
 pub fn parse_ref_items(inner: &str) -> Vec<RefItem> {
@@ -238,10 +239,15 @@ pub fn parse_ref_items(inner: &str) -> Vec<RefItem> {
         let word_at = head.rfind(char::is_whitespace).map_or(0, |i| i + 1);
         let word = &head[word_at..];
         let mut suppress_author = false;
+        let mut narrative = false;
         let mut candidate = word;
         let mut skipped = 0;
         if let Some(rest) = candidate.strip_prefix('-') {
             suppress_author = true;
+            candidate = rest;
+            skipped += 1;
+        } else if let Some(rest) = candidate.strip_prefix('+') {
+            narrative = true;
             candidate = rest;
             skipped += 1;
         }
@@ -262,11 +268,13 @@ pub fn parse_ref_items(inner: &str) -> Vec<RefItem> {
             // Not a key: the whole item is the key, as typed (the suffix
             // is part of it, so it is not repeated).
             suppress_author = false;
+            narrative = false;
             (None, item.replace('@', ""), item_at, item.len(), None)
         };
         out.push(RefItem {
             prefix,
             suppress_author,
+            narrative,
             key,
             key_span: SubSpan::new(Default::default(), key_at as u32, (key_at + key_len) as u32),
             suffix,
@@ -456,6 +464,19 @@ mod tests {
         let items = parse_ref_items("-@b, p. 3");
         assert_eq!(items[0].key, "-b, p. 3");
         assert!(items[0].suffix.is_none() && !items[0].suppress_author);
+        // `+` is the narrative flag; one flag per item, so `+-` is no key.
+        let items = parse_ref_items("see +ein05, p. 3; +@ko20; +-ko20");
+        assert!(items[0].narrative && !items[0].suppress_author);
+        assert_eq!(items[0].prefix.as_deref(), Some("see"));
+        assert_eq!(items[0].key, "ein05");
+        assert_eq!(
+            (items[0].key_span.0.start, items[0].key_span.0.end),
+            (5, 10)
+        );
+        assert_eq!(items[0].suffix.as_deref(), Some("p. 3"));
+        assert!(items[1].narrative);
+        assert_eq!(items[1].key, "ko20");
+        assert!(!items[2].narrative && items[2].key == "+-ko20");
     }
 
     #[test]

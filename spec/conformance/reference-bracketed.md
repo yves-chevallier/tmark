@@ -1,7 +1,8 @@
 # Bracketed reference
 
 Spec §Ref, §Cite: `@[…]` as soon as an item has a space or there are several
-items; Pandoc's item grammar (prefix, `-` to suppress the author, key,
+items; Pandoc's item grammar (prefix, `-` to suppress the author or `+` for
+a narrative item, key,
 suffix). Pandoc's `[@key, locator]` is accepted for import and never emitted.
 
 ## input

@@ -1,6 +1,6 @@
 """The tmark IR as Python dataclasses, generated from the IR schema. Do not edit.
 tmark version: 0.0.0
-schema sha256: b72987141242043c940233fc24a594f0e6ed91b15f01b8d7b98c7714360b9c43
+schema sha256: 8346ce36c0d5e8379d30649f654778193f083a99d6b6429347f9015335e7b0b2
 
 Regenerate with ``crates/tmark-py/scripts/gen_ir_models.py`` (``--check`` in CI).
 Every node is a
@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Any, ClassVar, Final, Literal, NamedTuple, TypeAlias
 
 TMARK_VERSION: Final = '0.0.0'
-SCHEMA_HASH: Final = 'b72987141242043c940233fc24a594f0e6ed91b15f01b8d7b98c7714360b9c43'
+SCHEMA_HASH: Final = '8346ce36c0d5e8379d30649f654778193f083a99d6b6429347f9015335e7b0b2'
 
 #: A JSON value the schema leaves untyped (front-matter blobs).
 JsonValue: TypeAlias = Any
@@ -558,6 +558,7 @@ class RefItem(Record):
 
     key: str
     key_span: Span = NO_SPAN
+    narrative: bool = False
     prefix: str | None = None
     suffix: str | None = None
     suppress_author: bool = False
@@ -1305,6 +1306,7 @@ FIELDS: Final[dict[type, tuple[FieldSpec, ...]]] = {
     RefItem: (
         FieldSpec("key", ("str",), "required", None),
         FieldSpec("key_span", ("span",), "always", NO_SPAN),
+        FieldSpec("narrative", ("bool",), "skip", False),
         FieldSpec("prefix", ("opt", ("str",)), "skip", None),
         FieldSpec("suffix", ("opt", ("str",)), "skip", None),
         FieldSpec("suppress_author", ("bool",), "skip", False),
