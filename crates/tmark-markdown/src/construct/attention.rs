@@ -218,6 +218,21 @@ pub fn resolve(tokenizer: &mut Tokenizer) -> Option<Subresult> {
                         }
                     }
 
+                    // TMark keystroke sugar (challenge C51): the content
+                    // between the pair must be non-empty and hold no
+                    // whitespace, or `a ++ b` and similar prose would still
+                    // match once both sequences happen to sit at word
+                    // boundaries.
+                    if sequence_close.marker == b'+'
+                        && !keystroke_content_ok(
+                            tokenizer.parse_state.bytes,
+                            sequence_open.end_point.index,
+                            sequence_close.start_point.index,
+                        )
+                    {
+                        continue;
+                    }
+
                     // We found a match!
                     next_index = match_sequences(tokenizer, &mut sequences, open, close);
 
@@ -283,11 +298,23 @@ fn get_sequences(tokenizer: &mut Tokenizer) -> Vec<Sequence> {
                     size: exit.point.index - enter.point.index,
                     open: if marker == b'_' {
                         open && (before != CharacterKind::Other || !close)
+                    } else if marker == b'+' {
+                        // TMark keystroke sugar (spec §Inline text,
+                        // `++ctrl+s++`, challenge C51): a keystroke opener
+                        // must not be preceded by a word character, or
+                        // prose like `C++03`/`i++` reads the first `++` as
+                        // an opener.
+                        open && before != CharacterKind::Other
                     } else {
                         open
                     },
                     close: if marker == b'_' {
                         close && (after != CharacterKind::Other || !open)
+                    } else if marker == b'+' {
+                        // Symmetric rule for the closer: not followed by a
+                        // word character, or `C++ moderne` reads the second
+                        // `++` as a closer.
+                        close && after != CharacterKind::Other
                     } else {
                         close
                     },
@@ -486,4 +513,19 @@ fn match_sequences(
 /// GFM and TMark markers that need equal-sized sequences.
 fn is_classic(marker: u8) -> bool {
     matches!(marker, b'*' | b'_')
+}
+
+/// Whether the bytes between a keystroke opener and closer (spec §Inline
+/// text, `++ctrl+s++`, challenge C51) are a valid keystroke body: non-empty,
+/// with no whitespace. This rejects prose that only accidentally sits at
+/// word boundaries on both ends (`a ++ b`, two lone sequences the boundary
+/// rule alone would not catch).
+fn keystroke_content_ok(bytes: &[u8], start: usize, end: usize) -> bool {
+    if start >= end || end > bytes.len() {
+        return false;
+    }
+    match core::str::from_utf8(&bytes[start..end]) {
+        Ok(text) => !text.chars().any(char::is_whitespace),
+        Err(_) => false,
+    }
 }

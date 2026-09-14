@@ -1023,6 +1023,17 @@ text and `tmark lint` hints `feature-off`; on, it is sugar for
 role (Appendix @[app:pymdownx]). Long inline code wraps per
 `press.code.inline`.
 
+`++x++` (keystroke) recognises prose as its off switch: the opening `++`
+must not be preceded by a word character (letter, digit, or a character
+`\w` would call a letter) and the closing `++` must not be followed by one,
+and the text between the pair must be non-empty and hold no whitespace.
+Without this, `C++03` and `i++` in ordinary prose read as a keystroke from
+the first `++` to the next one, swallowing everything in between (challenge
+C61). PyMdownX's `keys` extension is narrower still — the content is a
+`+`-separated list of key tokens (`[A-Za-z0-9][A-Za-z0-9_-]*`) with no
+spaces — but the two boundary conditions plus the no-whitespace rule are
+what the tokenizer enforces; a per-token grammar is not.
+
 #### Math (inline)
 
 `$…$` canonical; `\(…\)` accepted as sugar (a LaTeX habit, class E under
