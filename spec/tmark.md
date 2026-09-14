@@ -1172,6 +1172,12 @@ numbers that host in its series instead of the host's own:
 prefix is *required* only where no host tells the kind: counter items
 (`#(fw:x)`).
 
+A numeric reference (`@id`, `[](#id)`) to an anchor whose host has no
+counter (a span, a `Div`, a sub-figure of an unnumbered container) is the
+warning `ref-unnumbered`, and renders the anchor's text or, failing that,
+its id; write a textual reference `[text](#id)` (§@[sec:references],
+"Ref") instead.
+
 #### Ref
 
 `@` refers. TMark adopts Pandoc's citation grammar for labels and

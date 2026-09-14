@@ -1,0 +1,50 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+This claim<claim> and#metadata(none) <top> are anchors.
+
+#ts-div("div", id: "d1")[
+A block.
+] <d1>
+
+#counter(figure.where(kind: "ts-subfigure")).update(0)
+#figure(
+  grid(columns: 2, gutter: 1em,
+    [#ts-subfigure(image("l.svg"), caption: [Left]) <fig:u>],
+    [#ts-subfigure(image("r.svg"), caption: [Right]) <fig:v>],
+  ),
+)
+
+See #link(<claim>)[claim], #link(<top>)[top], #link(<d1>)[d1], #link(<fig:u>)[fig:u], #link(<d1>)[d1], second, and #link(<claim>)[the claim].
+
+---requires---
+{
+  "packages": [
+    "epigraph",
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "xcolor"
+  ],
+  "fragments": [
+    "ts-typesetting"
+  ],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "l.svg",
+      "node": 13
+    },
+    {
+      "src": "r.svg",
+      "node": 17
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

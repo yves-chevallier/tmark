@@ -1,0 +1,59 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+This \phantomsection\label{claim}claim and\phantomsection\label{top} are anchors.
+
+\begin{tsdiv}{div}[id=d1]
+A block.
+\end{tsdiv}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{l.svg}
+\caption{Left}\label{fig:u}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{r.svg}
+\caption{Right}\label{fig:v}
+\end{subfigure}
+\end{figure}
+
+See \hyperref[claim]{claim}, \hyperref[top]{top}, \hyperref[d1]{d1}, \hyperref[fig:u]{fig:u}, \hyperref[d1]{d1}, second, and \hyperref[claim]{the claim}.
+
+---requires---
+{
+  "packages": [
+    "epigraph",
+    "float",
+    "graphicx",
+    "marginnote",
+    "multicol",
+    "progressbar",
+    "subcaption",
+    "xcolor"
+  ],
+  "fragments": [
+    "ts-typesetting"
+  ],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "l.svg",
+      "node": 13
+    },
+    {
+      "src": "r.svg",
+      "node": 17
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

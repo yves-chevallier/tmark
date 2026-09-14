@@ -39,7 +39,7 @@ neither.
 | ----- | -------- | ----- |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `container-orphan` (a `tab` outside `tabs`, hint), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error), `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` (the `yaml table` schema) | `tmark-syntax` |
-| Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing`, `ref-implicit-id` (hint: a reference to a heading's implicit id) | `tmark-registry` |
+| Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing`, `ref-implicit-id` (hint: a reference to a heading's implicit id), `ref-unnumbered` (a numeric reference to an anchor with no counter: it renders the anchor's text) | `tmark-registry` |
 | Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum`, `directive-foreign`, `icon-web-only`, `feature-off` (hints) | `tmark-lint` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error), `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` (the `yaml table` schema) | `tmark-syntax` |
@@ -212,6 +212,13 @@ IR can hold the offending shape (design 03 §Tables):
 - `ref-implicit-id` (resolve, hint) is reported on the whole reference
   (the `@key` or the link), not on the key token, and only when the label
   it resolved to is implicit.
+- `ref-unnumbered` (resolve, warning) is reported on the whole reference
+  too, for `@key` and the empty link `[](#key)` only: `[text](#key)` is
+  the textual form the message recommends. The host has no counter when
+  it is an anchor-only host (a span, a `Div`, a block quote) that no
+  declared series numbered, or a sub-figure of a container that has no
+  label. The writers show the anchor's text (a span's content) or its id
+  in place of the number.
 - `directive-foreign` (lint, hint) fires per dotted directive on the
   `RawBlock{format=markdown}`; `[TOC]` is the same node and silent.
   `icon-web-only` fires per icon span. `feature-off` fires per `^^x^^` run

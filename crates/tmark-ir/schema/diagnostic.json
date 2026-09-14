@@ -280,6 +280,13 @@
           ]
         },
         {
+          "description": "Spec §Anchor: a numeric reference (`@id`, `[](#id)`) to an anchor whose host has no counter (a span, a `Div`, a sub-figure of an unnumbered container); it renders the anchor's text or its id. Write a textual reference `[text](#id)`.",
+          "type": "string",
+          "enum": [
+            "ref-unnumbered"
+          ]
+        },
+        {
           "description": "Spec §Ref: \"Figure 3\" typed in prose.",
           "type": "string",
           "enum": [

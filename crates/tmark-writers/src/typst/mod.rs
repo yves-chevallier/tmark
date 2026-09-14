@@ -475,7 +475,14 @@ impl Typst<'_> {
                 self.out.push(&format!("#ts-div({})[\n", args.join(", ")));
                 self.contained(|w| w.blocks(&d.content));
                 self.out.ensure_newline();
-                self.out.push("]\n");
+                self.out.push("]");
+                // The id is a label a reference can reach (spec §Anchor);
+                // `ts-div` only forwards its body, so the writer attaches
+                // it (typst 0.15 attaches a label to a call's content).
+                if let Some(id) = d.attrs.id() {
+                    self.out.push(&format!(" <{}>", escape::label(id)));
+                }
+                self.out.push("\n");
             }
         }
     }

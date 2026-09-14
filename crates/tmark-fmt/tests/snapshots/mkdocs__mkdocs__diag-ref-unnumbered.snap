@@ -1,0 +1,16 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+This [claim]{#claim} and []{#top} are anchors.
+
+<div id="d1" markdown>
+A block.
+</div>
+
+::: figure
+![Left](l.svg){#fig:u}
+![Right](r.svg){#fig:v}
+:::
+
+See @claim, @top, @d1, @fig:u, @[d1, second], and [the claim](#claim).

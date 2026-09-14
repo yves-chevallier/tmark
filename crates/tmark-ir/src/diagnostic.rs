@@ -138,6 +138,11 @@ pub enum Code {
     /// Spec §Header: a reference to a heading's implicit id, which changes
     /// whenever the title is edited; write `{#id}`.
     RefImplicitId,
+    /// Spec §Anchor: a numeric reference (`@id`, `[](#id)`) to an anchor
+    /// whose host has no counter (a span, a `Div`, a sub-figure of an
+    /// unnumbered container); it renders the anchor's text or its id.
+    /// Write a textual reference `[text](#id)`.
+    RefUnnumbered,
     // --- Lint (tmark-lint) ---
     /// Spec §Ref: "Figure 3" typed in prose.
     HardcodedNumber,
@@ -218,6 +223,7 @@ impl Code {
         Code::CrossrefInventoryStale,
         Code::IncludeMissing,
         Code::RefImplicitId,
+        Code::RefUnnumbered,
         Code::HardcodedNumber,
         Code::PositionWord,
         Code::CaptionIdOffConvention,
@@ -274,6 +280,7 @@ impl Code {
             Code::CrossrefInventoryStale => "crossref-inventory-stale",
             Code::IncludeMissing => "include-missing",
             Code::RefImplicitId => "ref-implicit-id",
+            Code::RefUnnumbered => "ref-unnumbered",
             Code::HardcodedNumber => "hardcoded-number",
             Code::PositionWord => "position-word",
             Code::CaptionIdOffConvention => "caption-id-off-convention",
@@ -326,6 +333,7 @@ impl Code {
             | Code::CrossrefInventoryStale
             | Code::IncludeMissing
             | Code::DeprecatedFrontmatterKey
+            | Code::RefUnnumbered
             | Code::TableWidthSum => Severity::Warning,
             Code::LeadPromotion => Severity::Info,
             Code::RoleUnknown
@@ -375,7 +383,8 @@ impl Code {
             | Code::CrossrefInventoryMissing
             | Code::CrossrefInventoryStale
             | Code::IncludeMissing
-            | Code::RefImplicitId => Stage::Resolve,
+            | Code::RefImplicitId
+            | Code::RefUnnumbered => Stage::Resolve,
             Code::HardcodedNumber
             | Code::PositionWord
             | Code::CaptionIdOffConvention
@@ -456,6 +465,9 @@ impl Code {
             Code::ContainerOrphan => "Spec §Tabs: a `::: tab` outside `::: tabs`, wrapped in a set of one",
             Code::RefImplicitId => {
                 "Spec §Header: a reference to a heading's implicit id, which changes with the title"
+            }
+            Code::RefUnnumbered => {
+                "Spec §Anchor: a numeric reference to an anchor whose host has no counter; write `[text](#id)`"
             }
             Code::DirectiveForeign => {
                 "Spec §Foreign directive: a dotted `:::` directive the HTML and paged writers drop"

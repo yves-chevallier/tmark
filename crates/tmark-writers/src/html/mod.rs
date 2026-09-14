@@ -993,13 +993,17 @@ impl Html<'_> {
                         .get(&item.key.to_ascii_lowercase())
                         .cloned()
                         .unwrap_or_else(|| "?".to_string());
-                    let text = match &prefix {
-                        Some(p) => refs::template(
+                    // An anchor with no number shows its text (spec
+                    // §Anchor, `ref-unnumbered`).
+                    let unnumbered = refs::unnumbered_text(self.res, &item.key);
+                    let text = match (&prefix, unnumbered) {
+                        (_, Some(text)) => text,
+                        (Some(p), None) => refs::template(
                             &refs::reference_template(self.res, p),
                             &refs::label_word(self.res, p, &item.key, self.lang.as_deref()),
                             &number,
                         ),
-                        None => number,
+                        (None, None) => number,
                     };
                     self.out.push(&format!(
                         "<a href=\"#{}\" class=\"reference\">{}</a>",

@@ -266,8 +266,15 @@ impl Typst<'_> {
                     // its own, so `#ref` alone would show `(a)`, not `2a`.
                     let lettered = subfigure.is_some_and(|s| s.letter.is_some());
                     let label = escape::label(&defined);
-                    match (&prefix, number) {
-                        (Some(p), Some(number)) => {
+                    // An anchor with no number shows its text (spec
+                    // §Anchor, `ref-unnumbered`): `#ref` would refuse it.
+                    let unnumbered = refs::unnumbered_text(self.res, &item.key);
+                    match (&prefix, number, unnumbered) {
+                        (_, _, Some(text)) => {
+                            self.out
+                                .push(&format!("#link(<{label}>)[{}]", escape::markup(&text)));
+                        }
+                        (Some(p), Some(number), None) => {
                             let template = refs::reference_template(self.res, p);
                             let word =
                                 refs::label_word(self.res, p, &item.key, self.lang.as_deref());
@@ -278,7 +285,7 @@ impl Typst<'_> {
                             );
                             self.out.push(&format!("#link(<{label}>)[{}]", text.trim()));
                         }
-                        (Some(p), None) if lettered => {
+                        (Some(p), None, None) if lettered => {
                             let template = refs::reference_template(self.res, p);
                             let word =
                                 refs::label_word(self.res, p, &item.key, self.lang.as_deref());
@@ -289,7 +296,7 @@ impl Typst<'_> {
                             );
                             self.out.push(&format!("#link(<{label}>)[{}]", text.trim()));
                         }
-                        (Some(p), None) => {
+                        (Some(p), None, None) => {
                             let word =
                                 refs::label_word(self.res, p, &item.key, self.lang.as_deref());
                             if word.is_empty() {
@@ -301,7 +308,9 @@ impl Typst<'_> {
                                 ));
                             }
                         }
-                        (None, _) => self.out.push(&format!("#ref(<{label}>, supplement: none)")),
+                        (None, _, None) => {
+                            self.out.push(&format!("#ref(<{label}>, supplement: none)"))
+                        }
                     }
                 }
                 Resolution::Citation { key } => {

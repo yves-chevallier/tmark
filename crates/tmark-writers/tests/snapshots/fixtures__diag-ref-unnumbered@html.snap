@@ -1,0 +1,37 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>This <span id="claim">claim</span> and<span id="top"></span> are anchors.</p>
+<div id="d1">
+<p>A block.</p>
+</div>
+<figure>
+<img src="l.svg" alt="Left" id="fig:u" />
+<span class="subcaption">(a)</span>
+<img src="r.svg" alt="Right" id="fig:v" />
+<span class="subcaption">(b)</span>
+</figure>
+<p>See <a href="#claim" class="reference">claim</a>, <a href="#top" class="reference">top</a>, <a href="#d1" class="reference">d1</a>, <a href="#fig:u" class="reference">fig:u</a>, <a href="#d1" class="reference">d1</a>, second, and <a href="#claim" class="reference">the claim</a>.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "l.svg",
+      "node": 13
+    },
+    {
+      "src": "r.svg",
+      "node": 17
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
