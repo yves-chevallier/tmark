@@ -1,0 +1,6 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+> Simplicity is prerequisite for reliability.
+> {.epigraph}

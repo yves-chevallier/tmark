@@ -336,8 +336,16 @@ impl Latex<'_> {
                         .map(|l| l.id.clone())
                         .unwrap_or_else(|| item.key.clone());
                     let key = escape::escape(&defined);
-                    match (&prefix, number) {
-                        (Some(p), Some(number)) => {
+                    // An anchor with no number shows its text (spec
+                    // §Anchor, `ref-unnumbered`): a `\\ref` would print the
+                    // enclosing section's number.
+                    let unnumbered = refs::unnumbered_text(self.res, &item.key);
+                    match (&prefix, number, unnumbered) {
+                        (_, _, Some(text)) => {
+                            self.out
+                                .push(&format!("\\hyperref[{key}]{{{}}}", escape::prose(&text)));
+                        }
+                        (Some(p), Some(number), None) => {
                             // TMark numbers the series: the template as text.
                             let template = refs::reference_template(self.res, p)
                                 .replace("{name} {number}", "{name}~{number}");
@@ -351,7 +359,7 @@ impl Latex<'_> {
                             self.out
                                 .push(&format!("\\hyperref[{key}]{{{}}}", label.trim()));
                         }
-                        (Some(p), None) => {
+                        (Some(p), None, None) => {
                             let template = refs::reference_template(self.res, p)
                                 .replace("{name} {number}", "{name}~{number}");
                             let word =
@@ -363,7 +371,7 @@ impl Latex<'_> {
                             );
                             self.out.push(label.trim());
                         }
-                        (None, _) => self.out.push(&format!("\\ref{{{key}}}")),
+                        (None, _, None) => self.out.push(&format!("\\ref{{{key}}}")),
                     }
                 }
                 Resolution::Glossary { term } => {

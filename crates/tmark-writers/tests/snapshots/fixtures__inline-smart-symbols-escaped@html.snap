@@ -1,0 +1,19 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>Copyright (c) 2025, tea (tm), reg (r), c/o Ada: 1/2 a cup, +/- 3, 4 =/= 5.</p>
+<p>Arrows a --&gt; b, c &lt;-- d, e &lt;--&gt; f; © then © is still a symbol, (c) is not.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

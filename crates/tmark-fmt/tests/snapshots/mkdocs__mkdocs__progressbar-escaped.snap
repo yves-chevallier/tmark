@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Write \[=45% \"Review"] for a bar, \[=100%] for a full one; [=x%] is text.

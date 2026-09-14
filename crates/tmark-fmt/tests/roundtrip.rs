@@ -3,7 +3,7 @@
 //! same IR; formatting is idempotent.
 mod common;
 
-use common::{first_difference, fixtures};
+use common::{first_difference, fixture_inputs, fixtures};
 use tmark_fmt::{format, Profile};
 use tmark_ir::FileId;
 use tmark_syntax::parse;
@@ -44,6 +44,29 @@ fn roundtrip(name: &str, text: &str) -> Vec<String> {
         failures.push(format!("{name}: format is not idempotent\n{diff}"));
     }
     failures
+}
+
+/// Spec §Round-trip and source spans: `parse(print(parse(text)))` is
+/// `parse(text)` for every input block of every fixture, the sugar and
+/// escaped spellings included, not only the canonical block the fixed-point
+/// test reads (an escaped `\\(c)` or `\\[=50%]` never enters that one).
+#[test]
+fn input_blocks_round_trip() {
+    let mut failures = Vec::new();
+    for (name, index, input) in fixture_inputs() {
+        // The printer refuses a file the tokenizer failed on
+        // (`diag-parse-internal`): nothing to round-trip.
+        let parsed = parse(&input, FileId::default());
+        if parsed
+            .diagnostics
+            .iter()
+            .any(|d| d.code == tmark_ir::Code::ParseInternal)
+        {
+            continue;
+        }
+        failures.extend(roundtrip(&format!("{name} input #{index}"), &input));
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
 
 #[test]

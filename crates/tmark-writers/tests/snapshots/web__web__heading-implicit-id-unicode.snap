@@ -1,0 +1,11 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+## Café au lait
+
+## Thé à la menthe
+
+## 日本語 見出し
+
+See [Café au lait](#café-au-lait), [Thé à la menthe](#thé-à-la-menthe) and [](#日本語-見出し).

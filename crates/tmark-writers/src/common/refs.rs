@@ -15,6 +15,22 @@ pub fn unresolved(key: &str) -> String {
     format!("[?{key}]")
 }
 
+/// The text a numeric reference to `key` shows when its anchor has no
+/// number (spec §Anchor, `ref-unnumbered`): the anchor's text or title,
+/// else its id. `None` for a numbered label.
+pub fn unnumbered_text(res: &Resolved, key: &str) -> Option<String> {
+    let label = res.labels.get(key).filter(|l| res.unnumbered(l))?;
+    Some(
+        label
+            .title
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+            .unwrap_or(&label.id)
+            .to_string(),
+    )
+}
+
 /// Renders `{name}` and `{number}` in a counter's `ref` template.
 pub fn template(template: &str, name: &str, number: &str) -> String {
     template.replace("{name}", name).replace("{number}", number)

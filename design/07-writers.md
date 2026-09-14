@@ -493,3 +493,11 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   by a space, so a leading `-5` keeps Typst's own minus-sign substitution
   and a leading `a--b` keeps its en-dash conversion. Verified against
   typst 0.15.1 (fixture `escape-typst-structural`).
+- A Typst label (`typst/escape.rs::label`) keeps the characters Typst's
+  lexer reads in one, XID_Continue plus `_ - : .`, so an accented or
+  non-Latin id (`café-au-lait`, `日本語-見出し`) is a label as written;
+  any other character becomes `-` and the label takes a six-hex-digit
+  hash of the original id as a suffix, so two ids that differ only there
+  never collide. LaTeX writes the id unchanged (`\label{café-au-lait}`,
+  fine under UTF-8 engines), HTML uses it as the fragment. Verified
+  against typst 0.15.1 (fixture `heading-implicit-id-unicode`).

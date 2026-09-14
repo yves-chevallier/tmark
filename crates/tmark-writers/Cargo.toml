@@ -19,6 +19,10 @@ tmark-fmt = { path = "../tmark-fmt" }
 serde = { workspace = true }
 # `press.declare.acronyms` is a JSON map in the front matter (common/abbr.rs).
 serde_json = { workspace = true }
+# Typst labels take XID_Continue characters plus `_ - : .` (typst 0.15
+# lexer): the exact predicate, so an accented or non-Latin heading id stays
+# a label of its own instead of a run of dashes (typst/escape.rs).
+unicode-ident = "1.0"
 
 [dev-dependencies]
 # Tests parse their inputs.

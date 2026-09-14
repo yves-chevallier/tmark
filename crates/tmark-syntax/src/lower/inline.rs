@@ -390,8 +390,7 @@ impl Lowerer {
         let pieces: Vec<&str> = value.split('\n').collect();
         if pieces.len() == 1 {
             if !value.is_empty() {
-                let exact = value == source;
-                self.text_pieces(value, span, exact, source, out);
+                self.text_pieces(value, span, source, out);
             }
             return;
         }
@@ -422,49 +421,60 @@ impl Lowerer {
             if piece.is_empty() {
                 continue;
             }
-            let (piece_span, exact) = if aligned {
+            let (piece_span, piece_source) = if aligned {
                 let (from, to) = lines[i];
                 // Continuation indent is stripped from the value.
                 let skip = source[from..to].len() - source[from..to].trim_start().len();
                 (
                     self.span_of(ctx, base + from + skip, base + to),
-                    &source[from + skip..to] == *piece,
+                    &source[from + skip..to],
                 )
             } else {
-                (span, false)
+                (span, source)
             };
-            self.text_pieces(piece, piece_span, exact, source, out);
+            self.text_pieces(piece, piece_span, piece_source, out);
         }
     }
 
     /// One line of text as `Str` runs with the inline sugar found in it
     /// turned into nodes: progress bars, emoji (a `Str` holding the
-    /// character), icon shortcodes (`Span{.icon media=web}`). `exact`: the
-    /// text is its source byte for byte, so sub-spans are precise;
-    /// otherwise every node takes `span`. A spelling escaped at its first
-    /// character in `source` (`\:smile:`, `\[=1%]`) is the author's literal
-    /// text: only checked when the text is not exact, since an exact text
-    /// holds no backslash escape.
-    fn text_pieces(
-        &mut self,
-        text: &str,
-        span: Span,
-        exact: bool,
-        source: &str,
-        out: &mut Vec<Inline>,
-    ) {
+    /// character), icon shortcodes (`Span{.icon media=web}`), quoted
+    /// phrases, smart symbols. `source` is the line's source (the whole
+    /// node's when the lines could not be told apart); when the text is
+    /// its source byte for byte, sub-spans are precise, otherwise every
+    /// node takes `span`. A spelling with a backslash escape inside it in
+    /// the source (`\:smile:`, `\[=1%]`, `\(c)`, `1\/2`, `\"x"`) is the
+    /// author's literal text (spec §Round-trip and source spans: the
+    /// printer writes that escape back).
+    fn text_pieces(&mut self, text: &str, span: Span, source: &str, out: &mut Vec<Inline>) {
+        let exact = text == source;
+        // Where each byte of the decoded text sits in the source and
+        // whether it came from a backslash escape; when the source cannot
+        // be aligned (an entity the tokenizer decoded in a way this scan
+        // does not know), every node takes `span` and any escaped
+        // spelling of the character anywhere in the source counts.
+        let aligned = if exact { None } else { align(text, source) };
         let sub = |this: &Self, start: usize, end: usize| {
-            if exact {
-                Span::new(
-                    this.file,
-                    span.start + start as u32,
-                    span.start + end as u32,
-                )
+            let (from, to) = if exact {
+                (start, end)
+            } else if let Some(aligned) = &aligned {
+                (aligned.offsets[start], aligned.offsets[end])
             } else {
-                span
+                return span;
+            };
+            Span::new(this.file, span.start + from as u32, span.start + to as u32)
+        };
+        let escaped = |from: usize, to: usize| -> bool {
+            if exact {
+                return false;
+            }
+            match &aligned {
+                Some(aligned) => aligned.escaped[from..to].iter().any(|b| *b),
+                None => text[from..to]
+                    .chars()
+                    .any(|c| c.is_ascii_punctuation() && source.contains(&format!("\\{c}"))),
             }
         };
-        let escaped = |first: char| !exact && source.contains(&format!("\\{first}"));
         let mut buffer = String::new();
         let mut buffer_start = 0;
         let mut i = 0;
@@ -482,8 +492,14 @@ impl Lowerer {
         };
         while i < text.len() {
             let rest = &text[i..];
-            if rest.starts_with("[=") && !escaped('[') {
+            if rest.starts_with("[=") {
                 if let Some(bar) = sugar::progress_bar(rest) {
+                    if escaped(i, i + 1) {
+                        // The literal spelling, quotes included.
+                        buffer.push_str(&text[i..i + bar.len]);
+                        i += bar.len;
+                        continue;
+                    }
                     flush(self, &mut buffer, buffer_start, i, out);
                     let len = bar.len;
                     let at = sub(self, i, i + len);
@@ -495,7 +511,7 @@ impl Lowerer {
                     continue;
                 }
             }
-            if rest.starts_with(':') && !escaped(':') {
+            if rest.starts_with(':') && !escaped(i, i + 1) {
                 if let Some((len, kind)) = sugar::shortcode(text, i) {
                     match kind {
                         Shortcode::Emoji(character) => buffer.push_str(character),
@@ -519,8 +535,10 @@ impl Lowerer {
                     continue;
                 }
             }
-            if rest.starts_with('"') && !escaped('"') {
-                if let Some((start, end)) = sugar::quoted(text, i) {
+            if rest.starts_with('"') && !escaped(i, i + 1) {
+                if let Some((start, end)) =
+                    sugar::quoted(text, i).filter(|(_, end)| !escaped(*end, end + 1))
+                {
                     flush(self, &mut buffer, buffer_start, i, out);
                     let at = sub(self, i, end + 1);
                     let meta = self.meta(at);
@@ -539,11 +557,15 @@ impl Lowerer {
                 }
             }
             if let Some((len, symbol)) = sugar::smart_symbol(text, i) {
-                if !escaped(rest.chars().next().expect("in bounds")) {
-                    buffer.push_str(symbol);
-                    i += len;
-                    continue;
-                }
+                // An escaped spelling is literal as a whole: `\<-->` is
+                // not `<` and an arrow.
+                buffer.push_str(if escaped(i, i + len) {
+                    &text[i..i + len]
+                } else {
+                    symbol
+                });
+                i += len;
+                continue;
             }
             let c = rest.chars().next().expect("in bounds");
             buffer.push(c);
@@ -1314,6 +1336,72 @@ fn doi_key(key: &str) -> String {
 
 /// Adjacent `Str` nodes become one: the IR does not record how text was
 /// split by the tokenizer or by literal fallbacks (design 03 §Shape).
+/// The decoded text of a run aligned with its source.
+struct Aligned {
+    /// The source byte offset each decoded byte starts at, plus one entry
+    /// for the end of the text.
+    offsets: Vec<usize>,
+    /// Whether the source spelled the decoded byte with a backslash escape.
+    escaped: Vec<bool>,
+}
+
+/// Aligns `text` (decoded) with `source`; `None` when they cannot be
+/// aligned, and the caller falls back to coarser rules. Handles the two
+/// decodings the tokenizer applies to a text run, backslash escapes
+/// (`\\` + ASCII punctuation) and character references (`&amp;`,
+/// `&#169;`), which decode to one character each.
+fn align(text: &str, source: &str) -> Option<Aligned> {
+    let t = text.as_bytes();
+    let s = source.as_bytes();
+    let mut offsets = Vec::with_capacity(t.len() + 1);
+    let mut escaped = vec![false; t.len()];
+    let (mut i, mut j) = (0, 0);
+    while i < t.len() {
+        let &sj = s.get(j)?;
+        if sj == b'\\'
+            && s.get(j + 1)
+                .is_some_and(|b| b.is_ascii_punctuation() && *b == t[i])
+        {
+            offsets.push(j);
+            escaped[i] = true;
+            i += 1;
+            j += 2;
+            continue;
+        }
+        if sj == b'&' {
+            let entity = s[j + 1..]
+                .iter()
+                .take(40)
+                .position(|b| *b == b';')
+                .filter(|end| {
+                    *end > 0
+                        && s[j + 1..j + 1 + end]
+                            .iter()
+                            .all(|b| b.is_ascii_alphanumeric() || *b == b'#')
+                });
+            // A reference decodes to one character; `&` itself only from
+            // `&amp;`. Anything else spelled `&…;` is literal text.
+            if let Some(end) = entity {
+                if t[i] != b'&' || s[j..j + end + 2].eq_ignore_ascii_case(b"&amp;") {
+                    let len = text[i..].chars().next()?.len_utf8();
+                    offsets.extend(std::iter::repeat(j).take(len));
+                    i += len;
+                    j += end + 2;
+                    continue;
+                }
+            }
+        }
+        if sj != t[i] {
+            return None;
+        }
+        offsets.push(j);
+        i += 1;
+        j += 1;
+    }
+    offsets.push(j);
+    Some(Aligned { offsets, escaped })
+}
+
 fn merge_strs(inlines: Vec<Inline>) -> Vec<Inline> {
     let mut out: Vec<Inline> = Vec::with_capacity(inlines.len());
     for inline in inlines {
@@ -1325,4 +1413,35 @@ fn merge_strs(inlines: Vec<Inline>) -> Vec<Inline> {
         out.push(inline);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::align;
+
+    #[test]
+    fn alignment_finds_escapes_and_entities() {
+        let map = |text: &str, source: &str| {
+            align(text, source).map(|a| {
+                a.escaped
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, b)| **b)
+                    .map(|(i, _)| i)
+                    .collect::<Vec<_>>()
+            })
+        };
+        assert_eq!(map("a (c) b", "a \\(c) b"), Some(vec![2]));
+        assert_eq!(map("1/2", "1\\/2"), Some(vec![1]));
+        assert_eq!(map("&(c) (c)", "&amp;(c) \\(c)"), Some(vec![5]));
+        assert_eq!(map("© (c)", "&copy; \\(c)"), Some(vec![3]));
+        assert_eq!(map("&b; (c)", "&b; \\(c)"), Some(vec![4]));
+        assert_eq!(map("a b", "a b"), Some(vec![]));
+        assert_eq!(map("x", "y"), None, "not the text's source");
+        assert_eq!(map("ab", "a"), None, "source too short");
+        let a = align("a © b", "a &copy; b").unwrap();
+        assert_eq!(a.offsets, vec![0, 1, 2, 2, 8, 9, 10]);
+        let a = align("(c) x", "\\(c) x").unwrap();
+        assert_eq!(a.offsets, vec![0, 2, 3, 4, 5, 6]);
+    }
 }

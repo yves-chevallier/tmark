@@ -74,19 +74,33 @@ pub fn string(text: &str) -> String {
     text.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// A Typst label: `[^A-Za-z0-9_.:-]` becomes `-` (`typst/writer.py:932`,
-/// shared with bibliography keys).
+/// A Typst label (also a bibliography key). Typst 0.15 reads a label as
+/// a run of XID_Continue characters plus `_`, `-`, `:` and `.`; every
+/// other character becomes `-`, and a key that lost a character takes a
+/// short hash of its original spelling as a suffix so that two ids that
+/// differ only in such characters (`日本語 見出し` and `日本語 本文`,
+/// `a/b` and `a+b`) never share a label. An accented or non-Latin id is
+/// a label as written.
 pub fn label(key: &str) -> String {
-    key.trim()
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '-') {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect()
+    let key = key.trim();
+    let mut out = String::with_capacity(key.len() + 8);
+    let mut lossy = false;
+    for c in key.chars() {
+        if unicode_ident::is_xid_continue(c) || matches!(c, '_' | '.' | ':' | '-') {
+            out.push(c);
+        } else {
+            out.push('-');
+            lossy = true;
+        }
+    }
+    if lossy {
+        // FNV-1a over the original bytes: stable across runs and platforms.
+        let hash = key.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+        });
+        out.push_str(&format!("-{:06x}", hash & 0xff_ffff));
+    }
+    out
 }
 
 /// A raw span with a backtick fence longer than any run inside
@@ -179,8 +193,22 @@ mod tests {
     #[test]
     fn strings_labels_fences() {
         assert_eq!(string("a\"b\\c"), "a\\\"b\\\\c");
-        assert_eq!(label("fig:boot loop"), "fig:boot-loop");
         assert_eq!(label(" ein05 "), "ein05");
+        assert_eq!(label("fig:a.b_c-d"), "fig:a.b_c-d");
+        // Unicode letters and combining marks are label characters (typst
+        // 0.15 lexer, verified: `<café>`, `<日本語-見出し>`, `<e\u{301}>`
+        // compile); a superscript digit is not.
+        assert_eq!(label("café-au-lait"), "café-au-lait");
+        assert_eq!(label("日本語-見出し"), "日本語-見出し");
+        assert_eq!(label("e\u{301}"), "e\u{301}");
+        // A lost character leaves a stable hash behind, so two ids that
+        // differ only there keep distinct labels.
+        let a = label("fig:boot loop");
+        let b = label("fig:boot/loop");
+        assert!(a.starts_with("fig:boot-loop-") && a.len() == "fig:boot-loop-".len() + 6);
+        assert_ne!(a, b);
+        assert_eq!(a, label("fig:boot loop"), "deterministic");
+        assert_ne!(label("a²"), "a²");
         assert_eq!(raw_inline("x"), "`x`");
         assert_eq!(raw_inline("a`b"), "``a`b``");
         assert_eq!(raw_inline("`a"), "`` `a ``");

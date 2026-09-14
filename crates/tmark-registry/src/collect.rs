@@ -244,7 +244,14 @@ impl<'a> Collector<'a> {
     fn inline(&mut self, inline: &Inline) {
         match inline {
             Inline::Image(i) => self.define(&i.attrs, Host::Figure, i.meta.id, i.meta.span, None),
-            Inline::Span(s) => self.define(&s.attrs, Host::Anchor, s.meta.id, s.meta.span, None),
+            Inline::Span(s) => {
+                // The span's text is what a numeric reference to it shows
+                // (spec §Anchor, `ref-unnumbered`) and what a sibling
+                // document sees as its title.
+                let title =
+                    Some(tmark_ir::walk::plain_text(&s.content)).filter(|t| !t.trim().is_empty());
+                self.define(&s.attrs, Host::Anchor, s.meta.id, s.meta.span, title)
+            }
             Inline::CounterItem(c) => {
                 // Spec §CounterItem: "An undeclared prefix warns."
                 if !self.counters.is_declared(&c.prefix) {

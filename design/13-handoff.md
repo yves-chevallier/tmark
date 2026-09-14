@@ -235,6 +235,11 @@ resolutions instead. It is not started, and must not land before
 - **Diagnostics**: `{code, severity, span, message, fix, related}` plus
   `stage`, `path`, `line`, `col` (1-based, byte column, X10); the
   catalogue from `tmark.codes()`.
+  Review 07 F8 added `ref-unnumbered` (resolve, warning: a numeric
+  reference to an anchor with no counter); `tmark.codes()` and
+  `schema("diagnostic")` list it, and the writers render the anchor's
+  text in place of the number, so a TeXSmith template that keyed on `?`
+  or `Figure ?` for such a reference sees prose now.
 
 ### How TeXSmith consumes the crate
 

@@ -1,0 +1,24 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+== Café au lait <café-au-lait>
+
+== Thé à la menthe <thé-à-la-menthe>
+
+== 日本語 見出し <日本語-見出し>
+
+See #ref(<café-au-lait>, supplement: [Section]), #ref(<thé-à-la-menthe>, supplement: [Section]) and #ref(<日本語-見出し>, supplement: none).
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

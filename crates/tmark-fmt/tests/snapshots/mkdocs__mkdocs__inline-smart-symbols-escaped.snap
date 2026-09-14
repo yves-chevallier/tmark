@@ -1,0 +1,7 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Copyright \(c) 2025, tea \(tm), reg \(r), c\/o Ada: 1\/2 a cup, \+/- 3, 4 \=/= 5.
+
+Arrows a \--> b, c \<-- d, e \<--> f; © then © is still a symbol, \(c) is not.

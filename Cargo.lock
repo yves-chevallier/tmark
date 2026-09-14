@@ -968,6 +968,7 @@ dependencies = [
  "tmark-ir",
  "tmark-registry",
  "tmark-syntax",
+ "unicode-ident",
 ]
 
 [[package]]

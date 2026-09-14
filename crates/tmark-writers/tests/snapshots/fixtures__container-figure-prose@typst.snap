@@ -1,0 +1,44 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+#figure(
+  [
+#figure(
+  image("p.svg"),
+  caption: [Plot],
+) <fig:p>
+
+Some prose in the float.
+
+#figure(
+  image("o.svg"),
+  caption: [Other],
+) <fig:o>
+  ],
+  caption: [A prose float.],
+) <fig:prose>
+
+See #ref(<fig:p>, supplement: [Figure]), #ref(<fig:o>, supplement: [Figure]) and #ref(<fig:prose>, supplement: [Figure]).
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "p.svg",
+      "node": 3
+    },
+    {
+      "src": "o.svg",
+      "node": 9
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

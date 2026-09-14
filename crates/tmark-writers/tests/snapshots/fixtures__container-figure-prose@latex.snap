@@ -1,0 +1,48 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+\begin{figure}[H]
+\centering
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{p.svg}
+\caption{Plot}\label{fig:p}
+\end{figure}
+
+Some prose in the float.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{o.svg}
+\caption{Other}\label{fig:o}
+\end{figure}
+\caption{A prose float.}\label{fig:prose}
+\end{figure}
+
+See Figure~\ref{fig:p}, Figure~\ref{fig:o} and Figure~\ref{fig:prose}.
+
+---requires---
+{
+  "packages": [
+    "float",
+    "graphicx"
+  ],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "p.svg",
+      "node": 3
+    },
+    {
+      "src": "o.svg",
+      "node": 9
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

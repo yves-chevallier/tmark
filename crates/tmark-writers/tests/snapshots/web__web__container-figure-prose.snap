@@ -1,0 +1,18 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+<figure markdown="1" id="fig:prose">
+
+![Plot](p.svg){#fig:p}
+
+Some prose in the float.
+
+![Other](o.svg){#fig:o}
+
+<figcaption markdown="span"><span class="ts-caption-label">Figure 3:</span> A prose float.</figcaption>
+</figure>
+
+
+
+See [Figure 1](#fig:p), [Figure 2](#fig:o) and [Figure 3](#fig:prose).

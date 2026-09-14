@@ -39,12 +39,12 @@ neither.
 | ----- | -------- | ----- |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `container-orphan` (a `tab` outside `tabs`, hint), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error), `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` (the `yaml table` schema) | `tmark-syntax` |
-| Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing`, `ref-implicit-id` (hint: a reference to a heading's implicit id) | `tmark-registry` |
-| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum`, `directive-foreign`, `icon-web-only`, `feature-off` (hints) | `tmark-lint` |
+| Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing`, `ref-implicit-id` (hint: a reference to a heading's implicit id), `ref-unnumbered` (a numeric reference to an anchor with no counter: it renders the anchor's text) | `tmark-registry` |
+| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum`, `directive-foreign`, `icon-web-only`, `feature-off` (hints) | `tmark-lint` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `compat-unsupported` (a PyMdownX spelling recognised but not implemented yet: literal text plus a warning), `parse-internal` (the tokenizer failed: the text is one paragraph, an error) | `tmark-syntax` |
 | Parse | `attr-no-host`, `role-dangling-head`, `container-unclosed`, `fence-unknown-node-word`, `frontmatter-yaml`, `deprecated` (spelling), `parse-internal` (the tokenizer failed: the text is one paragraph, an error), `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` (the `yaml table` schema) | `tmark-syntax` |
 | Resolve | `ref-unresolved`, `ref-ambiguous` (key in two registries), `prefix-unknown`, `prefix-host-mismatch` (`{#tbl:x}` on a figure), `label-duplicate`, `citation-shadowed-by-footnote`, `crossref-inventory-missing`, `include-missing` | `tmark-registry` |
-| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `strict-x-construct`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum` | `tmark-lint` |
+| Lint | `hardcoded-number` ("Figure 3" in prose), `position-word` ("above", "below"), `caption-id-off-convention`, `deprecated-frontmatter-key`, `lead-promotion` (info: sugar promoted), `heading-skip`, `table-placement`, `table-width`, `table-width-sum` | `tmark-lint` |
 
 Parse and resolve diagnostics are not optional; they are facts about the
 document. Lint rules are a catalogue the user can enable, disable and
@@ -100,10 +100,11 @@ spelling is safe, guessing a label for an unresolved reference is not.
   trait whose `check` receives a `Context { doc, resolved, text }`: the
   source text is there for rules that look at spellings (lead promotion).
 - Rules shipped: `hardcoded-number`, `position-word`,
-  `caption-id-off-convention`, `heading-skip`, `lead-promotion`.
-  `strict-x-construct` waits for the strict profile's parse-time reporting
-  (milestone 5); `deprecated-frontmatter-key` and `role-unknown` are emitted
-  by the parser, not by a rule.
+  `caption-id-off-convention`, `heading-skip`, `lead-promotion`;
+  `deprecated-frontmatter-key` and `role-unknown` are emitted by the
+  parser, not by a rule. There is no `strict-x-construct`: under the
+  strict profile an X-class spelling is what GFM makes of it (`__x__` is
+  strong), which needs no report (review 07 triage).
 - `Config` maps a `Code` to `off | hint | info | warning | error`; the CLI
   takes `--level code=level` and the `[lint]` table of `tmark.toml`
   (`tmark::Config`, milestone 3).
@@ -148,11 +149,10 @@ spelling is safe, guessing a label for an unresolved reference is not.
   inside a word), `^^…^^` without `inline.insert`, lower-case fancy list
   markers (`a.`, `iv.`, `#.`, `1)`) and `[TOC]` at a paragraph start; what
   is left today is the wiki link and the fancy list marker, each other
-  spelling having become a construct. It is a new code rather than
-  `strict-x-construct` because these are not X-class deviations under a
-  profile: they are constructs of the compatibility appendix that every
-  profile will accept once implemented, and the strict profile must keep
-  reporting X1/X3 separately. A spelling escaped at its first character
+  spelling having become a construct. It is a code of its own
+  because these are not X-class deviations under a profile: they are
+  constructs of the compatibility appendix that every profile will accept
+  once implemented. A spelling escaped at its first character
   (`\[TOC]`, `\:smile:`, a paragraph starting with `\`) is the author's
   literal text and is not reported. The scans are narrow on purpose (a
   miss is the old behaviour, a false positive is a wrong warning on
@@ -212,6 +212,13 @@ IR can hold the offending shape (design 03 §Tables):
 - `ref-implicit-id` (resolve, hint) is reported on the whole reference
   (the `@key` or the link), not on the key token, and only when the label
   it resolved to is implicit.
+- `ref-unnumbered` (resolve, warning) is reported on the whole reference
+  too, for `@key` and the empty link `[](#key)` only: `[text](#key)` is
+  the textual form the message recommends. The host has no counter when
+  it is an anchor-only host (a span, a `Div`, a block quote) that no
+  declared series numbered, or a sub-figure of a container that has no
+  label. The writers show the anchor's text (a span's content) or its id
+  in place of the number.
 - `directive-foreign` (lint, hint) fires per dotted directive on the
   `RawBlock{format=markdown}`; `[TOC]` is the same node and silent.
   `icon-web-only` fires per icon span. `feature-off` fires per `^^x^^` run

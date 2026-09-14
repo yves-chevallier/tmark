@@ -207,11 +207,16 @@ pub fn parse_role_head(s: &str) -> Option<RoleHead> {
     })
 }
 
+/// The `key`/`id` production of spec §Identifiers as a bracketed item
+/// spells it: a letter or a digit first (Zotero's `1RgTv`, challenge
+/// C27), a letter or a digit last, `_ : . - /` inside; an all-digit item
+/// is never a key.
 fn is_ref_key(s: &str) -> bool {
     let bytes = s.as_bytes();
     bytes.len() >= 2
-        && bytes[0].is_ascii_alphabetic()
+        && bytes[0].is_ascii_alphanumeric()
         && bytes[bytes.len() - 1].is_ascii_alphanumeric()
+        && !bytes.iter().all(u8::is_ascii_digit)
         && bytes
             .iter()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b':' | b'.' | b'-' | b'/'))
@@ -477,6 +482,14 @@ mod tests {
         assert!(items[1].narrative);
         assert_eq!(items[1].key, "ko20");
         assert!(!items[2].narrative && items[2].key == "+-ko20");
+        // A digit-initial key (spec §Identifiers, C27) keeps its locator
+        // and prefix out of the key; an all-digit item is no key.
+        let items = parse_ref_items("7HA7H, p. 3; see 1RgTv; 12, p. 4");
+        assert_eq!(items[0].key, "7HA7H");
+        assert_eq!(items[0].suffix.as_deref(), Some("p. 3"));
+        assert_eq!(items[1].prefix.as_deref(), Some("see"));
+        assert_eq!(items[1].key, "1RgTv");
+        assert_eq!(items[2].key, "12, p. 4");
     }
 
     #[test]

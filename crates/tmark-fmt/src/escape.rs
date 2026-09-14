@@ -15,6 +15,8 @@
 //! character is that character); under-escaping breaks it, so ties go to
 //! the escape.
 
+use tmark_ir::sugar;
+
 use crate::out::Out;
 
 /// Where a run of text is printed.
@@ -48,7 +50,8 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     // line (the `.` of `1.`, the `:` of `Table:`).
     let mut pending: Option<usize> = None;
     let mut forced = autolink_escapes(&chars);
-    forced.extend(quote_escapes(&chars));
+    forced.extend(quote_escapes(text));
+    forced.extend(sugar_escapes(text));
     for (i, &c) in chars.iter().enumerate() {
         let next_c = chars.get(i + 1).copied().or(next);
         if c == '\n' {
@@ -78,27 +81,54 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     out.push(&buf);
 }
 
-/// Positions of the straight double quotes that would pair into a
-/// `Quoted` when read back (`lower::sugar::quoted`): a `"` with a later
-/// `"` on the same line and something between them. A quote that reached
-/// the printer inside a `Str` is one the author escaped or one that never
-/// paired; escaping the opening quote keeps it that way.
-fn quote_escapes(chars: &[char]) -> Vec<usize> {
+/// Character positions of the straight double quotes that would open a
+/// `Quoted` when read back (`tmark_ir::sugar::quoted`, the SmartyPants
+/// boundaries). A quote that reached the printer inside a `Str` is one
+/// the author escaped or one that never paired; escaping the opening
+/// quote keeps it that way.
+fn quote_escapes(text: &str) -> Vec<usize> {
     let mut out = Vec::new();
     let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '"' {
-            let close = chars[i + 1..]
-                .iter()
-                .position(|c| matches!(c, '"' | '\n'))
-                .filter(|at| *at > 0 && chars[i + 1 + at] == '"');
-            if let Some(at) = close {
-                out.push(i);
-                i += at + 2;
-                continue;
-            }
+    let mut index = 0;
+    while i < text.len() {
+        if let Some((_, end)) = sugar::quoted(text, i) {
+            out.push(index);
+            index += text[i..=end].chars().count();
+            i = end + 1;
+            continue;
         }
-        i += 1;
+        i += text[i..].chars().next().map_or(1, char::len_utf8);
+        index += 1;
+    }
+    out
+}
+
+/// Character positions of the inline sugar `tmark_ir::sugar` recognises
+/// in a text run (spec §ProgressBar, Appendix "PyMdownX compatibility
+/// profile"): the `[` of a progress bar spelling, the first punctuation
+/// character of a smart symbol (`\(c)`, `\-->`, `\+/-`, `1\/2`, `c\/o`).
+/// A spelling that reached the printer inside a `Str` is one the author
+/// escaped, and the parser keeps a spelling literal when any character of
+/// it is escaped in the source, so one backslash per spelling is enough.
+fn sugar_escapes(text: &str) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    let mut index = 0;
+    while i < text.len() {
+        if text[i..].starts_with("[=") && sugar::progress_bar(&text[i..]).is_some() {
+            out.push(index);
+        }
+        if let Some((len, _)) = sugar::smart_symbol(text, i) {
+            let spelling = &text[i..i + len];
+            if let Some(at) = spelling.chars().position(|c| c.is_ascii_punctuation()) {
+                out.push(index + at);
+            }
+            i += len;
+            index += spelling.chars().count();
+            continue;
+        }
+        i += text[i..].chars().next().map_or(1, char::len_utf8);
+        index += 1;
     }
     out
 }
@@ -323,6 +353,26 @@ mod tests {
         assert_eq!(esc("mailto:me@x.y"), "mailto\\:me\\@x.y");
         assert_eq!(esc("mail me@example.com"), "mail me\\@example.com");
         assert_eq!(esc("a@b and ftp://x"), "a@b and ftp://x");
+    }
+
+    #[test]
+    fn sugar_is_defused() {
+        // Spec §ProgressBar and the appendix's smart symbols: a `Str`
+        // spelled like one is literal text that must stay literal.
+        assert_eq!(
+            esc("A [=50% \"x\"] B [=50%]"),
+            "A \\[=50% \\\"x\"] B \\[=50%]"
+        );
+        assert_eq!(esc("[=x%] and [x]"), "[=x%] and [x]");
+        assert_eq!(
+            esc("(c) (tm) (r) +/- =/= <--> --> <--"),
+            "\\(c) \\(tm) \\(r) \\+/- \\=/= \\<--> \\--> \\<--"
+        );
+        assert_eq!(
+            esc("1/2 cup, c/o Ada, 11/2, 1/7"),
+            "1\\/2 cup, c\\/o Ada, 11/2, 1/7"
+        );
+        assert_eq!(esc("a ---> b"), "a ---> b");
     }
 
     #[test]

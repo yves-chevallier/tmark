@@ -1061,6 +1061,9 @@ percentage form and the deprecated fraction (`0/0` is literal):
 \[=\s*(?:(?<value>\d+(?:\.\d+)?)%|(?<num>\d+)/(?<den>\d+))(?:\s+"(?<label>[^"]*)")?\s*\]
 ```
 
+A backslash before the `[` keeps the whole spelling literal, label
+included, and the printer writes it back (§@[sec:roundtrip]).
+
 #### Emoji and icon shortcodes
 
 An emoji shortcode `:smile:` is sugar for the character it names: the
@@ -1168,6 +1171,12 @@ numbers that host in its series instead of the host's own:
 `## Boot loop {#fw:boot-loop}` is Finding FW-03 as well as a heading. A
 prefix is *required* only where no host tells the kind: counter items
 (`#(fw:x)`).
+
+A numeric reference (`@id`, `[](#id)`) to an anchor whose host has no
+counter (a span, a `Div`, a sub-figure of an unnumbered container) is the
+warning `ref-unnumbered`, and renders the anchor's text or, failing that,
+its id; write a textual reference `[text](#id)` (§@[sec:references],
+"Ref") instead.
 
 #### Ref
 
@@ -2250,7 +2259,7 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Span{.critic}` holding `Underline`, `Strikeout`, the two in order, or `Comment`; the highlight is a plain `Highlight` | E | see below; the printer emits the critic spelling, and nothing fires inside code, where the extension does |
 | `:smile:` | `Str` holding the character | E | emoji, GitHub's name table; the printer emits the character (§@[sec:inline]) |
 | `:material-…:`, `:fontawesome-…:`, `:octicons-…:`, `:simple-…:` | `Span{.icon media=web}` | D | Material icons; print drops them, hint `icon-web-only` (§@[sec:inline]) |
-| `(c)`, `(tm)`, `(r)`, `c/o`, `+/-`, `=/=`, `-->`, `<--`, `<-->`, `1/2` … | `Str` holding the character | E | smart symbols; the ordinal-number form (`1st`) is *not* applied: it is a superscript, not a `Str` |
+| `(c)`, `(tm)`, `(r)`, `c/o`, `+/-`, `=/=`, `-->`, `<--`, `<-->`, `1/2` … | `Str` holding the character | E | smart symbols; the ordinal-number form (`1st`) is *not* applied: it is a superscript, not a `Str`. A backslash on any character of a spelling keeps the whole spelling literal (`\(c)`, `1\/2`, `\<-->`), and the printer escapes the first punctuation character of a spelling a `Str` holds (§@[sec:roundtrip]) |
 | `"quotes"` | `Quoted` | E | SmartyPants; the pair is read inside one text run with SmartyPants' boundaries: an opening `"` at the start of the run or after whitespace or `(`, `[`, followed by a non-space; a closing `"` after a non-space, followed by the end, whitespace or punctuation. A phrase whose quotes sit on either side of inline markup stays literal, and its orphan quote never pairs with the next phrase's. Single quotes are left alone: an apostrophe is not a quote |
 | `--`, `---`, `...` | `Str`, as typed | E | both backends typeset the ASCII spelling as the dash and the ellipsis; converting them would gain nothing and lose the round-trip |
 | `https://…` bare | `Link` | C | magic links; GFM autolinks too |
@@ -2387,6 +2396,7 @@ Table: The diagnostics, by stage. {#tbl:diagnostics}
 | `ref-unresolved` | warning | a key found in no registry; renders `[?key]` | §@[sec:lookup] |
 | `ref-ambiguous` | warning | a key that is both a label and a bibliography key | §@[sec:lookup] |
 | `ref-implicit-id` | hint | a reference to a heading's implicit id | §@[sec:structure] |
+| `ref-unnumbered` | warning | a numeric reference (`@id`, `[](#id)`) to an anchor whose host has no counter; renders the anchor's text or its id | §@[sec:references] |
 | `prefix-unknown` | warning | a counter item, or a `#{…}`, whose prefix is not declared | §@[sec:references] |
 | `prefix-host-mismatch` | warning | a predeclared prefix on the wrong host | §@[sec:references] |
 | `label-duplicate` | warning | the same id defined twice | §@[sec:references] |

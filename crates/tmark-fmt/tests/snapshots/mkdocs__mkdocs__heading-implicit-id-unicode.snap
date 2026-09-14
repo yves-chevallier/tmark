@@ -1,0 +1,11 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+## Café au lait
+
+## Thé à la menthe
+
+## 日本語 見出し
+
+See @[café-au-lait], @[thé-à-la-menthe] and [](#日本語-見出し).

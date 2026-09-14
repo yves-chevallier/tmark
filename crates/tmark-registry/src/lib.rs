@@ -152,6 +152,25 @@ impl Resolved {
             .collect()
     }
 
+    /// Whether a numeric reference to `label` has no number to show (spec
+    /// §Anchor, `ref-unnumbered`): its host is an anchor only (a span, a
+    /// `Div`, a block quote) and no declared series numbered it, or it is
+    /// a sub-figure of a container that has no label of its own. The
+    /// backend-numbered hosts (headings, floats, equations, theorems) are
+    /// numbered even though `formatted` is `None` for them.
+    pub fn unnumbered(&self, label: &Label) -> bool {
+        match label.host {
+            Host::Anchor => self.formatted(label).is_none(),
+            Host::Subfigure => label
+                .subfigure
+                .as_ref()
+                .and_then(|s| s.parent.as_deref())
+                .and_then(|parent| self.labels.get(parent))
+                .map_or(true, |parent| self.unnumbered(parent)),
+            _ => false,
+        }
+    }
+
     /// The formatted number of a label, when its series numbered it. A
     /// subfigure's is its container's number and its letter (`2a`); the
     /// container's own number is never a subfigure's, so one level of
