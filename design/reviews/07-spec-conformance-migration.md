@@ -317,3 +317,39 @@ sole source of truth**: fit once F3–F6 are closed in the spec (with the
 challenge rows deleted per the file's own rule), F1, F2 and F8 have their
 fixtures, and the Typst writer has F7, F10, F11 fixed or documented as
 known limitations in design 07.
+
+## 5. Triage
+
+Disposition of every finding, on branch `fix/spec-text` (the spec text)
+and `fix/spec-code` (the code side of F1, F2, F7, F8, F10, owned by the
+sibling worktree). Spec commits: `3d66d60` (identifiers, item grammar,
+info string), `331bc1e` (row grammar, minors).
+
+| Id | Disposition |
+| -- | ----------- |
+| F1 | deferred to `fix/spec-code` (printer escaping of `[=`, the smart symbols, `1\/2`). Spec side covered: §Round-trip now states the general rule (`331bc1e`) — the printer re-escapes the first character of anything a recogniser of the grammar or of the appendix would match — which includes the progress bar and the symbol spellings. |
+| F2 | deferred to `fix/spec-code` (quote pairing, spans). Spec side fixed (`331bc1e`): the `"quotes"` row states SmartyPants' boundaries and that an orphan quote never pairs with the next phrase's. |
+| F3 | fixed (`3d66d60`): §Identifiers gives `key` a digit-initial first character, the bracketed item recogniser finds the key by the production, so `@[7HA7H, p. 3]` is key plus locator; a bare `@` still needs a letter. C27 → code: `tmark-syntax::lower::head::is_ref_key` still requires a letter and falls back to the whole item (`{"key": "7HA7H, p. 3"}` today); fixture `reference-key-digit-initial` to add. |
+| F4 | fixed (`3d66d60`): the family-4 recogniser ends with `(?:\s+(?&attrs))?`, and the prose says where the classes and id land and when the printer keeps the braces. C28 closed; `fence-attributes` agrees. |
+| F5 | fixed (`331bc1e`): rung 5 of §Table states the row grammar (positional items over leaves, scalar and list fill the remaining leaves, rich cells span from the cursor, `~` on every absorbed slot, named rows, two-column minimum) and names the diagnostics and fixtures. C30 closed. |
+| F6 | deferred (C54): the spec keeps "NFC-normalised"; the code adds the pass. |
+| F7 | deferred to `fix/spec-code` (Typst labels of non-ASCII ids). |
+| F8 | deferred to `fix/spec-code` (`ref-unnumbered`, including its spec sentence in §Anchor and its row in Appendix "Diagnostics"). |
+| F9 | deferred (C55): the empty-link reference renders empty on the web and bare in LaTeX; a writer fix with backend blocks in `heading-implicit-id`. |
+| F10 | deferred to `fix/spec-code` (Typst plain-float `::: figure`). |
+| F11 | deferred (C56): `//` and `/*` in Typst prose. |
+| F12 | fixed in text (`331bc1e`): consecutive orphans form one set; a `tab` without a title and attributes on `tabs` are silent. The dangling `tabs` label in the paged writers: C55. |
+| F13 | fixed (`331bc1e`): a bar's `#id` defines no label; classes are forwarded and the print contract honours `thin` alone — the spec now says what the code does. |
+| F14 | fixed in part (`331bc1e`): no nesting, one line. Whitespace loss: C57. |
+| F15 | fixed (`331bc1e`): `icon-web-only` on every occurrence; the closing colon of an emoji must be followed by a non-alphanumeric. |
+| F16 | fixed (`331bc1e`): `.unlisted` implies `.unnumbered`, as in Pandoc, which is what both paged writers do. |
+| F17 | fixed (`331bc1e`): the HTML writer emits no id for an implicit id; a label is emitted in print only when referenced. |
+| F18 | deferred (C58): design 04's profile table and `mkdocs.rs`. |
+| F19 | deferred (C58): `latex render` should be `fence-unknown-node-word`. |
+| F20 | fixed (`331bc1e`): the recogniser covers the fraction form; emoji and critic are appendix constructs and stay without a PCRE. |
+| F21 | fixed (`331bc1e`): `directive-foreign` is a lint hint of `tmark check`. |
+| F22 | fixed (`331bc1e`): `markdown="span"` and `markdown="1"` are the same `Div` of parsed blocks. |
+| F23 | fixed (`331bc1e`): no space before the closing `$` either; `$5 and $6` is prose. |
+| F24 | deferred (C56). |
+| F25 | deferred (C59): fixtures to add. |
+| K1 | closed by C51 (`4593a6b`): bare `@key` is the short form on every backend, `@[+key]` and `citations.narrative` the narrative one. |

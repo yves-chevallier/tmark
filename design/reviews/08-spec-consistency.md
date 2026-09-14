@@ -424,3 +424,52 @@ seven key grammars, a citation form keyed on a space, and a marker in three
 states; and the document itself declines to be normative in its first
 paragraph. Fix those five things and the hosts, front-matter and
 diagnostic tables, and draft 3 becomes draft 4, publishable.
+
+## 6. Triage
+
+Disposition of every finding, on branch `fix/spec-text` (draft 4 of
+`spec/tmark.md`). Commits: `4cbedba` (normativity, markers, profiles,
+processor), `3d66d60` (identifiers, lookup order, sigils, hosts, roles),
+`331bc1e` (front-matter keys, diagnostics, captions, escapes, minors).
+
+| Id | Disposition |
+| -- | ----------- |
+| B1 | fixed (`4cbedba`): normative preamble; every `(proposed)`, "shipping", "roadmap", "pydantic", "ships today" marker removed; node names point at `tmark schema ir`; §Tooling is a status table; 46–49 rewritten. |
+| B2 | fixed (`3d66d60`): one ordered lookup over registries in §Registries (alias, `doi:`/`gls:`, labels, bibliography), `ref-ambiguous` stated; §Ref and §Cite refer to it; the copy at §Cite deleted. Labels are looked up for any unprefixed key and any declared prefix; a colon key with an undeclared head stays a bibliography key, as the resolver does (C24 stated, the span example is `{#claim-one}`). |
+| B3 | fixed (`3d66d60`): §Identifiers defines `prefix`, `key`, `id`, `doi` once; every recogniser cites them; the digit-initial rule stated (bare needs a letter, bracketed accepts a digit). |
+| B4 | fixed (C51, verified): §Cite is one rule (bare = default form, `@[…]` = item list read as written, `+`/`-` per item); the "brackets appear when there is a space" sentence removed; labels have one form (§Ref). |
+| B5 | fixed (`3d66d60`): `#{prefix:key}` is deprecated, guarded sugar in §Two sigils, X5, §CounterItem, Appendix draft 2 and the deprecation table; draft-2 item 1 corrected. |
+| M1 | fixed (`3d66d60`): sigils are sugar for the roles, stated in §Two sigils; the column reads "sugar for a role". |
+| M2 | fixed (`3d66d60`): Table "The attribute hosts" with the position per host; links, code spans, paragraphs and lists are not hosts (the IR has no field for them); no whitespace before the list. |
+| M3 | fixed (`3d66d60`): verbatim roles `code` and `keys`; balanced brackets nest; `\[` is a literal bracket, not re-read. |
+| M4 | fixed (`4cbedba`): §Profiles, one table; `canonical` is the base name; `strict` = X1, X3 and critic off, no feature change. |
+| M5 | fixed (`331bc1e`): Table "The metadata keys" and Table "The `press` groups" with type, default and reader; C9's rule replaces the pydantic sentence. |
+| M6 | fixed (`331bc1e`): Appendix "Diagnostics" with the four-step scale; the body cites names only. `strict-x-construct` exists in the code and is emitted nowhere: omitted from the table, reported to the code side. |
+| M7 | fixed (`331bc1e`): `table-config` transparent to attachment; a caption before its float is sugar for every kind; "bare" defined; `caption-kind-mismatch` defined as a hint (C18 → code to emit it). |
+| M8 | fixed (`3d66d60`): `[^\s}]+` values, caption line takes the full list, the container fence and the info string reuse `(?&attrs)`. |
+| M9 | fixed (`3d66d60`): predeclared prefix must agree (any heading prefix agrees with any heading), mismatch warned and numbered in the prefix's series; user-declared prefix numbers the host in that series. |
+| M10 | fixed (`331bc1e`): class column is the canonical spelling's; `'x'` removed; the `Span` row states its three printed spellings; `Str`/`SoftBreak`/`LineBreak`, `Link`, `Math`, `Abbr` rows added. |
+| M11 | fixed (`3d66d60`): `fw` declared in the example, `#(fw:joy)`, `{#fw:watchdog}`. |
+| M12 | fixed (`331bc1e`): P6 reworded; rows for `\(…\)`/`\[…\]`, the sigils and one-line `$$` added (indefinite); the PyMdownX rows declared indefinite unless listed. |
+| M13 | fixed (`4cbedba`): one paragraph in §IR; each sentence tagged `(processor)`; `format` is the `{n}`, `{n:0Nd}`, `{prefix}`, `{key}` subset the code implements. |
+| M14 | fixed (`331bc1e`): the escape list under §Round-trip, `Kind\:` included; entities print as their character (C22 decided that way). |
+| M15 | fixed (`4cbedba`, `331bc1e`): `tmark schema ir` is the normative field list, cited once; backend lines for block quotes, lists, definition lists, footnotes, inline links, math, acronyms; "backend-defined" stated for the rest. |
+| m1 | fixed (`331bc1e`): default titles; `!!! type` accepts any word, `::: type` does not. |
+| m2 | fixed (`4cbedba`): class C for a plain fence, E for its options. |
+| m3 | fixed (`4cbedba`): footnotes are class C; the `note` row says no `@note:…` key exists. |
+| m4 | fixed (`4cbedba`): three levels in both spellings, a fourth group is literal. |
+| m5 | fixed (`3d66d60`): "one or more items"; `{}` is literal text. |
+| m6 | fixed (`331bc1e`): the line between a form key and a feature drawn in §Feature registry. |
+| m7 | fixed (`331bc1e`): entities next to the escapes. |
+| m8 | fixed (`331bc1e`): `<strong class="lead">`. |
+| m9 | fixed (`331bc1e`): wiki links are kept as typed and `compat-unsupported`; resolution is the site's `(processor)`. |
+| m10 | fixed (`4cbedba`, `331bc1e`): `[](other.md)` needs an alias (C12); `[text](other.md)` is a plain link. |
+| m11 | fixed in part (`4cbedba`: §Tabs says the contract is defined in §Div); the section order is deferred (C52). |
+| m12 | fixed in part (`3d66d60`: stated as a hint, `position-word`); the narrower scope is a lint change, deferred (C53). |
+| m13 | fixed (`3d66d60`): the reason for not shadowing a role name; the key part is compared case-insensitively. |
+| m14 | fixed (`331bc1e`): `cols=`/`rows=` defaults; one anchor per figure container. |
+| m15 | fixed (`331bc1e`): the brace group is recognised before the smart symbols and the same-character sugar. |
+| m16 | fixed (`331bc1e`): "Reversed in draft 3" on the include row. |
+| m17 | fixed (`331bc1e`): video in print renders the alt text and the URL, `poster=` names an image. |
+| m18 | fixed (`3d66d60`): §Registries no longer says `#[…]` resolves. |
+| m19 | deferred (C52): the rationale prose moves to `design/` in an editorial pass after 0.1. |
