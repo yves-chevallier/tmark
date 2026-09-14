@@ -93,9 +93,10 @@ P6, one mechanism per job, one spelling per mechanism
 :   Where TeXSmith historically grew two spellings, two positions or two
     registries for one feature, this spec picks one and demotes the other to
     a compatibility alias with a deprecation horizon (Appendix
-    @[app:deprecations]). No sugar is accepted without a horizon, and no
-    horizon is later than the release that ships `tmark fmt`: a formatter
-    that can rewrite a spelling removes the last reason to keep accepting it.
+    @[app:deprecations]). Every sugar has a row there, with a horizon of
+    `fmt` or `indefinite`: no sugar is accepted without one, and a
+    formatter that can rewrite a spelling removes the last reason to keep
+    accepting it.
 
 ## Document model {#sec:model}
 
@@ -153,13 +154,32 @@ Edits are local
 What the canonical printer normalises, and therefore what a full reprint
 loses: the choice of sugar, fence lengths and marker characters, attribute
 order (`#id`, then `.class`, then keys in source order), redundant
-whitespace, and the position of a caption line. What it never loses: soft
-line breaks inside paragraphs (a `SoftBreak` is a node, so prose is not
-re-wrapped and diffs stay minimal), comments (§@[sec:structure]), raw
-passthroughs, escapes, and text that looked like syntax but was not
-recognised (an unknown role name is `Str`, printed as typed). The front
-matter is copied byte for byte: YAML comments and key order survive because
-the printer does not re-serialise it.
+whitespace, the position of a caption line, and the spelling of an escape
+or an entity (below). What it never loses: soft line breaks inside
+paragraphs (a `SoftBreak` is a node, so prose is not re-wrapped and diffs
+stay minimal), comments (§@[sec:structure]), raw passthroughs, and text
+that looked like syntax but was not recognised (an unknown role name is
+`Str`, printed as typed). The front matter is copied byte for byte: YAML
+comments and key order survive because the printer does not re-serialise
+it.
+
+A `Str` holds decoded text: every backslash escape and every entity of the
+source is resolved by the tokenizer, and `&nbsp;` is the character U+00A0
+in the IR. The printer therefore re-escapes, in the position it prints a
+run, the first character of anything a recogniser of §@[sec:grammar] or of
+Appendix @[app:pymdownx] would otherwise match, and nothing else: `\@`
+before a key, `\#` before `[`, `(` or `{`, `\{` before a role or attribute
+head, `\[` before `^`, `@` or `=` and inside a role group, `\]` before
+`(`, `{`, `[` or `:`, `\^`, `\~`, `` \` ``, `\$`, a `\=` or `\+` in a
+run of two, `\<` before a tag, `\&` before an entity name, `\|` in a
+cell, the CommonMark block starts (`\#`, `\>`, `\-`, `\1.`, `\!!!`,
+`\:::`, `\---`), and `Table\:`, `Figure\:`, `Listing\:` at the start of
+a paragraph so that prose never becomes a caption. All of them are ASCII
+punctuation, hence ordinary CommonMark escapes: a foreign renderer shows
+the character. An entity is printed as its character, never re-encoded,
+which is the one normalisation of text the printer performs (challenge
+C22); an author who needs the entity spelling on GitHub keeps it in a
+code span.
 
 Backends are one-directional. LaTeX or HTML output cannot be turned back
 into the document that produced it, and the spec does not pretend
@@ -638,17 +658,63 @@ GitHub; whether X3 should stay on under it is open question 2.
 
 ## Front matter {#sec:front-matter}
 
-YAML island at line 1, fenced by `---`.
+YAML island at line 1, fenced by `---`. A TMark file is a `.md` file, so
+that it renders on GitHub (P3); `.tm`, `.tmd` and `.tmark` are accepted as
+explicit markers of the dialect (ADR 0006).
 
-`press` is a namespace, not a category. Every key TMark reads (`template`,
-`base_level`, `declare`, `sources`, `features`, and the metadata keys
-`title`, `authors`, `date`) may sit at the root of the front matter or under
-`press:`; when the same key appears in both places, `press` wins. The
-namespace is optional and exists for one reason: a Markdown file is often
-shared with a static site generator whose own front matter schema owns the
-root (MkDocs, Hugo, Jekyll, Zensical). Moving the TMark keys under `press`
-keeps them out of that generator's way without changing their meaning. A
-document that only TeXSmith reads may put everything at the root.
+`press` is a namespace, not a category. Every key TMark reads (Table
+@[tbl:keys-meta] and Table @[tbl:keys-press]) may sit at the root of the
+front matter or under `press:`; when the same key appears in both places,
+`press` wins, per key, the root value being dropped rather than merged.
+The namespace is optional and exists for one reason: a Markdown file is
+often shared with a static site generator whose own front matter schema
+owns the root (MkDocs, Hugo, Jekyll, Zensical). Moving the TMark keys
+under `press` keeps them out of that generator's way without changing
+their meaning. A document that only TeXSmith reads may put everything at
+the root.
+
+Table: The metadata keys, read by TMark. {#tbl:keys-meta}
+
+| Key | Type | Default | Meaning |
+| --- | ---- | ------- | ------- |
+| `title` | string or `null` | absent | The document title. Absent: the first heading is promoted *(processor)*; `null`: no promotion and no title. |
+| `subtitle` | string | absent | |
+| `authors` | list of `{name, affiliation, email}`; a bare string is a name | absent | |
+| `date` | ISO date, free text, or `commit` | absent | `commit` is resolved by the processor from the repository *(processor)*; TMark keeps it as written. |
+| `id` | string | absent | Document identifier, the head of every key the document publishes for cross-document references. |
+| `lang` | BCP 47 tag (`fr`, `en-GB`) | template's | Document language: hyphenation, quotes, list-of-figures words, typographic spacing. |
+| `epigraph` | `{quote, source}` | absent | An epigraph placed before the first heading (§@[sec:structure]). |
+
+Table: The `press` groups, and who reads them. {#tbl:keys-press}
+
+| Key | Type | Default | Read by |
+| --- | ---- | ------- | ------- |
+| `base_level` | `chapter`, `section`, … | template's | TMark, TeXSmith: what a top-level `#` maps to |
+| `declare.counters` | map of prefix to counter fields (§@[sec:counters]) | `{}` | TMark |
+| `declare.admonitions` | map of type to `{name, group, reference, counter}` (§@[sec:containers]) | `{}` | TMark |
+| `declare.glossary` | flat or structured (§@[sec:glossary]) | `{}` | TMark |
+| `declare.acronyms` | map of acronym to expansion | `{}` | TMark |
+| `sources.bibliography` | map of key to DOI URL or entry fields, or a list of `.bib` paths (§@[sec:bibliography]) | `{}` | TMark |
+| `sources.crossrefs` | map of alias to inventory path (§@[sec:crossrefs]) | `{}` | TMark |
+| `features` | map of feature name to boolean (Table @[tbl:features]) | the table's defaults | TMark |
+| `template` | string | `article` | TeXSmith |
+| `toc` | boolean | template's | TeXSmith |
+| `slots` | map of slot name to label or `{label, flatten}` | template's | TeXSmith |
+| `numbered` | boolean | `true` | TeXSmith: the document-level heading numbering default (§@[sec:structure]) |
+| `callouts.style` | `fancy`, `classic`, `minimal` | `fancy` | TeXSmith |
+| `callouts.<type>` | `{icon, color}` | template's | TeXSmith |
+| `details` | `expand`, `reference` | `expand` | TeXSmith (§@[sec:containers]) |
+| `code.engine` | `pygments`, `listings`, `verbatim`, `minted` | `pygments` | TeXSmith |
+| `code.inline` | `{breaks: boolean}` | `{breaks: false}` | TeXSmith |
+| `aside` | `left`, `right`, `outer`, `inner` | template's | TeXSmith (§@[sec:notes]) |
+| `comments` | `strip`, `keep` | `strip` | TeXSmith (§@[sec:structure]) |
+| `refs.textual` | `{print, web}` format strings | `{print: "{text} ({number})", web: "{text}"}` | TeXSmith (§@[sec:references]) |
+
+The form keys of the second half are TeXSmith's: TMark preserves them and
+never reads them, and the list is what this document cites, not the whole
+of TeXSmith's schema. A `press` key that is a form key is also the place a
+site plugin reads its own switches; none of them toggles a feature of Table
+@[tbl:features].
 
 Within the namespace, four groups; the draft-2 top-level keys remain
 accepted with a deprecation warning (Appendix @[app:deprecations]):
@@ -694,8 +760,12 @@ to as "See page N"; the form keys (`template`, `callouts`, `code`, …) say it
 is blue with a graduation-cap icon. A document can be re-skinned by
 replacing the form keys alone.
 
-All sections are validated (pydantic); unknown keys fail at parse time, not
-in the PDF.
+TMark validates the groups it reads and preserves every other key, byte
+for byte, for the tool that owns it (challenge C9): an unknown key inside
+`declare`, `sources` or `features` is the error `frontmatter-unknown-key`;
+a YAML island that does not parse is `frontmatter-yaml`, and the document
+is read as having no front matter. The draft-2 spellings of Appendix
+@[app:deprecations] are read and reported as `deprecated-frontmatter-key`.
 
 Any front-matter value is available in the body as a moustache, `{{ key }}`
 or `{{ press.template }}`, resolved after Markdown parsing and never inside
@@ -741,8 +811,9 @@ friends, `= Heading`, `<h1>`.
 
 Two classes are recognised on a heading, both Pandoc's: `.unnumbered` takes
 the heading out of the numbering sequence (`\section*`, `numbering: none`,
-`class="unnumbered"`), and `.unlisted` additionally keeps it out of the
-table of contents. Each applies to its own heading only; the document-level
+`class="unnumbered"`), and `.unlisted` keeps it out of the table of
+contents and, as in Pandoc, implies `.unnumbered`. Each applies to its own
+heading only; the document-level
 default is `press.numbered` (`true` by default), which a class overrides one
 heading at a time. Pandoc's `{-}` shorthand is not an attribute list (there
 are no bare-word attributes, §@[sec:families]) and stays literal text; the
@@ -765,7 +836,10 @@ stored in the IR or printed, so the round-trip is untouched; an explicit
 `{#id}` replaces it, a heading having one id. Because an implicit id
 changes whenever the title is edited, a reference to one is a lint hint
 `ref-implicit-id` that suggests `{#id}`. Editors compute go-to-target with
-the same function.
+the same function. The paged writers emit a label for an implicit id only
+when it is referenced; the HTML writer emits none, since a site gives its
+headings ids by its own slug rule, which is why a site whose rule is not
+GitHub's needs the explicit id.
 
 #### Para
 
@@ -787,19 +861,24 @@ of the sentence into a paragraph of its own, since `\tslead` breaks the
 paragraph around the lead-in. A list item is not promoted either: a
 bold-only item is a label. The promotion is sugar, not magic: it is
 named, switchable, and `tmark fmt` rewrites it to the role. Class C.
-Backends: `\tslead{…}`, a bold run-in, `<p><b class="lead">`.
+Backends: `\tslead{…}`, a bold run-in, `<p><strong class="lead">`.
 
 #### BlockQuote
 
-`>`; class C. A quote tagged `{.epigraph}` renders as an epigraph; the
+`>`; class C. The attribute list is a line of its own closing the quote
+(Table @[tbl:hosts]); a quote tagged `{.epigraph}` renders as an epigraph
+(`\tsepigraph`, `#ts-epigraph`, `<blockquote class="epigraph">`), and the
 front-matter `epigraph:` key places one before the first heading.
+Backends otherwise: `displayquote` (csquotes), `#quote(block: true)`,
+`<blockquote>`.
 
 #### BulletList, OrderedList
 
 `-` and `1.`, nesting by indentation; `pymdownx.fancylists` markers are
 accepted (Appendix @[app:pymdownx]). Task items `- [ ]` and `- [x]` are
 class C; `- [.]` "partial" is class D, feature `tasklist.partial`, off by
-default, literal text when off.
+default, literal text when off. Backends: `itemize` / `enumerate`, `-` /
+`+` items, `<ul>` / `<ol>`; a task item is a checkbox in every backend.
 
 #### DefinitionList
 
@@ -809,6 +888,8 @@ PHP-Markdown-Extra `def_list`, class E:
 Term
 :   Definition, indented continuation lines aligned.
 ```
+
+Backends: `description`, `/ Term: definition`, `<dl>`.
 
 #### Comment
 
@@ -881,32 +962,38 @@ directive closes at the first dedent, and the fence rules of
 do not apply to it. The printer emits the block as typed; the HTML writer
 and the paged writers emit nothing: the table of contents in print is
 `press.toc`, and an API reference has no print form. `[TOC]` is silent
-(class E); a dotted directive is a hint `directive-foreign` in every
-backend but the printer, so that a document meant for print does not lose a
-block without notice (class D).
+(class E); a dotted directive is the lint hint `directive-foreign`, so that
+a document meant for print does not lose a block without notice (class D).
 
 ### Inline text {#sec:inline}
 
 Table @[tbl:inline] lists the inline nodes, their canonical spelling, their
-sugar and their mapping.
+sugar and their mapping. The class column is the class of the *canonical*
+spelling; the class of a sugar is in the row of Appendix @[app:pymdownx]
+or the deviation table that names it (`__x__` is X1, `~x~` is X3, the
+rest of the PyMdownX sugar is E).
 
 Table: Inline text nodes. {#tbl:inline}
 
 | Node | Canonical | Sugar | Class | LaTeX / Typst / HTML |
 | ---- | --------- | ----- | ----- | -------------------- |
+| `Str`, `SoftBreak`, `LineBreak` | text, a newline inside a paragraph, `\` at the end of a line | two trailing spaces for the hard break | C | text |
 | `Emph` | `*x*` | `_x_` | C | `\emph` / `_x_` / `<em>` |
 | `Strong` | `**x**` | (none) | C | `\textbf` / `*x*` / `<strong>` |
-| `SmallCaps` | `{sc}[x]` | `__x__` (X1) | X | `\textsc` / `smallcaps` / `font-variant` |
-| `Strikeout` | `{del}[x]` | `~~x~~` | C | `\sout` / `strike` / `<del>` |
+| `SmallCaps` | `{sc}[x]` | `__x__` (X1) | D | `\textsc` / `smallcaps` / `font-variant` |
+| `Strikeout` | `{del}[x]` | `~~x~~` | D | `\sout` / `strike` / `<del>` |
 | `Underline` | `{underline}[x]` | `^^x^^` under `inline.insert` only | D | `\underline` / `underline` / `<u>` |
-| `Highlight` | `{mark}[x]` | `==x==` | E | `\hl` / `highlight` / `<mark>` |
-| `Subscript` | `{sub}[x]` | `~x~` (X3) | X | `\textsubscript` / `sub` / `<sub>` |
-| `Superscript` | `{sup}[x]` | `^x^` | E | `\textsuperscript` / `super` / `<sup>` |
-| `Keystroke` | `{keys}[ctrl+s]` | `++ctrl+s++` | E | ts-keystrokes / `kbd` / `<kbd>` |
+| `Highlight` | `{mark}[x]` | `==x==` | D | `\hl` / `highlight` / `<mark>` |
+| `Subscript` | `{sub}[x]` | `~x~` (X3) | D | `\textsubscript` / `sub` / `<sub>` |
+| `Superscript` | `{sup}[x]` | `^x^` | D | `\textsuperscript` / `super` / `<sup>` |
+| `Keystroke` | `{keys}[ctrl+s]` (verbatim, keys split on `+`) | `++ctrl+s++` | D | ts-keystrokes / `kbd` / `<kbd>` |
 | `Code` | `` `x` `` | (none) | C | engine-dependent |
-| `Code` (highlighted) | `{code lang=py}[print(1)]`, positional `{code py}[…]` | `` `#!py print(1)` `` | E | engine-dependent |
-| `Quoted` | `"x"`, `'x'` | SmartyPants (Appendix @[app:pymdownx]) | C | locale quotes |
-| `Span` | `[x]{attrs}` | (none) | D | `\foreignlanguage`, anchor, media switch |
+| `Code` (highlighted) | `{code lang=py}[print(1)]`, positional `{code py}[…]` (verbatim) | `` `#!py print(1)` `` | D | engine-dependent |
+| `Link` | `[text](url)`, `[text](#id)`, `<url>` | a bare URL (magic link, autolinked; the printer keeps it bare) | C | `\href` / `#link` / `<a>` |
+| `Math` | `$x$` | `\(x\)` | C | `\(…\)` / `$x$` / MathJax |
+| `Quoted` | `"x"` | (none; the pair is read by the smart-symbol rule, Appendix @[app:pymdownx]) | C | `\enquote` / smart quotes / locale quotes |
+| `Abbr` | the acronym, with `*[HTML]: expansion` defined once (§@[sec:glossary]) | (none) | E | `\acrshort` / `#ts-abbr` / `<abbr>` |
+| `Span` | `[x]{attrs}`; printed as the shortcode when the class is `icon` with `media=web` and the text is a shortcode, as critic markup when the class is `critic` (Appendix @[app:pymdownx]) | (none) | D | `\foreignlanguage`, anchor, media switch |
 
 ```yaml table-config
 columns:
@@ -938,10 +1025,12 @@ role (Appendix @[app:pymdownx]). Long inline code wraps per
 
 #### Math (inline)
 
-`$…$` canonical; `\(…\)` accepted as a compatibility layer (LaTeX habit,
-class E under `arithmatex`, literal elsewhere). Content is LaTeX math
-(MathJax-compatible), the Typst backend translates it. No space directly
-after the opening delimiter. Class C for `$…$`: GitHub renders it natively.
+`$…$` canonical; `\(…\)` accepted as sugar (a LaTeX habit, class E under
+`arithmatex`, literal elsewhere; Appendix @[app:deprecations]). Content is
+LaTeX math (MathJax-compatible), the Typst backend translates it. No space
+directly after the opening delimiter nor directly before the closing one,
+PyMdownX's rule, so `$5 and $6` is prose. Class C for `$…$`: GitHub
+renders it natively.
 
 #### ProgressBar
 
@@ -952,8 +1041,11 @@ after the opening delimiter. Class C for `$…$`: GitHub renders it natively.
 
 An inline node with a `value` (a number from 0 to 100, clamped) and an
 optional `label` (plain text in double quotes; the percentage when absent).
-Attributes attach as on any host: `.thin` halves the height; other classes
-reach the web stylesheet and are ignored in print. The spelling is
+Attributes attach as on any host (Table @[tbl:hosts]): `.thin` halves the
+height; every class is forwarded to the print contract and to the web
+stylesheet, and the print contract honours `thin` alone. A bar has no
+counter and is not a reference target: its `#id` reaches the web element
+only and defines no label. The spelling is
 PyMdownX's and is the canonical one. Sugar: the fraction form
 `[=9/20 "Review"]`, normalised to a percentage, and the Python-Markdown
 attribute spelling `{: .thin}` (both deprecated, Appendix
@@ -962,10 +1054,11 @@ stylesheet displays the bar as a block; TMark keeps the node inline
 (a bar fits a table cell), consecutive bars on separate lines are separate
 paragraphs or hard-broken lines, and the template chooses the width. Class
 E. Backends: `\tsprogress` (`ts-typesetting`, over the `progressbar`
-package), `#ts-progress`, `<div class="progress">`. Recogniser:
+package), `#ts-progress`, `<div class="progress">`. Recogniser, the
+percentage form and the deprecated fraction (`0/0` is literal):
 
 ```text
-\[=\s*(?<value>\d+(?:\.\d+)?)%(?:\s+"(?<label>[^"]*)")?\s*\]
+\[=\s*(?:(?<value>\d+(?:\.\d+)?)%|(?<num>\d+)/(?<den>\d+))(?:\s+"(?<label>[^"]*)")?\s*\]
 ```
 
 #### Emoji and icon shortcodes
@@ -975,7 +1068,9 @@ tokenizer replaces it with a `Str` holding U+1F604, and the printer emits
 the character. The name table is GitHub's (the `gemoji` short names, which
 `pymdownx.emoji` ships as one of its indexes): a colon-delimited word that
 is not in the table is literal text with no diagnostic, so `12:30:45` and
-`a:b:c` are safe. Nothing fires in code. Class E, and GitHub renders the
+`a:b:c` are safe, and the closing colon must be followed by the end of the
+run or a character that is not a letter or a digit, so `:smile:a` is text.
+Nothing fires in code. Class E, and GitHub renders the
 shortcodes too. How an emoji is set in print (a colour font, a monochrome
 one, an image) is the template's business, not syntax.
 
@@ -988,7 +1083,7 @@ of §@[sec:families] removes it from print (the spaces around it collapse)
 and the HTML writer emits `<span class="icon">:material-cog:</span>` for the
 site's stylesheet or plugin to replace. The shortcode is its own canonical
 spelling: the printer writes such a span back as the shortcode. `tmark
-lint` hints `icon-web-only` once per shortcode, so an author writing for
+check` hints `icon-web-only` on every occurrence, so an author writing for
 print knows the icon is not there. Class D. Icons are decoration; a symbol
 that must reach print is an emoji or an image.
 
@@ -1118,10 +1213,12 @@ number out of the body:
 As [the trace](#fig:trace) shows, the watchdog fires twice.
 ```
 
-Canonical form: a link with text to the anchor (class C). On the web the
-text is the link and nothing is added. In paged media a hyperlink is not
-enough, so the template appends a locator whose shape is form, hence
-declared in `press`, per medium:
+Canonical form: a link with text to the anchor (class C); a link with text
+to another document (`[the review](other.md)`) is a plain link, not a
+reference, and the empty-link form alone reaches the inventory
+(§@[sec:crossrefs]). On the web the text is the link and nothing is added.
+In paged media a hyperlink is not enough, so the template appends a
+locator whose shape is form, hence declared in `press`, per medium:
 
 ```yaml
 press:
@@ -1288,15 +1385,24 @@ Rules:
 - The image `alt` text is the short caption (list of figures); the caption
   line is the long one.
 - An element with a caption line or an anchor is *promoted* to a numbered
-  float; a bare image or table stays inline. Promotion is the same rule for
-  every float kind, including images produced by data directives.
+  float; a *bare* image or table — no caption line and no anchor, whatever
+  its paragraph holds — stays inline. Promotion is the same rule for every
+  float kind, including images produced by data directives.
 - Attachment: a caption line attaches to the block *before* it when that
   block is a float (a table, a code block, a paragraph made of images, a
   figure container) that has no caption yet; otherwise to the float *after*
-  it. Inside a `::: figure` container a caption with no such neighbour is
-  the caption of the figure itself. A caption line with no float next to it
-  is a paragraph and a `caption-no-host` diagnostic. In the IR the caption
-  always follows its host; the source position is recorded, not the order.
+  it, which is the sugar position, for every kind. A `yaml table-config`
+  fence is part of its table: never a float, never a host, transparent to
+  attachment, so the canonical order of §Table (table, `table-config`,
+  caption) attaches the caption to the table. Inside a `::: figure`
+  container a caption with no such neighbour is the caption of the figure
+  itself. A caption line with no float next to it is a paragraph and a
+  `caption-no-host` warning. In the IR the caption always follows its
+  host; the source position is recorded, not the order.
+- Kind: the host decides the float kind and its counter (§@[sec:references]);
+  the kind word is the author's statement of the same fact. A kind word
+  that disagrees with its host (`Figure:` next to a table) attaches all the
+  same and is the hint `caption-kind-mismatch` (challenge C18).
 
 #### Image, Figure
 
@@ -1306,8 +1412,10 @@ Rules:
 
 Attributes: `width`, `align`, `media`, plus per-format options (draw.io
 `crop=false`). A video or audio source (`![Demo](demo.mp4)`) is a player on
-the web and, in print, its poster frame or first frame with the URL as a
-textual reference locator; `media=web` hides it from print altogether.
+the web; in print the writers render the `alt` text as a caption-less
+paragraph followed by the URL, since a page cannot play it, and a
+`poster=` attribute names an image to show in its place *(processor)*;
+`media=web` hides it from print altogether.
 Diagram sources are images: `![Pipeline](pipeline.mmd)`,
 `![GCD](pgcd.drawio){width=60%}`. The IR records the source as written;
 converting it to a vector image (mermaid-cli, the draw.io export) and
@@ -1328,7 +1436,12 @@ Figure: Watchdog traces before and after the fix. {#fig:traces}
 ```
 
 Renders "Figure 1" with "(a)", "(b)"; `@fig:crash` yields "figure 1b".
-Layout via `cols=` and `rows=`. Class D.
+Layout via `cols=` (default: one row of all the images) and `rows=`
+(default: as many as `cols` requires). The container's anchor is the
+caption line's id when there is a caption line, the fence's `#id`
+otherwise; both naming the same float, they must not both be written
+(`label-duplicate` if they differ in spelling only, and one id per host
+in any case). Class D.
 
 The images are sub-figures when every block of the container is a
 paragraph of images only; a container holding a table, prose or a listing
@@ -1407,10 +1520,35 @@ A power ladder; use the lowest rung that fits.
    ````
 
 5. `yaml table` fence: the fully structured form. Grouped headers (recursive
-   `columns:`), row, column and rectangular spans (`{value, rows, cols}` with
-   `~` acknowledging absorbed slots), separators with labels, footers,
-   named-row mode with typo detection, width groups, `long` and `placement`.
-   Validated before rendering; errors are inline and local.
+   `columns:`), row, column and rectangular spans, separators with labels,
+   footers, named-row mode, width groups, `long` and `placement`. A table
+   declares at least two columns (`table-columns`). Its rows follow one
+   grammar (challenge C30; fixtures `fence-yaml-table-spans`,
+   `fence-yaml-table-named`):
+
+   - A *positional* row is a list. Its items fill the leaf columns from
+     left to right: a scalar fills every remaining leaf of the current
+     top-level column (a group's leaves included), a list fills the
+     remaining leaves of that column one item each, and a rich cell
+     `{value, rows, cols, align}` spans `cols` leaves from where it
+     stands, the slots its column span absorbs being left unwritten.
+     The first top-level column is the row label and a column like the
+     others: a rich label spans to the right.
+   - Every slot a row span from above absorbs is written `~`, inside a
+     group list too (`- [Beta, ~, ~, [5, 6]]` under a two-by-two span);
+     a `~` anywhere else is an empty cell, and a value written on an
+     absorbed slot is `table-span`. A row that covers fewer or more
+     leaves than the table declares is `table-row-width`.
+   - A *named* row (`- Label: {Column: value}` or `- {label, cells}`)
+     addresses the top-level data columns by name (`table-column-unknown`
+     otherwise); each present value fills its own column's free leaves,
+     and an omitted column is left empty, or absorbed when a span covers
+     it.
+
+   What the model cannot hold (unknown keys, a shape that is not a table,
+   a ragged row, a span past the edge) is a parse error and the fence
+   stays a code block; what it holds but a backend refuses (`placement`
+   letters, width ranges) is a lint rule (Appendix @[app:diagnostics]).
 
 Spans begin at rung 4; pipe tables stay dumb on purpose (magic span tokens
 in cell data collide with content). Decimal alignment: right-aligned columns
@@ -1454,8 +1592,10 @@ From @eq:pythagoras we conclude…
 ```
 
 Equations have an anchor but no caption line; print never captions them.
-Compatibility: `\begin{equation}\label{eq:x}…` inside `$$` and `$\eqref{…}$`
-keep working (class D, LaTeX-flavoured).
+A one-line display, `$$x$$ {#eq:a}`, is accepted with the same attribute
+position and printed on three lines (challenge C13). Compatibility:
+`\begin{equation}\label{eq:x}…` inside `$$` and `$\eqref{…}$` keep working
+(class D, LaTeX-flavoured).
 
 ### Containers {#sec:containers}
 
@@ -1473,7 +1613,12 @@ Install TeX Live, MiKTeX or MacTeX before `texsmith --build`.
 ```
 
 Built-in types: `note tip warning important danger info hint seealso
-question abstract`. Rendered as `tcolorbox`, `#block`, `<div
+question abstract`, each with a localised default title used when
+`title=` is absent (`Note`, `See also`, …). A type that is neither
+built-in nor declared is an unknown container under `:::`
+(`container-unknown`, §@[sec:containers]) but is accepted under `!!!`,
+where PyMdownX accepts any word: the type is then its own title, which is
+what MkDocs Material shows. Rendered as `tcolorbox`, `#block`, `<div
 class="admonition">`; global style via `press.callouts.style`. Class D for
 `:::`, E for `!!!`.
 
@@ -1541,10 +1686,12 @@ content), and a template restyles it. Sugar: PyMdownX's
 `=== "Windows"` line followed by its four-space-indented body, consecutive
 tab lines forming one set; class E, kept indefinitely because MkDocs
 Material renders it natively (the standing of `!!!`, Appendix
-@[app:deprecations]). A `tab` outside `tabs` is a `tabs` of one and a hint
+@[app:deprecations]). A `tab` outside `tabs` is wrapped in a `tabs` of
+its own, consecutive orphans forming one set, and is the hint
 `container-orphan`. The nodes are `Div{name=tabs}` and `Div{name=tab}`;
-`tabs` takes no attribute of its own, a `tab` takes `title=` and `#id`.
-Class D for `:::`, E for `===`.
+`tabs` takes no attribute of its own, a `tab` takes `title=` and `#id`; a
+`tab` with no title shows an empty tab, and neither omission is a
+diagnostic. Class D for `:::`, E for `===`.
 
 #### Div
 
@@ -1586,7 +1733,8 @@ A CommonMark HTML block whose opening tag carries the `markdown` attribute
 (`<div class="grid cards" markdown>`, Python-Markdown's `md_in_html`, in
 the standard extension set) is sugar for a container named after the tag,
 its `id` and `class` attributes becoming the attribute list and its body
-parsed as Markdown (`markdown="span"` parses it as inlines). `<div
+parsed as Markdown (`markdown="span"` and `markdown="1"` are the same
+thing here: a `Div` holding the parsed blocks). `<div
 markdown>` is therefore `::: div`; any other tag is an unknown container,
 with the diagnostic. The sugar is class E, kept indefinitely because it is
 the only container spelling a Python-Markdown site renders, and the
@@ -1848,7 +1996,10 @@ names that path, and is `ref-unresolved` otherwise (challenge C12).
 Every switchable behaviour has a dotted name and a default (Table
 @[tbl:features]). The table *is* the registry; `features:` in the front
 matter (or the configuration file) flips entries. Nothing else in the front
-matter toggles a feature.
+matter toggles a feature: a form key of Table @[tbl:keys-press]
+(`press.details`, `press.comments`, `press.numbered`) chooses *how* a
+construct renders and never whether a spelling is recognised, which is
+the line between the two.
 
 Table: The feature registry. {#tbl:features}
 
@@ -2026,7 +2177,7 @@ Table: Divergences from draft 1. {#tbl:draft1}
 | `>>>` / `vvv` and empty-cell span propagation | Spans start at grid and YAML tables | Magic tokens in data; empty cells are too common to be meaningful. |
 | "Ascii tables" | `grid table` fence | Aligns with reST and Pandoc terminology and syntax. |
 | Ref aliases `fig`/`f`, `tab`/`t`, `eqn`/`e` | `fig tbl sec eq lst …` only | One spelling per prefix; matches the implemented set. |
-| `{include}[file.md]` role | `--8<--` plus fence `include=` | No third include mechanism. |
+| `{include}[file.md]` role | `--8<--` plus fence `include=` | No third include mechanism. Reversed in draft 3: `{include}(file)` is canonical and `--8<--` deprecated (§@[sec:includes]). |
 
 ### Open questions {#app:questions}
 
@@ -2095,12 +2246,12 @@ Table: PyMdownX sugar accepted under the compatibility profile. {#tbl:compat}
 | `=== "Title"` and its indented body | `::: tab {title=…}` inside `::: tabs` (§@[sec:containers]) | E | kept indefinitely: MkDocs Material renders it |
 | `<div class="x" markdown>` | `::: div {.x}` (§@[sec:containers]) | E | `md_in_html`; kept indefinitely, emitted by the `mkdocs` profile |
 | `{: .cls #id}` | `{.cls #id}` | E | Python-Markdown `attr_list` colon; deprecated |
-| `[[Page Title]]`, optional label after a vertical bar | `Link` to the project file | D | wiki links |
+| `[[Page Title]]`, optional label after a vertical bar | `Link` to the project file | D | wiki links; which file a title names is the site's *(processor)*, so the link is kept as typed and reported `compat-unsupported` |
 | critic markup: insert `++`, delete `--`, substitute `~~ ~> ~~`, highlight `==`, comment in double angle brackets, each wrapped in braces | `Span{.critic}` holding `Underline`, `Strikeout`, the two in order, or `Comment`; the highlight is a plain `Highlight` | E | see below; the printer emits the critic spelling, and nothing fires inside code, where the extension does |
 | `:smile:` | `Str` holding the character | E | emoji, GitHub's name table; the printer emits the character (§@[sec:inline]) |
 | `:material-…:`, `:fontawesome-…:`, `:octicons-…:`, `:simple-…:` | `Span{.icon media=web}` | D | Material icons; print drops them, hint `icon-web-only` (§@[sec:inline]) |
 | `(c)`, `(tm)`, `(r)`, `c/o`, `+/-`, `=/=`, `-->`, `<--`, `<-->`, `1/2` … | `Str` holding the character | E | smart symbols; the ordinal-number form (`1st`) is *not* applied: it is a superscript, not a `Str` |
-| `"quotes"` | `Quoted` | E | SmartyPants; the pair is read inside one text run, so a phrase whose quotes sit on either side of inline markup stays literal. Single quotes are left alone: an apostrophe is not a quote |
+| `"quotes"` | `Quoted` | E | SmartyPants; the pair is read inside one text run with SmartyPants' boundaries: an opening `"` at the start of the run or after whitespace or `(`, `[`, followed by a non-space; a closing `"` after a non-space, followed by the end, whitespace or punctuation. A phrase whose quotes sit on either side of inline markup stays literal, and its orphan quote never pairs with the next phrase's. Single quotes are left alone: an apostrophe is not a quote |
 | `--`, `---`, `...` | `Str`, as typed | E | both backends typeset the ASCII spelling as the dash and the ellipsis; converting them would gain nothing and lose the round-trip |
 | `https://…` bare | `Link` | C | magic links; GFM autolinks too |
 | `1)`, `a.`, `i.`, `#.` list markers | `OrderedList` with style | E | fancylists |
@@ -2134,9 +2285,14 @@ web writer keeps it zero width, since a published page is not a review.
 lowers to the plain `Highlight` of `==x==` and prints as `{mark}[x]`.
 
 The content between the delimiters is inline content, read on one line, so
-markup inside an annotation is markup. None of the five fires inside a code
-span, a fenced block, math, a raw block or a link destination, which is
-where TMark parts from `pymdownx.critic` (the extension fires in code too).
+markup inside an annotation is markup; an annotation does not nest, and
+one that opens on one line and closes on another is literal text. The
+brace group is recognised before the smart symbols and the keystroke,
+strikeout and highlight sugar of the same characters, so `{--x--}` is a
+deletion and never an arrow, and `{~~a~>b~~}` a substitution and never a
+strikeout. None of the five fires inside a code span, a fenced block,
+math, a raw block or a link destination, which is where TMark parts from
+`pymdownx.critic` (the extension fires in code too).
 The critic spelling is what the printer emits, in every profile: there is
 no other spelling for an annotation, and inventing one would degrade from
 class E — `pymdownx.critic` is in the standard extension set — to a literal
@@ -2146,9 +2302,12 @@ brace group on a foreign renderer.
 
 Table @[tbl:deprecations] lists every accepted non-canonical spelling, with
 its replacement and horizon. "fmt" means the release that ships `tmark
-fmt`, which can rewrite the spelling automatically; "indefinite" means the
-sugar is part of the dialect's compatibility promise and is not scheduled
-for removal.
+fmt`, which can rewrite the spelling automatically: every such row is
+reported as `deprecated` with the canonical replacement as its fix
+(challenge C20). "indefinite" means the sugar is part of the dialect's
+compatibility promise and is not scheduled for removal: those rows are
+silent. The PyMdownX rows of Appendix @[app:pymdownx] are all indefinite
+unless listed here.
 
 Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 
@@ -2170,7 +2329,6 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | `[](gls:term)` | `@gls:term` | draft 2 | fmt |
 | `[](){#id}` anchor | `[]{#id}` | draft 3 | fmt |
 | bare `mermaid` fence | `mermaid image` | draft 3 | indefinite (MkDocs renders it) |
-| `Table:` line before the table | `Table:` line after | draft 3 | indefinite (Pandoc accepts both); open question 6 |
 | `!!!` / `???` callouts | `::: type {…}` | draft 2 | indefinite (MkDocs Material renders them) |
 | top-level `bibliography`, `crossrefs` | `sources.*` | draft 3 | fmt |
 | top-level `counters`, `admonitions`, `glossary`, `acronyms` | `declare.*` | draft 3 | fmt |
@@ -2181,6 +2339,10 @@ Table: Deprecated spellings and their horizons. {#tbl:deprecations}
 | `[=a/b "…"]` progress fraction | `[=NN% "…"]` | draft 3 | fmt |
 | `=== "Title"` tabs | `::: tabs` / `::: tab {title=…}` | draft 3 | indefinite (MkDocs Material renders them) |
 | `<div markdown>` | `::: div` | draft 3 | indefinite (the only container a Python-Markdown site renders) |
+| `\(…\)`, `\[…\]` math | `$…$`, `$$…$$` | draft 3 | indefinite (arithmatex; a LaTeX habit) |
+| `#[…]`, `#(…)` sigil forms | `{index}[…]`, `{counter}(…)` | draft 3 | indefinite (the finger-friendly sugar of §@[sec:sigils]) |
+| `$$x$$ {…}` on one line | `$$` … `$$ {…}` on three | draft 4 | indefinite (sugar) |
+| caption line before its float | caption line after | draft 3 | indefinite (Pandoc accepts both); open question 6 |
 
 ```yaml table-config
 columns:
@@ -2188,4 +2350,64 @@ columns:
   - {align: left, width: X}
   - {width: 1.8cm}
   - {align: left, width: X}
+```
+
+### Diagnostics {#app:diagnostics}
+
+Every diagnostic a conformant processor emits has a name from Table
+@[tbl:diagnostics], a default severity, and the section that defines the
+rule; the body of this document cites the name only. The severity scale
+has four steps: an *error* makes `tmark check` fail; a *warning* makes it
+fail under `--strict`; an *info* reports a rewrite the formatter performs;
+a *hint* is style. Parse and resolve diagnostics are facts about the
+document and are always emitted; lint rules may be reconfigured per code
+(`off`, `info`, `warning`, `error`) in the workspace configuration.
+
+Table: The diagnostics, by stage. {#tbl:diagnostics}
+
+| Name | Severity | Fires when | Section |
+| ---- | -------- | ---------- | ------- |
+| `attr-no-host` | warning | an attribute list has no host element | §@[sec:families] |
+| `role-dangling-head` | warning | a role head is not followed by `[` or `(` | §@[sec:families] |
+| `role-unknown` | hint | a brace group followed by `[` or `(` whose name is not a role; literal text | §@[sec:families] |
+| `caption-no-host` | warning | a `Kind:` line with no float to attach to | §@[sec:floats] |
+| `caption-kind-mismatch` | hint | a caption whose kind word disagrees with its host | §@[sec:floats] |
+| `include-inline` | warning | an `include` role inside a paragraph with other content; literal text | §@[sec:includes] |
+| `container-unclosed` | warning | a `:::` fence without its closing line | §@[sec:families] |
+| `container-unknown` | warning | a `::: name` whose name is not in the registry; the content renders transparently | §@[sec:containers] |
+| `container-orphan` | hint | a `tab` outside `tabs` | §@[sec:containers] |
+| `fence-unknown-node-word` | warning | an info string whose second word is not a node word, or `raw` on a language that is not a backend | §@[sec:families], §@[sec:raw] |
+| `frontmatter-yaml` | error | the YAML island does not parse | §@[sec:front-matter] |
+| `frontmatter-unknown-key` | error | an unknown key under `declare`, `sources` or `features` | §@[sec:front-matter] |
+| `deprecated` | warning | a deprecated spelling; carries the canonical replacement as its fix | Appendix @[app:deprecations] |
+| `deprecated-frontmatter-key` | warning | a draft-2 front-matter key | Appendix @[app:deprecations] |
+| `compat-unsupported` | warning | a PyMdownX spelling recognised but not implemented (wiki links, some list markers); literal text | Appendix @[app:pymdownx] |
+| `parse-internal` | error | the tokenizer failed; the text is one paragraph | §@[sec:ir] |
+| `table-yaml`, `table-unknown-key`, `table-columns`, `table-align`, `table-shape`, `table-row-width`, `table-span`, `table-column-unknown` | error | a `yaml table` the model cannot hold; the fence stays a code block | §@[sec:floats] |
+| `ref-unresolved` | warning | a key found in no registry; renders `[?key]` | §@[sec:lookup] |
+| `ref-ambiguous` | warning | a key that is both a label and a bibliography key | §@[sec:lookup] |
+| `ref-implicit-id` | hint | a reference to a heading's implicit id | §@[sec:structure] |
+| `prefix-unknown` | warning | a counter item, or a `#{…}`, whose prefix is not declared | §@[sec:references] |
+| `prefix-host-mismatch` | warning | a predeclared prefix on the wrong host | §@[sec:references] |
+| `label-duplicate` | warning | the same id defined twice | §@[sec:references] |
+| `citation-shadowed-by-footnote` | warning | a `[^key]` citation whose key is also a footnote label | §@[sec:references] |
+| `crossref-inventory-missing`, `crossref-inventory-stale` | warning | an inventory that cannot be loaded, or whose hash no longer matches | §@[sec:crossrefs] |
+| `include-missing` | warning | an included file that cannot be loaded | §@[sec:includes] |
+| `hardcoded-number` | hint | "Figure 3" typed in prose | §@[sec:references] |
+| `position-word` | hint | "above" or "below" used as a reference | §@[sec:references] |
+| `caption-id-off-convention` | hint | a caption id without the recommended prefix | §@[sec:references] |
+| `lead-promotion` | info | a strong-only paragraph promoted to a lead-in | §@[sec:structure] |
+| `heading-skip` | hint | a heading level skipped | §@[sec:structure] |
+| `table-placement`, `table-width` | error | a `placement` outside `hHtbpT!`; an empty width or a percentage outside (0, 100] | §@[sec:floats] |
+| `table-width-sum` | warning | column percentages adding up to more than 100 | §@[sec:floats] |
+| `directive-foreign` | hint | a dotted `:::` directive, which print drops | §@[sec:structure] |
+| `icon-web-only` | hint | an icon shortcode, which print drops | §@[sec:inline] |
+| `feature-off` | hint | a spelling whose feature is off (`^^x^^` without `inline.insert`); literal text | §@[sec:features] |
+
+```yaml table-config
+columns:
+  - {align: left, width: X}
+  - {width: 1.6cm}
+  - {align: left, width: X}
+  - {width: 2.4cm}
 ```
