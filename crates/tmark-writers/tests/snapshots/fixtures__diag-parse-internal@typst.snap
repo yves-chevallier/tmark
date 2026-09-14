@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-- \`\`\`h
+\- \`\`\`h
 1. i
 
 ---requires---

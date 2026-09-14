@@ -1,0 +1,30 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+Ratio a // b and the rest.
+
+Block comment attempt: a /* b */ c.
+
+= Not a heading, just a sentence starting with an equals sign.
+
+- Not a bullet, just a sentence starting with a hyphen.
+
++ Not an enum item, just a sentence starting with a plus.
+
+/ term: not a term list, just prose starting with a slash.
+
+A tilde example: 10\textasciitilde{}cm should stay a plain tilde.
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
