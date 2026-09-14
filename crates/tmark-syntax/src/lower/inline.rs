@@ -448,32 +448,28 @@ impl Lowerer {
     /// printer writes that escape back).
     fn text_pieces(&mut self, text: &str, span: Span, source: &str, out: &mut Vec<Inline>) {
         let exact = text == source;
+        // Where each byte of the decoded text sits in the source and
+        // whether it came from a backslash escape; when the source cannot
+        // be aligned (an entity the tokenizer decoded in a way this scan
+        // does not know), every node takes `span` and any escaped
+        // spelling of the character anywhere in the source counts.
+        let aligned = if exact { None } else { align(text, source) };
         let sub = |this: &Self, start: usize, end: usize| {
-            if exact {
-                Span::new(
-                    this.file,
-                    span.start + start as u32,
-                    span.start + end as u32,
-                )
+            let (from, to) = if exact {
+                (start, end)
+            } else if let Some(aligned) = &aligned {
+                (aligned.offsets[start], aligned.offsets[end])
             } else {
-                span
-            }
-        };
-        // Which bytes of the decoded text came from a backslash escape;
-        // when the source cannot be aligned (an entity the tokenizer
-        // decoded in a way this scan does not know), any escaped spelling
-        // of the character anywhere in the source counts.
-        let escaped_bytes = if exact {
-            None
-        } else {
-            escaped_bytes(text, source)
+                return span;
+            };
+            Span::new(this.file, span.start + from as u32, span.start + to as u32)
         };
         let escaped = |from: usize, to: usize| -> bool {
             if exact {
                 return false;
             }
-            match &escaped_bytes {
-                Some(map) => map[from..to].iter().any(|b| *b),
+            match &aligned {
+                Some(aligned) => aligned.escaped[from..to].iter().any(|b| *b),
                 None => text[from..to]
                     .chars()
                     .any(|c| c.is_ascii_punctuation() && source.contains(&format!("\\{c}"))),
@@ -1340,16 +1336,25 @@ fn doi_key(key: &str) -> String {
 
 /// Adjacent `Str` nodes become one: the IR does not record how text was
 /// split by the tokenizer or by literal fallbacks (design 03 §Shape).
-/// For each byte of `text` (decoded), whether the source spelled it with
-/// a backslash escape. `None` when `source` cannot be aligned with the
-/// text: the caller falls back to a coarser rule. Handles the two
+/// The decoded text of a run aligned with its source.
+struct Aligned {
+    /// The source byte offset each decoded byte starts at, plus one entry
+    /// for the end of the text.
+    offsets: Vec<usize>,
+    /// Whether the source spelled the decoded byte with a backslash escape.
+    escaped: Vec<bool>,
+}
+
+/// Aligns `text` (decoded) with `source`; `None` when they cannot be
+/// aligned, and the caller falls back to coarser rules. Handles the two
 /// decodings the tokenizer applies to a text run, backslash escapes
 /// (`\\` + ASCII punctuation) and character references (`&amp;`,
 /// `&#169;`), which decode to one character each.
-fn escaped_bytes(text: &str, source: &str) -> Option<Vec<bool>> {
+fn align(text: &str, source: &str) -> Option<Aligned> {
     let t = text.as_bytes();
     let s = source.as_bytes();
-    let mut map = vec![false; t.len()];
+    let mut offsets = Vec::with_capacity(t.len() + 1);
+    let mut escaped = vec![false; t.len()];
     let (mut i, mut j) = (0, 0);
     while i < t.len() {
         let &sj = s.get(j)?;
@@ -1357,7 +1362,8 @@ fn escaped_bytes(text: &str, source: &str) -> Option<Vec<bool>> {
             && s.get(j + 1)
                 .is_some_and(|b| b.is_ascii_punctuation() && *b == t[i])
         {
-            map[i] = true;
+            offsets.push(j);
+            escaped[i] = true;
             i += 1;
             j += 2;
             continue;
@@ -1377,7 +1383,9 @@ fn escaped_bytes(text: &str, source: &str) -> Option<Vec<bool>> {
             // `&amp;`. Anything else spelled `&…;` is literal text.
             if let Some(end) = entity {
                 if t[i] != b'&' || s[j..j + end + 2].eq_ignore_ascii_case(b"&amp;") {
-                    i += text[i..].chars().next()?.len_utf8();
+                    let len = text[i..].chars().next()?.len_utf8();
+                    offsets.extend(std::iter::repeat(j).take(len));
+                    i += len;
                     j += end + 2;
                     continue;
                 }
@@ -1386,10 +1394,12 @@ fn escaped_bytes(text: &str, source: &str) -> Option<Vec<bool>> {
         if sj != t[i] {
             return None;
         }
+        offsets.push(j);
         i += 1;
         j += 1;
     }
-    Some(map)
+    offsets.push(j);
+    Some(Aligned { offsets, escaped })
 }
 
 fn merge_strs(inlines: Vec<Inline>) -> Vec<Inline> {
@@ -1407,13 +1417,14 @@ fn merge_strs(inlines: Vec<Inline>) -> Vec<Inline> {
 
 #[cfg(test)]
 mod tests {
-    use super::escaped_bytes;
+    use super::align;
 
     #[test]
-    fn escaped_bytes_align_escapes_and_entities() {
+    fn alignment_finds_escapes_and_entities() {
         let map = |text: &str, source: &str| {
-            escaped_bytes(text, source).map(|m| {
-                m.iter()
+            align(text, source).map(|a| {
+                a.escaped
+                    .iter()
                     .enumerate()
                     .filter(|(_, b)| **b)
                     .map(|(i, _)| i)
@@ -1428,5 +1439,9 @@ mod tests {
         assert_eq!(map("a b", "a b"), Some(vec![]));
         assert_eq!(map("x", "y"), None, "not the text's source");
         assert_eq!(map("ab", "a"), None, "source too short");
+        let a = align("a © b", "a &copy; b").unwrap();
+        assert_eq!(a.offsets, vec![0, 1, 2, 2, 8, 9, 10]);
+        let a = align("(c) x", "\\(c) x").unwrap();
+        assert_eq!(a.offsets, vec![0, 2, 3, 4, 5, 6]);
     }
 }

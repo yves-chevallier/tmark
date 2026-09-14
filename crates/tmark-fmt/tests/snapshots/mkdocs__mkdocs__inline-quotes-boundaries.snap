@@ -1,0 +1,7 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Quotes: "one *two* three" and "plain" and 'single' and "unclosed here.
+
+A 5" screen, a ("bracketed") one, and "last".

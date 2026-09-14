@@ -1,14 +1,14 @@
 //! Inline sugar found inside text runs (spec Appendix "PyMdownX
 //! compatibility profile"): emoji shortcodes `:smile:` expanded from the
 //! `gemoji` table, the Material icon shortcodes `:material-cog:` (§Emoji
-//! and icon shortcodes), and straight double quotes (§Quoted). The
-//! progress bar and the smart symbols live in `tmark_ir::sugar`, shared
+//! and icon shortcodes). The progress bar, the smart symbols and the
+//! straight double quotes (§Quoted) live in `tmark_ir::sugar`, shared
 //! with the printer that escapes them; `inline.rs` turns the pieces into
 //! nodes.
 
 use tmark_ir::emoji;
 
-pub use tmark_ir::sugar::{progress_bar, smart_symbol, Progress};
+pub use tmark_ir::sugar::{progress_bar, quoted, smart_symbol, Progress};
 
 /// A shortcode at `at` in `text` (a `:` there): its byte length and what
 /// it is. A colon-delimited word touching a word character on either side
@@ -46,34 +46,9 @@ pub fn shortcode(text: &str, at: usize) -> Option<(usize, Shortcode)> {
     Some((len + 2, kind))
 }
 
-/// A straight double-quoted phrase at `at` in `text`: the byte range of
-/// the phrase between the quotes. TeXSmith's `quotes.py` pattern
-/// `(?<!\\)"([^"\n]+?)"`, which is what feeds `\enquote{…}` (spec §Quoted,
-/// SmartyPants). Single quotes are not paired: an apostrophe is not a
-/// quote and the legacy extension never touched them.
-pub fn quoted(text: &str, at: usize) -> Option<(usize, usize)> {
-    if !text[at..].starts_with('"') {
-        return None;
-    }
-    let inner = &text[at + 1..];
-    let end = inner.find('"')?;
-    if end == 0 || inner[..end].contains('\n') {
-        return None;
-    }
-    Some((at + 1, at + 1 + end))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn quotes() {
-        assert_eq!(quoted("He said \"straight quotes\".", 8), Some((9, 24)));
-        assert_eq!(quoted("a \"b\" and \"c\"", 2), Some((3, 4)));
-        assert_eq!(quoted("a \"\" b", 2), None, "empty");
-        assert_eq!(quoted("a \"b", 2), None, "unclosed");
-    }
 
     #[test]
     fn shortcodes() {

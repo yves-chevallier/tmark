@@ -50,7 +50,7 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     // line (the `.` of `1.`, the `:` of `Table:`).
     let mut pending: Option<usize> = None;
     let mut forced = autolink_escapes(&chars);
-    forced.extend(quote_escapes(&chars));
+    forced.extend(quote_escapes(text));
     forced.extend(sugar_escapes(text));
     for (i, &c) in chars.iter().enumerate() {
         let next_c = chars.get(i + 1).copied().or(next);
@@ -81,27 +81,24 @@ pub fn text(out: &mut Out, text: &str, ctx: Context, next: Option<char>) {
     out.push(&buf);
 }
 
-/// Positions of the straight double quotes that would pair into a
-/// `Quoted` when read back (`lower::sugar::quoted`): a `"` with a later
-/// `"` on the same line and something between them. A quote that reached
-/// the printer inside a `Str` is one the author escaped or one that never
-/// paired; escaping the opening quote keeps it that way.
-fn quote_escapes(chars: &[char]) -> Vec<usize> {
+/// Character positions of the straight double quotes that would open a
+/// `Quoted` when read back (`tmark_ir::sugar::quoted`, the SmartyPants
+/// boundaries). A quote that reached the printer inside a `Str` is one
+/// the author escaped or one that never paired; escaping the opening
+/// quote keeps it that way.
+fn quote_escapes(text: &str) -> Vec<usize> {
     let mut out = Vec::new();
     let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '"' {
-            let close = chars[i + 1..]
-                .iter()
-                .position(|c| matches!(c, '"' | '\n'))
-                .filter(|at| *at > 0 && chars[i + 1 + at] == '"');
-            if let Some(at) = close {
-                out.push(i);
-                i += at + 2;
-                continue;
-            }
+    let mut index = 0;
+    while i < text.len() {
+        if let Some((_, end)) = sugar::quoted(text, i) {
+            out.push(index);
+            index += text[i..=end].chars().count();
+            i = end + 1;
+            continue;
         }
-        i += 1;
+        i += text[i..].chars().next().map_or(1, char::len_utf8);
+        index += 1;
     }
     out
 }

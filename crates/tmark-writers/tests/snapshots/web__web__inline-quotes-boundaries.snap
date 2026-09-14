@@ -1,0 +1,7 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Quotes: "one *two* three" and "plain" and 'single' and "unclosed here.
+
+A 5" screen, a ("bracketed") one, and "last".

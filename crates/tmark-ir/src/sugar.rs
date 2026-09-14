@@ -1,7 +1,8 @@
 //! Inline sugar shared by the parser and the canonical printer (spec
 //! Appendix "PyMdownX compatibility profile", §ProgressBar): the progress
 //! bar `[=45% "label"]` and its deprecated fraction form, and the smart
-//! symbols `(c)`, `-->`, `1/2`. One recogniser per spelling, here, so that
+//! symbols `(c)`, `-->`, `1/2`, and the straight double quotes of a
+//! `Quoted` (§Quoted). One recogniser per spelling, here, so that
 //! `tmark-syntax` reads exactly what `tmark-fmt` escapes (spec §Round-trip
 //! and source spans: a spelling the printer does not defend is one the
 //! next parse turns into a node). Pure scanners over decoded text.
@@ -147,6 +148,46 @@ pub fn smart_symbol(text: &str, at: usize) -> Option<(usize, &'static str)> {
         .map(|(spelling, symbol)| (spelling.len(), *symbol))
 }
 
+/// A straight double-quoted phrase at `at` in `text` (a `"` there): the
+/// byte range of the phrase between the quotes. SmartyPants boundaries
+/// (spec Appendix "PyMdownX compatibility profile", `"quotes"` row): a
+/// quote opens when it starts the run or follows whitespace or an opening
+/// bracket or dash, and is followed by a non-space; a quote closes when it
+/// follows a non-space and is followed by the end, whitespace or
+/// punctuation. Both are read inside one text run, never across a
+/// newline or another inline node, so the closing quote of a phrase that
+/// straddles markup never opens the next pair. Single quotes are not
+/// paired: an apostrophe is not a quote and the legacy extension never
+/// touched them.
+pub fn quoted(text: &str, at: usize) -> Option<(usize, usize)> {
+    if !text[at..].starts_with('"') {
+        return None;
+    }
+    let opens = text[..at].chars().next_back().map_or(true, |c| {
+        c.is_whitespace() || matches!(c, '(' | '[' | '{' | '-' | '–' | '—')
+    });
+    let inner = &text[at + 1..];
+    if !opens || inner.starts_with(char::is_whitespace) {
+        return None;
+    }
+    let mut from = 0;
+    while let Some(found) = inner[from..].find(['"', '\n']) {
+        let end = from + found;
+        if !inner[end..].starts_with('"') {
+            return None;
+        }
+        let before = inner[..end].chars().next_back();
+        let after = inner[end + 1..].chars().next();
+        if before.is_some_and(|c| !c.is_whitespace())
+            && after.map_or(true, |c| c.is_whitespace() || c.is_ascii_punctuation())
+        {
+            return Some((at + 1, at + 1 + end));
+        }
+        from = end + 1;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,5 +232,26 @@ mod tests {
         assert_eq!(smart_symbol("11/2", 1), None, "part of a number");
         assert_eq!(smart_symbol("1/25", 0), None, "part of a number");
         assert_eq!(smart_symbol("1/7", 0), None, "no such fraction");
+    }
+
+    #[test]
+    fn quotes() {
+        assert_eq!(quoted("He said \"straight quotes\".", 8), Some((9, 24)));
+        assert_eq!(quoted("a \"b\" and \"c\"", 2), Some((3, 4)));
+        assert_eq!(quoted("a \"\" b", 2), None, "empty");
+        assert_eq!(quoted("a \"b", 2), None, "unclosed");
+        assert_eq!(quoted("(\"b\")", 1), Some((2, 3)), "after a bracket");
+        // SmartyPants boundaries: a quote after a word does not open, and a
+        // quote before a space does not close.
+        assert_eq!(quoted("three\" and \"plain\"", 5), None, "after a word");
+        assert_eq!(quoted("\" and \"plain\"", 0), None, "before a space");
+        assert_eq!(quoted("\" and \"plain\"", 6), Some((7, 12)));
+        assert_eq!(quoted("a 5\" screen, \"x\"", 3), None, "an inch mark");
+        assert_eq!(
+            quoted("\"a\"b and \"c\"", 0),
+            Some((1, 11)),
+            "a\"b is no close"
+        );
+        assert_eq!(quoted("\"a\nb\"", 0), None, "one line");
     }
 }
