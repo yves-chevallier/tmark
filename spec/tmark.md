@@ -1,6 +1,6 @@
 ---
 title: TMark
-subtitle: TeXSmith Markdown — specification, draft 3
+subtitle: TeXSmith Markdown — specification 0.1
 authors:
   - name: Yves Chevallier
 date: commit
@@ -11,12 +11,13 @@ press:
     appendix: {label: Appendices, flatten: true}
 ---
 
-> Draft 3, consolidated specification proposal.
-> Status: working draft. Normative wording ("MUST", "SHOULD") is aspirational
-> until the conformance suite exists. Constructs marked *(proposed)* are not
-> implemented in TeXSmith yet; everything else describes shipping behaviour.
-> Draft 3 supersedes draft 2; the changes and their rationale are recorded in
-> Appendix @[app:draft2], open questions in Appendix @[app:questions].
+> This is the normative definition of TMark 0.1 (draft 4). The
+> conformance suite is `spec/conformance/`; where a fixture and this text
+> disagree, the text wins and the fixture is a bug, recorded in
+> `design/12-spec-challenges.md` until one of them is fixed. Behaviour that
+> needs a file, a process, a clock or the network is marked *(processor)*
+> and is not part of the language (§@[sec:ir]). The history of the drafts
+> is Appendix @[app:draft2], the open questions Appendix @[app:questions].
 
 TMark is the Markdown dialect understood by TeXSmith. It is a curated,
 opinionated stack: CommonMark structure, the Python-Markdown and PyMdownX
@@ -43,10 +44,10 @@ compatibility with the PyMdownX world is confined to Appendix
 @[app:pymdownx], and every deprecated spelling is dated in Appendix
 @[app:deprecations].
 
-This document is itself a TMark source, built with the TeXSmith that ships
-today. Where the spec proposes a spelling that is not implemented yet (the
-caption line after a table, the `:::` fence), the document uses the shipping
-spelling instead, which the spec keeps as accepted sugar.
+This document is itself a TMark source and parses with `tmark check`. It
+writes its captions *before* its tables, an accepted sugar (§@[sec:floats])
+kept here so that a reader of the Markdown source meets the caption first;
+`tmark fmt` would move them after.
 
 ## Philosophy {#sec:philosophy}
 
@@ -65,9 +66,9 @@ P1, content not form
 P2, canonical form plus permissive input
 :   TMark accepts the common spellings of the Markdown jungle (GFM tables,
     PyMdownX admonitions, Pandoc caption lines and citations) but defines,
-    for each feature, a single canonical form. A formatter (`tmark fmt`,
-    roadmap) rewrites any accepted spelling to the canonical one. Sugar is
-    for fingers; canonical is for tools.
+    for each feature, a single canonical form. The formatter (`tmark fmt`)
+    rewrites any accepted spelling to the canonical one. Sugar is for
+    fingers; canonical is for tools.
 
 P3, graceful degradation
 :   A TMark file pasted into GitHub or any CommonMark renderer should stay
@@ -103,11 +104,24 @@ P6, one mechanism per job, one spelling per mechanism
 A TMark document is front matter (YAML) plus a body. The body parses into a
 typed intermediate representation (IR); backends render the IR. The IR, not
 any concrete syntax, is the definition of TMark. The canonical serialization
-of the IR back to TMark text is the *normal form*. `tmark fmt` (roadmap)
-emits it, and round-tripping means `parse → IR → print → parse` is a fixed
-point. §@[sec:catalogue] is therefore both the syntax reference and the
-printer specification: for every node it states what the printer emits
-(canonical) and what the parser additionally accepts (sugar).
+of the IR back to TMark text is the *normal form*. `tmark fmt` emits it,
+and round-tripping means `parse → IR → print → parse` is a fixed point.
+§@[sec:catalogue] is therefore both the syntax reference and the printer
+specification: for every node it states what the printer emits (canonical)
+and what the parser additionally accepts (sugar). The nodes, their names
+and their fields are defined once, by the IR schema (`tmark schema ir`,
+design 03); the catalogue describes them and never contradicts it.
+
+Some behaviours this document describes need a file, a process, a clock or
+the network: converting a diagram source, executing a `python image` fence,
+fetching a DOI record, reading a `.bib` file, publishing a cross-document
+inventory, resolving `date: commit`. They are marked *(processor)*. The
+language records the *request* in the IR (an `Image` whose source is a
+`.mmd` file, a `CodeBlock` whose node word is `image`, a
+`sources.bibliography` entry) and a processor fulfils it; the reference
+implementation (`tmark`) never performs them itself, and a conformant
+processor may decline any of them with a diagnostic. Everything not so
+marked is the language.
 
 ### Round-trip and source spans {#sec:roundtrip}
 
@@ -265,8 +279,8 @@ Containers hold Markdown:
 
 Grammar: `:::` name, an optional attribute list, content, closing `:::`.
 Nesting is by fence length (`::::` outside `:::`), as in Pandoc and
-markdown-it-container. `:::` is the canonical fence for every container
-*(proposed; aligns with Pandoc, Djot, MyST, markdown-it-container)*. The
+markdown-it-container. `:::` is the canonical fence for every container,
+as in Pandoc, Djot, MyST and markdown-it-container. The
 PyMdownX spellings `!!! type "Title"` and `??? type "Title"` remain accepted
 sugar for callouts only, because MkDocs Material renders them natively
 (§@[sec:containers]). The PyMdownX block fence `/// name … ///` is
@@ -487,12 +501,26 @@ Table: Class X deviations from GFM. {#tbl:deviations}
 A conformant TMark processor MUST implement classes C, E and D and MUST
 document which X-deviations are active.
 
-Profiles *(proposed)* select which deviations and which sugar are active.
-`default` accepts everything in this document and Appendix @[app:pymdownx].
-`strict` disables X1 and X2 and rejects Appendix @[app:pymdownx] sugar, for
-teams that co-render sources on GitHub. `tmark fmt` translates between
-profiles; the translation is lossless because every sugar has a canonical
-form that is class C, E or D.
+### Profiles {#sec:profiles}
+
+A *profile* selects which deviations and which sugar are active, at parse
+time, and which spelling the printer emits. There are three (Table
+@[tbl:profiles]); every other mention of a profile in this document refers
+to this table.
+
+Table: The profiles. {#tbl:profiles}
+
+| Profile | Parses | Prints |
+| ------- | ------ | ------ |
+| `canonical` (default) | everything in this document and in Appendix @[app:pymdownx]; X1–X5 active | the normal form |
+| `strict` | X1, X3 and critic markup (Appendix @[app:pymdownx]) are off: `__x__` is strong, `~x~` and `{++x++}` are literal text; X2, X4 and X5 stay, since `---` is a divider in GFM too and `@`/`#` are guarded | the normal form |
+| `mkdocs` | as `canonical` | the PyMdownX and TeXSmith 0.6 spelling of every construct that has one (`!!!`, `--8<--`, `[^key]`, `<div markdown>`, …), the normal form otherwise (design 04) |
+
+A profile changes no feature default (Table @[tbl:features]); `features:`
+does. `tmark fmt --profile` translates between profiles, and the
+translation is lossless because every sugar has a canonical form that is
+class C, E or D. `strict` serves teams that co-render their sources on
+GitHub; whether X3 should stay on under it is open question 2.
 
 ## Front matter {#sec:front-matter}
 
@@ -508,9 +536,8 @@ root (MkDocs, Hugo, Jekyll, Zensical). Moving the TMark keys under `press`
 keeps them out of that generator's way without changing their meaning. A
 document that only TeXSmith reads may put everything at the root.
 
-Within the namespace, four groups *(proposed layout; the draft-2 top-level
-keys remain accepted with a deprecation warning, Appendix
-@[app:deprecations])*:
+Within the namespace, four groups; the draft-2 top-level keys remain
+accepted with a deprecation warning (Appendix @[app:deprecations]):
 
 ```yaml
 ---
@@ -558,7 +585,7 @@ in the PDF.
 
 Any front-matter value is available in the body as a moustache, `{{ key }}`
 or `{{ press.template }}`, resolved after Markdown parsing and never inside
-code spans or fenced blocks. This ships today. An unresolved moustache
+code spans or fenced blocks. An unresolved moustache
 warns and is left in place, visibly. Moustaches are substitution, not
 templating: there is no logic, no loop, no filter, and the spec does not
 intend to add any; a document that needs computation generates its
@@ -577,20 +604,25 @@ is a span: `[this taylor]{lang=en}`.
 Each entry follows the same shape: the canonical spelling (what `tmark fmt`
 emits), the sugar the parser additionally accepts (each with its status in
 Appendix @[app:deprecations]), the degradation class, and the backend mapping
-(LaTeX, Typst, HTML). Node names are those of `texsmith.ir.nodes`; nodes
-marked *(proposed)* do not exist yet.
+(LaTeX, Typst, HTML). Node names are those of the IR schema
+(`tmark schema ir`), which is also the normative list of every node's
+fields; an entry names a field only when the text needs it. Where an entry
+gives no backend mapping, the mapping is backend-defined: the writer
+renders the node with the backend's native construct and no contract of
+`ts-typesetting` is involved.
 
 ### Structure {#sec:structure}
 
 #### Header
 
 `#` to `######`, six levels, never manually numbered. Attributes at end of
-line: `## Title {#sec:intro}`. Class C. Headings are relative: TeXSmith
-aligns messy multi-file hierarchies automatically (per-fragment offset from
-the shallowest heading, plus the template slot base, plus
+line: `## Title {#sec:intro}`. Class C. Headings are relative
+*(processor)*: the processor aligns multi-file hierarchies (per-fragment
+offset from the shallowest heading, plus the template slot base, plus
 `press.base_level`), and promotes the first heading to the document title
-unless `title:` is declared (`title: null` or `--no-promote-title` opt out).
-That machinery is a processing concern, not syntax. Backends: `\section` and
+unless `title:` is declared (`title: null` opts out; TeXSmith's
+`--no-promote-title` flag is the command-line spelling of the same). That
+machinery is a processing concern, not syntax. Backends: `\section` and
 friends, `= Heading`, `<h1>`.
 
 Two classes are recognised on a heading, both Pandoc's: `.unnumbered` takes
@@ -652,8 +684,8 @@ front-matter `epigraph:` key places one before the first heading.
 
 `-` and `1.`, nesting by indentation; `pymdownx.fancylists` markers are
 accepted (Appendix @[app:pymdownx]). Task items `- [ ]` and `- [x]` are
-class C; `- [.]` "partial" *(proposed)* is class D, feature
-`tasklist.partial`, off by default.
+class C; `- [.]` "partial" is class D, feature `tasklist.partial`, off by
+default, literal text when off.
 
 #### DefinitionList
 
@@ -783,7 +815,7 @@ Giving `__` to underline would also lower the cost of a construct the spec
 does not want to encourage. The visual argument is real but it is the same
 argument that gave Markdown `*` for emphasis, which does not look like
 italics either. Draft 1 assigned `__` to underline; draft 2 reversed it to
-match the shipping implementation and the reasoning above. `^^x^^` (caret "insert") is not a TMark
+match the implementation and the reasoning above. `^^x^^` (caret "insert") is not a TMark
 construct: with the feature `inline.insert` off (the default) it is literal
 text and `tmark lint` hints `feature-off`; on, it is sugar for
 `{underline}[x]`, one node whatever the spelling, and the printer emits the
@@ -856,7 +888,7 @@ with the raised and lowered letters). There is no node and no role: the
 words are `Str` in the IR and print as typed. Like the language-driven
 punctuation spacing of §@[sec:front-matter], the logo is a typographic
 rule applied by the writer, form rather than content (P1). The rule is the
-feature `typography.tex-logos`, on by default (shipping behaviour): it
+feature `typography.tex-logos`, on by default: it
 matches whole words only, case-sensitively, and never inside code, math,
 raw passthroughs, link destinations or attribute values. To print one of
 these words literally, turn the feature off or put the word in a code span;
@@ -866,12 +898,13 @@ there is no per-word opt-out, on purpose.
 
 #### Note (footnote)
 
-`[^1]` reference, `[^1]: text` definition; class C (GFM) and E. Footnotes
-should stay one line in print. Inline footnotes `^[text]` *(proposed,
-Pandoc)* become available once the citation sugar that occupied that
-spelling is retired (Appendix @[app:deprecations]).
+`[^1]` reference, `[^1]: text` definition; class C (GFM renders them).
+Footnotes should stay one line in print. Pandoc's inline footnote
+`^[text]` is not part of 0.1: the spelling is occupied by the deprecated
+citation sugar until its horizon (Appendix @[app:deprecations]). Backends:
+`\footnote`, `#footnote`, the GFM footnote list.
 
-#### Aside (`MarginNote`)
+#### Aside
 
 Inline role for a remark tangential to the flow:
 
@@ -885,7 +918,7 @@ templates put asides in the margin, a web template may render a sidebar or
 a collapsed note. `side=left|right|outer|inner` is a layout hint of the
 same standing as `width=` on an image, with the default in `press.aside`.
 The aside has zero width in the flow (§@[sec:families]), so the spaces
-around it collapse. Sugar: `{margin}[…]` and the shipping suffix
+around it collapse. Sugar: `{margin}[…]` and the suffix form
 `{margin}[…]{l}` (deprecated, Appendix @[app:deprecations]). Block form for
 longer asides is a container:
 
@@ -897,7 +930,7 @@ A **marginal note** attached to the preceding paragraph.
 
 Class D. Backends: `\marginnote`, `place(…)`, `<aside>`. Width, font-size
 clamping and geometry awareness are the `ts-extra` fragment's problem, not
-syntax. The IR node keeps its shipping name `MarginNote`.
+syntax. The node is `Aside` in both forms.
 
 ### Anchors, references, citations {#sec:references}
 
@@ -923,8 +956,8 @@ image to number it in a custom series instead of its own
 
 #### Ref
 
-*(Proposed as a distinct node; today a `Link`.)* `@` refers. TMark adopts
-Pandoc's citation grammar for labels and bibliography keys alike:
+`@` refers. TMark adopts Pandoc's citation grammar for labels and
+bibliography keys alike:
 
 ```md
 @sec:intro                          bare, in-text: "section 2"
@@ -985,10 +1018,9 @@ move in print, so a position word is a reference in disguise, and
 
 #### Cite
 
-Same grammar, bibliography registry (§@[sec:bibliography]). The sources are
-unchanged from what ships today: `.bib` files on the command line, or
-front-matter entries by DOI or by fields. Only the *spelling* of a citation
-moves from the footnote form to the Pandoc form:
+Same grammar, bibliography registry (§@[sec:bibliography]): `.bib` files,
+or front-matter entries by DOI or by fields. The spelling is Pandoc's item
+grammar behind TMark's sigil:
 
 ```md
 Time is relative @ein05, and recent work agrees @[ein05; KOFINAS2025].
@@ -1022,13 +1054,12 @@ and `[@key]` for a short one. This is Typst's one-`@`-for-all model,
 default form included: a bare `@key` is `#cite(<key>)` as Typst renders it
 (`form: "normal"`), `\cite{key}` under biblatex; the switch and `+` add
 `form: "prose"` / `\textcite`. The web has one built-in author-year form,
-parenthetical, and reads neither. Sugar: `[^key]` and
-`^[k1,k2]` (citations as footnotes, shipping, deprecated; Appendix
+parenthetical, and reads neither. Sugar: `[^key]` and `^[k1,k2]`
+(TeXSmith 0.6's citations as footnotes, deprecated; Appendix
 @[app:deprecations]); they are the short form, so their fix to `@key` /
-`@[k1; k2]` renders as they did. While they
-last, the footnote-versus-citation shadowing rule is preserved (a real
-footnote with the same key wins) and linted against. Footnotes themselves
-(`[^1]` with a definition) are untouched.
+`@[k1; k2]` renders as they did. While they last, a real footnote with the
+same key wins over the citation reading (`citation-shadowed-by-footnote`).
+Footnotes themselves (`[^1]` with a definition) are untouched.
 
 A DOI may be cited in place through the predeclared `doi` prefix:
 `@doi:10.1002/andp.19053221004`, or `@[doi:10.1002/andp.19053221004, p. 3]`.
@@ -1046,8 +1077,7 @@ warning. Class X. Backends: `\cite` with biblatex (`\textcite` for a
 
 #### CounterItem
 
-*(Proposed as a distinct node; shipping as `Span`.)* Define *and print* a
-numbered item where no host element exists:
+Define *and print* a numbered item where no host element exists:
 
 ```md
 | Id | Requirement |
@@ -1076,10 +1106,14 @@ Define an index term:
 {index registry=physics}[relativity]   named registry
 ```
 
-Canonical role `{index}[…]` (several bracket groups for nesting); sugar
-`#[…]`, and `#[**term**]` for `main=true`. Sugar: `{index:physics}` and the
-`{b}` / `{i}` suffixes (shipping, deprecated in favour of attributes). Class
-X (X5). Backends: `\index`, `#index` (via `in-dexter`), no-op.
+Canonical role `{index}[…]` (one to three bracket groups, the nesting
+levels; a fourth group is literal text); sugar `#[…]` with the same bound,
+and `#[**term**]` for `main=true`. The bold sugar is lossy on purpose: a
+bold term that is *not* a main entry has no sugar spelling and is written
+`{index}[**term**]`, and the printer never emits the bold sugar (challenge
+C5). Sugar: `{index:physics}` and the `{b}` / `{i}` suffixes (TeXSmith
+0.6, deprecated in favour of attributes). Class X (X5). Backends:
+`\index`, `#index` (via `in-dexter`), no-op.
 
 #### Glossary reference
 
@@ -1091,8 +1125,8 @@ it uses `@` and the predeclared `gls` prefix. Sugar: `[](gls:term)`
 
 #### Caption
 
-*(Proposed as a node; `Table:` shipping.)* One pattern for all floats: a
-caption line is the paragraph adjacent to the block, `Kind: text {#id}`:
+One pattern for all floats: a caption line is the paragraph adjacent to
+the block, `Kind: text {attrs}`:
 
 ```md
 | Fruit | Geneva | Zurich |
@@ -1111,9 +1145,9 @@ Figure: Full caption, with **Markdown**. {#fig:plot}
 Kinds: `Table:`, `Figure:`, `Listing:`. The canonical *source* position is
 after the block; where the caption is *printed* (above a table, below a
 figure) is the template's business, exactly as Pandoc treats it. Sugar: a
-`Table:` line before the table, which is what ships today and what this
-document uses; it stays accepted for Pandoc compatibility but the printer
-never emits it. The PyMdownX `/// caption` and `/// figure-caption` blocks
+caption line *before* its float, for every kind (Pandoc's `Table:` habit,
+which this document uses); it stays accepted for Pandoc compatibility but
+the printer never emits it. The PyMdownX `/// caption` and `/// figure-caption` blocks
 are deprecated (Appendix @[app:deprecations]): their id-with-colon
 restriction (`fig:x` is rejected by pymdown-extensions and the block silently
 degrades) contradicts the prefix convention, which is exactly the kind of
@@ -1145,14 +1179,14 @@ Attributes: `width`, `align`, `media`, plus per-format options (draw.io
 the web and, in print, its poster frame or first frame with the URL as a
 textual reference locator; `media=web` hides it from print altogether.
 Diagram sources are images: `![Pipeline](pipeline.mmd)`,
-`![GCD](pgcd.drawio){width=60%}`. The extension recognises the format and
-converts to vector PDF at build time (mermaid-cli or Docker, draw.io
-export). Mermaid Live `pako:` URLs are supported. Class C. Backends:
-`\includegraphics` in `figure`, `#figure(image(…))`, `<figure>`.
+`![GCD](pgcd.drawio){width=60%}`. The IR records the source as written;
+converting it to a vector image (mermaid-cli, the draw.io export) and
+decoding a Mermaid Live `pako:` URL are the processor's *(processor)*.
+Class C. Backends: `\includegraphics` in `figure`, `#figure(image(…))`,
+`<figure>`.
 
-Subfigures *(proposed)* are a container; images inside become subfigures;
-the caption is a `Figure:` line like everywhere else, not a magic last
-paragraph:
+Subfigures are a container; images inside become subfigures; the caption
+is a `Figure:` line like everywhere else, not a magic last paragraph:
 
 ```md
 ::: figure {cols=2}
@@ -1195,9 +1229,11 @@ flowchart LR
 ```
 ````
 
-Generated images *(proposed)* are the data directive `python image`: the
+Generated images are the data directive `python image` *(processor)*: the
 fence executes and its output (stdout image or saved file) becomes the
-image. Sandboxed, opt-in (`features: {figures.exec: true}`), Python first:
+image. Sandboxed, opt-in (`features: {figures.exec: true}`), Python first;
+with the feature off, or under a processor that does not execute, the
+fence is a `CodeBlock` with node word `image` and no image is produced:
 
 ````md
 ```python image
@@ -1263,13 +1299,15 @@ def bubble_sort(items): ...
 Listing: Bubble sort, naive version. {#lst:bubble}
 ````
 
-Options in the info string: `title`, `linenums`, `hl_lines`, `include="file"`
-*(proposed unification of external sources; today `--8<--` snippets do
-this)*. Engines (global, `press.code.engine`): `pygments` (default,
-Tectonic-safe), `listings`, `verbatim`, `minted` (needs shell escape). A
-`Listing:` caption line *(proposed)* promotes the block to a numbered,
-referenceable listing: the caption rule, not a fence attribute, so that
-listings are captioned like every other float. Class E.
+Options in the info string: `title`, `linenums`, `hl_lines`,
+`include="file"` (the external source, read by the processor,
+§@[sec:includes]), and a trailing attribute list in braces for classes and
+an id (§@[sec:grammar], family 4). The highlighting engine is form
+(`press.code.engine`, read by TeXSmith: `pygments`, `listings`,
+`verbatim`, `minted`). A `Listing:` caption line promotes the block to a
+numbered, referenceable listing: the caption rule, not a fence attribute,
+so that listings are captioned like every other float. Class C for a plain
+fence, E for its options.
 
 #### Math (display), equation
 
@@ -1368,8 +1406,8 @@ Linux is an open-source operating system.
 A `tabs` container holds `tab` containers, each with a `title=`; on the web
 the reader sees one at a time. Print has no interaction, so the paged
 writers render the tabs in sequence, each as a titled block (the `tsdiv`
-contract of §Div; default: the title in bold, then the content), which is
-what TeXSmith ships today, and a template restyles it. Sugar: PyMdownX's
+contract of §Div, defined there; default: the title in bold, then the
+content), and a template restyles it. Sugar: PyMdownX's
 `=== "Windows"` line followed by its four-space-indented body, consecutive
 tab lines forming one set; class E, kept indefinitely because MkDocs
 Material renders it natively (the standing of `!!!`, Appendix
@@ -1434,14 +1472,16 @@ Table: Raw passthrough spellings. {#tbl:raw}
 
 | Node | Canonical | Sugar |
 | ---- | --------- | ----- |
-| `RawInline` | `{raw latex}(\clearpage)`, `{raw typst}(…)`, `{raw html}(…)` | `{latex}[…]` (shipping, deprecated) |
-| `RawBlock` | `latex raw`, `typst raw`, `html raw` fences | `/// latex … ///` (shipping, deprecated); `latex render` (draft 2) |
+| `RawInline` | `{raw latex}(\clearpage)`, `{raw typst}(…)`, `{raw html}(…)` | `{latex}[…]` (deprecated) |
+| `RawBlock` | `latex raw`, `typst raw`, `html raw` fences | `/// latex … ///` (deprecated); `latex render` (draft 2, never shipped) |
 
 A `latex raw` fence is ignored by the Typst and HTML backends, and vice
-versa, which is precisely how one document targets three outputs. Backend
-names do not occupy the role namespace, and the parentheses of the inline
-form say what the fence says for the block form: the payload is verbatim,
-never Markdown. Class D.
+versa, which is precisely how one document targets three outputs. The
+node word `raw` is valid only when the language is a backend name
+(`latex`, `typst`, `html`); `mermaid raw` is `fence-unknown-node-word`.
+Backend names do not occupy the role namespace, and the parentheses of the
+inline form say what the fence says for the block form: the payload is
+verbatim, never Markdown. Class D.
 
 HTML in the body is the third raw format and needs no fence: CommonMark
 already passes inline and block HTML through, so a tag or an HTML block is
@@ -1463,14 +1503,17 @@ break that must reach print is Markdown's hard break.
 {include base=chapters}(chapters/boot.md)
 ```
 
-A block include is the `include` role alone on its line *(proposed)*; the
-path is an argument, hence the parentheses. The included file is parsed as
-TMark and its blocks are spliced into the IR, so a fenced block inside it
-is content and cannot close anything in the including file. Relative paths
-in the included file (images, nested includes) resolve against the included
-file's own directory by default; `base=` overrides. Fenced code takes
-`include="file"` on its info string instead of inlining content, read at
-render time and never pasted, so a fence inside the file is text. The
+A block include is the `include` role alone in its paragraph; the path is
+an argument, hence the parentheses. The included file *(processor)* is
+parsed as TMark and its blocks are spliced into the IR, so a fenced block
+inside it is content and cannot close anything in the including file; a
+file that cannot be loaded is `include-missing`. An `include` role inside
+a paragraph with other content is not defined as a splice: it is literal
+text and the diagnostic `include-inline`. Relative paths in the included
+file (images, nested includes) resolve against the included file's own
+directory by default; `base=` overrides. Fenced code takes
+`include="file"` on its info string instead of inlining content, read by
+the processor and never pasted, so a fence inside the file is text. The
 PyMdownX snippet `--8<-- "file"` is accepted as sugar (class E) and
 deprecated: it pastes text before parsing, which breaks on nested fences,
 and it never rebases paths. Its marker is PyMdownX's own, `-{2,}8<-{2,}`:
@@ -1492,8 +1535,7 @@ two defects of the snippet syntax outweigh the purity argument. Class D.
 
 Every referenceable series is an entry of the counter registry, keyed by its
 prefix. The built-in prefixes are simply *predeclared entries*; there is no
-second mechanism for "reserved prefixes" *(proposed unification)*. Table
-@[tbl:prefixes] lists them.
+second mechanism for "reserved prefixes". Table @[tbl:prefixes] lists them.
 
 Table: Predeclared counter prefixes. {#tbl:prefixes}
 
@@ -1504,8 +1546,8 @@ Table: Predeclared counter prefixes. {#tbl:prefixes}
 | `tbl` | Table | chapter | backend | tables |
 | `lst` | Listing | chapter | backend | code blocks |
 | `eq` | Equation | chapter | backend | display math |
-| `thm` | Theorem | chapter | backend | theorem-type admonitions *(proposed)* |
-| `note` | Note | document | backend | footnotes |
+| `thm` | Theorem | chapter | backend | theorem-type admonitions |
+| `note` | Note | document | backend | footnotes; the series has no key of its own, so no `@note:…` reference exists |
 | `gls` | (none) | (none) | (none) | glossary entries (§@[sec:glossary]) |
 | `doi` | (none) | (none) | (none) | DOI citations resolved on the fly (§@[sec:references]) |
 
@@ -1524,10 +1566,16 @@ Fields:
 :   Label word, used in references and diagnostics.
 
 `format`
-:   Python format string over `n`, `prefix`, `key`; default `"{n}"`.
+:   A template over the fields `{n}`, `{prefix}` and `{key}`; `{n}` takes
+    an optional zero-padded width in Python's spelling (`{n:02d}`), and
+    that is the whole mini-language. Default `"{n}"`.
 
 `start`, `scope`
-:   First value, and `document | chapter | section`.
+:   First value, and `document | chapter | section`. `scope` is a hint to
+    whoever numbers the series: a backend that numbers by chapter resets
+    there; a medium that numbers a series itself with no chapters (a site)
+    numbers it continuously, and a multi-document build chains every
+    series through the `start` of the next document (challenge C29).
 
 `ref`
 :   Template a reference renders, with `{name}` and `{number}` fields. It
@@ -1545,16 +1593,16 @@ implementation detail: the syntax is identical.
 
 ### Bibliography {#sec:bibliography}
 
-Three kinds of source feed the bibliography registry, and all three ship
-today:
+Three kinds of source feed the bibliography registry:
 
 `.bib` files
-:   Passed on the command line: `texsmith paper.md refs.bib`. Every BibTeX
-    key becomes a citation key.
+:   Listed under `sources.bibliography` as paths, or named by the processor
+    (TeXSmith's command line: `texsmith paper.md refs.bib`) *(processor)*.
+    Every BibTeX key becomes a citation key.
 
 DOI shorthand
-:   A front-matter entry whose value is a DOI URL; the resolver fetches the
-    record. Network access is opt-in (P4).
+:   A front-matter entry whose value is a DOI URL; the processor fetches
+    the record *(processor)*. Network access is opt-in (P4).
 
 Inline entries
 :   pybtex-shaped YAML with explicit fields.
@@ -1628,7 +1676,8 @@ key of the same name; `glossary: <style>` names a style and no term, and a
 
 Wikipedia-backed entries
 (auto-fetch summaries from `[SOLID](https://en.wikipedia.org/wiki/SOLID)`
-links) are opt-in: `features: {glossary.wikipedia: true}` (P4).
+links) are opt-in: `features: {glossary.wikipedia: true}` (P4)
+*(processor)*.
 
 ### Index {#sec:index}
 
@@ -1640,8 +1689,8 @@ template chooses.
 ### Cross-document references {#sec:crossrefs}
 
 Each conversion publishes a JSON inventory (`doc.refs.json`: keys, formatted
-labels, pages). A citing document declares aliases and uses a three-segment
-reference:
+labels, pages) *(processor)*. A citing document declares aliases under
+`sources.crossrefs` and uses a three-segment reference, `@alias:prefix:key`:
 
 ```yaml
 sources:
@@ -1653,9 +1702,13 @@ sources:
 See @fwrev:fw:pas-de-temps.        → "RHE-423-FW-10 p. 14" (plain text, not a link)
 ```
 
-Resolution is explicit: an alias never falls back to a local counter. Stale
-or missing inventories warn; unresolved references render visibly as
-`[?fwrev:fw:x]`.
+Resolution is explicit: an alias never falls back to a local counter, and
+the alias is looked up before every other registry (§@[sec:lookup]). A
+missing inventory is `crossref-inventory-missing`, a stale one
+`crossref-inventory-stale`; unresolved references render visibly as
+`[?fwrev:fw:x]`. The empty-link form `[](other.md)` (§@[sec:references])
+is the same mechanism: it resolves only when an alias of `sources.crossrefs`
+names that path, and is `ref-unresolved` otherwise (challenge C12).
 
 ## Feature registry and extensibility {#sec:features}
 
@@ -1690,36 +1743,26 @@ Extension points other than features:
 - Custom sugar (user-defined inline or block syntax) is explicitly out of
   scope. MkDocs' history shows parser-level plugins breeding conflicts.
 
-## Tooling roadmap {#sec:roadmap}
+## Tooling {#sec:roadmap}
 
-1. Canonical printer (IR to TMark normal form), the prerequisite for
-   everything below. Its specification is the "Canonical" column of
-   §@[sec:catalogue].
-2. Conformance suite: one fixture per catalogue entry. Every sugar spelling
-   parses to the same IR as its canonical form, and the canonical form
-   round-trips.
-3. `tmark fmt --profile canonical|strict|mkdocs`: normalise any accepted
-   spelling to the chosen profile, with stable diffs. `canonical` emits the
-   normal form; `strict` additionally rewrites X-class constructs; `mkdocs`
-   emits the PyMdownX spellings so a site and a print build share one
-   source. This is also the dialect converter: a document written with
-   `!!!` callouts, `--8<--` includes or `[^key]` citations comes out in TMark
-   normal form. Its arrival is the horizon of every deprecation in Appendix
-   @[app:deprecations].
-4. `tmark lint`: line and column diagnostics for unresolved references,
-   shadowed citation keys, X-class constructs in strict mode, hardcoded
-   "Figure N", "above" and "below" wording, caption ids off-convention,
-   deprecated sugar.
-5. Dialect import: GFM, MyST and Pandoc admonitions and crossrefs rewritten
-   to TMark canonical form (and `__bold__` to `**bold**`).
-6. VS Code extension: grammar (from the recognisers of §@[sec:grammar]),
-   front-matter schema completion, outline, preview (HTML fast path, PDF via
-   Typst), and format-on-save running `tmark fmt` with the workspace's
-   profile, so that authors type whatever sugar they know and commit normal
-   form.
-7. MkDocs and Zensical parity: every TMark feature either renders on the
-   site (companion plugins: counters, index, tags) or degrades to class E or
-   D. One source, web and print.
+The language is defined by this document and its conformance suite; the
+tools are what make the definition usable. Table @[tbl:tooling] lists
+them with their standing in 0.1, so that no section of the catalogue has
+to say what is implemented.
+
+Table: The tools and their standing in 0.1. {#tbl:tooling}
+
+| Tool | What it does | In 0.1 |
+| ---- | ------------ | ------ |
+| `tmark parse` | the reference parser: text to IR, diagnostics on the side | yes |
+| Conformance suite | one fixture per catalogue entry: every sugar parses to the IR of its canonical form, and the canonical form round-trips | yes (`spec/conformance/`) |
+| `tmark fmt --profile` | the canonical printer and the dialect converter: any accepted spelling to the chosen profile (§@[sec:profiles]), with stable diffs; its existence is the horizon of every `fmt` row of Appendix @[app:deprecations] | yes |
+| `tmark check` (`lint`) | resolution and lint diagnostics with line and column (Appendix @[app:diagnostics]); `--fix` applies the safe rewrites | yes |
+| `tmark write`, `tmark lower` | the LaTeX, Typst and HTML writers, and the MkDocs page lowering (design 07) | yes |
+| Language server | outline, hover, go-to-target, completion from the registries (`tmark-lsp`) | yes |
+| Dialect import | GFM, MyST and Pandoc admonitions and cross-references rewritten to normal form; `__bold__` to `**bold**` | no implementation yet |
+| Editor grammar | a TextMate grammar generated from the recognisers of §@[sec:grammar] | no implementation yet |
+| Site parity | every construct renders on a MkDocs or Zensical site through the lowering, or degrades to class E or D | partial: the lowering exists; counters, index and tags need the site's plugins |
 
 ## Appendices
 
@@ -1856,15 +1899,15 @@ Table: Divergences from draft 1. {#tbl:draft1}
 ### Open questions {#app:questions}
 
 1. Stable counter pinning: explicit `=FW-07` pinning to survive renumbering
-   in contractual documents (warning-only today).
+   in contractual documents (not in 0.1).
 2. Strict profile contents: X1 and X2 only, or X3 too? `~x~` is
    meaning-changing on GitHub but far more established in the MkDocs world.
 3. `yaml table-config`: the only data directive that names an attachment,
    not a node. Fold its options into the `Table:` caption line attributes
    (`{#tbl:x widths="2,1,X"}`) and drop the fence, or keep the fence for rich
    per-column layout?
-4. Index nesting spelling: `{index}[a][b]` (several bracket groups,
-   shipping) is the one role with more than one content group. Alternatives:
+4. Index nesting spelling: `{index}[a][b]` (several bracket groups) is the
+   one role with more than one content group. Alternatives:
    a separator inside one group (`{index}[a / b]`) or a `levels=` attribute.
 5. Grouped label references: `@[fig:a; fig:b]` rendering rules ("figures 1
    and 2", "figures 1–3" for runs) and whether a mixed group
@@ -1889,7 +1932,7 @@ Table: Divergences from draft 1. {#tbl:draft1}
     (`"{text} ({number})"` or `"{text} (p. {page})"`), and whether a
     textual reference to a section should say "section 2" or the section
     title.
-11. Icon shortcodes in print: nothing today (§@[sec:inline]). Whether a
+11. Icon shortcodes in print: nothing in 0.1 (§@[sec:inline]). Whether a
     bundled monochrome fallback for the most used Material icons is worth
     its size, or whether "an icon is decoration" is the final word.
 12. Implicit heading ids on sites whose slugifier is not GitHub's
