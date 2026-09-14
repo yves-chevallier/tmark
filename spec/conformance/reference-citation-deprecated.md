@@ -1,8 +1,9 @@
 # Deprecated citation forms
 
 Spec §Cite, Appendix "Deprecation schedule" (decision X7): `[^key]` with no
-`[^key]:` definition and `^[k1,k2]` groups are citations, lowered to a
-bracketed `Ref` with a `deprecated` fix to `@key` / `@[k1; k2]`. A bare DOI
+`[^key]:` definition and `^[k1,k2]` groups are citations, lowered to a bare
+`Ref` (they were the short form, C51) with a `deprecated` fix to `@key` /
+`@[k1; k2]`. A bare DOI
 takes the `doi:` prefix. `^[` never opens a caret superscript, so two
 groups in one paragraph never swallow the prose between them. A defined
 label (`[^note]`) stays a footnote, a numeric one (`[^1]`) stays literal

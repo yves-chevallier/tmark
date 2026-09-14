@@ -186,8 +186,11 @@ candidate line for the spec's "Canonical" column.
 - Block quote attributes (`{.epigraph}`) print on their own line after the
   quote's last block, inside the `> ` prefix.
 - Reference keys print bare when the reference has one item without prefix,
-  suffix or `-`; bracketed otherwise. Autolink literals and `mailto:` links
-  whose text is the address print bare.
+  suffix or `-` and was written bare; bracketed otherwise. A lone `@[key]`
+  keeps its brackets (`Ref.bracketed`): for a citation they carry the
+  parenthetical meaning under `citations.narrative` (spec §Cite, C51), and
+  the deprecated `[^key]` lowers as bare, so its fix stays `@key`. Autolink
+  literals and `mailto:` links whose text is the address print bare.
 - The round-trip and fixed-point tests compare documents modulo ids, spans
   and the two fields that record a spelling (`Caption.position`,
   `Ref.bracketed`), exactly as the conformance runner does. Adjacent `Str`

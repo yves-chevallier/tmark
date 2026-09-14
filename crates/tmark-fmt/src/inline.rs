@@ -122,7 +122,7 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push(fence);
         }
         Inline::Link(n) => link(out, n, ctx),
-        Inline::Ref(n) => reference(out, &n.items),
+        Inline::Ref(n) => reference(out, &n.items, n.bracketed),
         Inline::Note(n) => match &n.label {
             Some(label) => {
                 out.push("[^");
@@ -518,7 +518,9 @@ pub fn destination(u: &str) -> String {
     }
 }
 
-/// `@key` when one plain item; `@[…]` otherwise (spec §Ref).
+/// `@key` when one plain item written bare; `@[…]` otherwise (spec §Ref:
+/// a lone `@[key]` keeps its brackets, which carry the parenthetical
+/// meaning of a citation under `citations.narrative`, C51).
 /// A key the bare `@key` grammar accepts (spec §Lexical grammar): a letter,
 /// then `[\w:.-]`, ending on an alphanumeric; `doi:` keys and URLs may hold
 /// `/`. Anything else (a digit-initial Zotero key, C27) prints bracketed,
@@ -536,7 +538,7 @@ fn is_bare_key(key: &str) -> bool {
         })
 }
 
-fn reference(out: &mut Out, items: &[RefItem]) {
+fn reference(out: &mut Out, items: &[RefItem], bracketed: bool) {
     // The X4 guard: `@` fires only after a non-word character that is not
     // one of `@/:.-` (spec §Lexical grammar). A reference printed right
     // after such a character (`text.` then `[^key]`) gets a space.
@@ -547,7 +549,8 @@ fn reference(out: &mut Out, items: &[RefItem]) {
         out.push(" ");
     }
     if let [item] = items {
-        if item.prefix.is_none()
+        if !bracketed
+            && item.prefix.is_none()
             && item.suffix.is_none()
             && !item.suppress_author
             && is_bare_key(&item.key)

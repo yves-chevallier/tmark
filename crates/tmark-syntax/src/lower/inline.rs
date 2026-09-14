@@ -250,7 +250,8 @@ impl Lowerer {
                     let local = n.position.as_ref().map_or(0, |p| p.start.offset);
                     let (items, bracketed) = match n.value.strip_prefix('[') {
                         // Deprecated `[^key]` citation (decision X7): one
-                        // item, the fix prints `@key`.
+                        // item, bare — the sugar was the short form
+                        // (spec §Cite, C51) — so the fix prints `@key`.
                         Some(inner) if inner.starts_with('^') => {
                             let key = inner[1..].trim_end_matches(']');
                             let at = local + 2;
@@ -260,7 +261,7 @@ impl Lowerer {
                                 ..Default::default()
                             };
                             self.deprecated(span, "[^key]", "@key");
-                            (vec![item], true)
+                            (vec![item], false)
                         }
                         Some(inner) => {
                             // Pandoc's `[@key, …]` import form carries `@` before
@@ -277,7 +278,8 @@ impl Lowerer {
                             (items, true)
                         }
                         // Deprecated `^[k1,k2]` citation group: one item per
-                        // comma, the fix prints `@[k1; k2]` (or `@k1`).
+                        // comma, bare like `[^key]`; the fix prints
+                        // `@[k1; k2]` (several items) or `@k1`.
                         None if n.value.starts_with("^[") => {
                             let inner = n.value[2..].trim_end_matches(']');
                             let mut at = local + 2;
@@ -291,7 +293,7 @@ impl Lowerer {
                                 at += key.len() + 1;
                             }
                             self.deprecated(span, "^[k1,k2]", "@[k1; k2]");
-                            (items, true)
+                            (items, false)
                         }
                         None => (
                             vec![tmark_ir::RefItem {

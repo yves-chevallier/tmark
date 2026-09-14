@@ -81,3 +81,16 @@ fn hugging_citations_get_a_space() {
     let failures = roundtrip("citations", &printed);
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
+
+/// A lone key written `@[key]` keeps its brackets: under
+/// `citations.narrative` they are what makes the citation parenthetical
+/// (spec §Cite, C51), so the printer must not rewrite the spelling.
+#[test]
+fn a_lone_bracketed_key_keeps_its_brackets() {
+    let text = "Cite @[ein05] and @ein05, not [^ein05].\n";
+    let doc = parse(text, FileId::default()).document;
+    assert_eq!(
+        format(&doc, Profile::Canonical),
+        "Cite @[ein05] and @ein05, not @ein05.\n"
+    );
+}

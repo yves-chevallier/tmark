@@ -120,7 +120,8 @@ fn deprecated_citations() {
         .map(|i| match i {
             Inline::Str(s) => s.text.as_str(),
             Inline::Ref(r) => {
-                assert!(r.bracketed);
+                // The sugars were the short citation, hence bare (C51).
+                assert!(!r.bracketed);
                 "Ref"
             }
             Inline::Superscript(_) => "Sup",
