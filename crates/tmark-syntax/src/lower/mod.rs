@@ -61,14 +61,7 @@ pub(crate) struct Features {
 
 impl Features {
     fn from_front_matter(fm: &FrontMatter) -> Self {
-        let get = |name: &str| {
-            fm.keys
-                .press
-                .features
-                .get(name)
-                .copied()
-                .unwrap_or_else(|| registry::feature(name).is_some_and(|f| f.default))
-        };
+        let get = |name: &str| fm.keys.press.feature(name);
         Features {
             paragraph_lead: get("paragraph.lead"),
             tasklist_partial: get("tasklist.partial"),

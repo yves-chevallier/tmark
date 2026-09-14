@@ -16,14 +16,7 @@ pub enum Segment<'a> {
 /// Whether the document turns the feature on (front matter `features`,
 /// else the registry default).
 pub fn enabled(doc: &Document) -> bool {
-    let name = "typography.tex-logos";
-    doc.front_matter
-        .keys
-        .press
-        .features
-        .get(name)
-        .copied()
-        .unwrap_or_else(|| registry::feature(name).is_some_and(|f| f.default))
+    doc.front_matter.keys.press.feature("typography.tex-logos")
 }
 
 fn is_word(c: char) -> bool {
