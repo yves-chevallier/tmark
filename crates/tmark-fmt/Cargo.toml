@@ -5,14 +5,15 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "TMark canonical printer: IR back to TeXSmith Markdown text"
 
 [dependencies]
 # The IR is what the printer prints.
-tmark-ir = { path = "../tmark-ir" }
+tmark-ir = { path = "../tmark-ir", version = "0.1.0" }
 
 [dev-dependencies]
 # Round-trip tests: parse(print(doc)) == doc.
-tmark-syntax = { path = "../tmark-syntax" }
+tmark-syntax = { path = "../tmark-syntax", version = "0.1.0" }
 # Scratch example and JSON dumps in tests.
 serde_json = { workspace = true }
 # Property tests: edit_many splices are the identity on canonical text.

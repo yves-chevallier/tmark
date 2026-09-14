@@ -1,6 +1,12 @@
 # Vendored fork of markdown-rs 1.0.0 (MIT, Titus Wormer), see VENDORED.md and
 # ADR 0002. The CommonMark core stays as upstream; TMark constructs are added
 # under src/construct/tmark_*.rs and flagged in `Constructs`.
+#
+# Publishable: the MIT license (LICENSE-markdown-rs) permits redistribution
+# and this crate keeps the copyright notice (the file is bundled by `cargo
+# package`'s default include-tracked-files rule) and states the changes in
+# VENDORED.md, so publishing to crates.io under the renamed package name is
+# allowed and left on.
 [package]
 name = "tmark-markdown"
 version.workspace = true

@@ -5,13 +5,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "TMark diagnostic rules over the IR"
 
 [dependencies]
 # Rules walk the IR.
-tmark-ir = { path = "../tmark-ir" }
+tmark-ir = { path = "../tmark-ir", version = "0.1.0" }
 # Rules read `Resolved` (counters, labels); never the file system.
-tmark-registry = { path = "../tmark-registry", default-features = false }
+tmark-registry = { path = "../tmark-registry", version = "0.1.0", default-features = false }
 
 [dev-dependencies]
 # Tests parse their inputs.
-tmark-syntax = { path = "../tmark-syntax" }
+tmark-syntax = { path = "../tmark-syntax", version = "0.1.0" }

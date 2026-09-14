@@ -5,13 +5,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "TMark language server (LSP) for TeXSmith Markdown"
 
 [[bin]]
 name = "tmark-lsp"
 path = "src/main.rs"
 
 [dependencies]
-tmark = { path = "../tmark" }
+tmark = { path = "../tmark", version = "0.1.0" }
 # Synchronous LSP transport and the protocol types (ADR 0007); edge crate.
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
