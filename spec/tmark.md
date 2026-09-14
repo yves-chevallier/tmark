@@ -185,14 +185,16 @@ the element they attach to:
 ![Trace](trace.png){width=60%}
 ```
 
-Grammar: `{` followed by any number of `#id`, `.class`, `key=value` items
-separated by spaces, then `}`. Values containing spaces are double-quoted.
-There are no bare-word attributes: `{collapsed}` is not an attribute list
-(write `{collapsed=true}`). This restriction is what makes attributes and
-roles disjoint grammars (see below). Python-Markdown's `attr_list` puts a
-colon right after the brace (`{: .thin #id}`); that spelling is accepted on
-every host as sugar and deprecated (Appendix @[app:deprecations]), and the
-printer drops the colon.
+Grammar: `{` followed by one or more `#id`, `.class`, `key=value` items
+separated by spaces, then `}` (§@[sec:grammar] has the recogniser; the id
+is an *identifier* of §@[sec:identifiers]). Values containing spaces are
+double-quoted. There are no bare-word attributes: `{collapsed}` is not an
+attribute list (write `{collapsed=true}`), and neither is `{}`: both stay
+literal text. This restriction is what makes attributes and roles disjoint
+grammars (see below). Python-Markdown's `attr_list` puts a colon right
+after the brace (`{: .thin #id}`); that spelling is accepted on every host
+as sugar and deprecated (Appendix @[app:deprecations]), and the printer
+drops the colon.
 
 #### Roles
 
@@ -220,9 +222,19 @@ consumes. `{aside}[see **Prandtl**]` and `{index}[…]` take content;
 take arguments, and nothing inside the parentheses is ever interpreted as
 Markdown. Each role accepts one form or the other, never both; the `index`
 role accepts several bracket groups, for nesting. Parentheses nest when
-balanced, as in link destinations. The reader's intuition "brackets are
-visible, parentheses are not" is a good approximation of the rule and the
-reason for it.
+balanced, as in link destinations; an unbalanced parenthesis has no escape
+inside an argument, so a raw payload holding one is not representable
+inline and is written as a fence (challenge C26). The reader's intuition
+"brackets are visible, parentheses are not" is a good approximation of the
+rule and the reason for it.
+
+Content is inline Markdown, except for the two roles the registry marks
+*verbatim*, `code` and `keys`, whose content is a string taken as typed
+(`{code py}[a*b*]` holds `a*b*`). Brackets nest inside content when they
+balance: `{aside}[see [x](u)]` holds a link. An unbalanced bracket is
+written `\[` or `\]`, the ordinary CommonMark escape, which yields the
+literal character and is not re-read as markup: `{aside}[\[x\](u)]`
+holds the text `[x](u)`.
 
 Roles and attributes are disjoint by construction, not by heuristic. An
 attribute list begins with `#`, `.` or `key=`; a role head begins with a bare
@@ -231,17 +243,38 @@ requirement that a role head be immediately followed by `[` or `(` exists
 only so that a brace group which is neither (`{foo}` in running text) stays
 literal.
 
-Attributes need a host. Headings, images, links, fenced blocks, tables and
-caption lines are hosts; so is an anonymous span, written Pandoc-style as
-`[text]{attrs}`. The span exists for attributes that are properties of a
-piece of text rather than a new kind of node: an anchor on a phrase
-(`[this claim]{#claim:one}`), the language of a quotation
-(`[this taylor]{lang=en}`), or media restriction (`[web only]{media=web}`).
-A span with no attributes is just brackets, as in CommonMark. An *empty*
-link hugging an attribute list (`[](){#id}`, the MkDocs/autorefs anchor
-idiom) is the same anchor written the long way: an empty link is no link,
-so it reads as the span and is deprecated in favour of it (Appendix
-@[app:deprecations]).
+Attributes need a host. Table @[tbl:hosts] is the complete list of hosts
+and of where each takes its list; nothing else is a host. In particular a
+paragraph, a list, a link, a code span and a role are not: a role carries
+its own `key=value` arguments in its head, and a phrase that needs an
+attribute is wrapped in the anonymous span. Nothing may separate an inline
+host from its list: `[x] {#id}` and `![a](b.png) {#id}` are the host
+followed by text. An attribute list with no host is literal text and the
+warning `attr-no-host`.
+
+Table: The attribute hosts and the position of the list. {#tbl:hosts}
+
+| Host | Position of `{…}` |
+| ---- | ----------------- |
+| heading | at the end of the heading line |
+| image | immediately after the closing `)` |
+| anonymous span `[text]{attrs}` | immediately after the closing `]` |
+| progress bar `[=45% "x"]{attrs}` | immediately after the closing `]` |
+| fenced block (code, data directive) | at the end of the info string, in braces |
+| container | on the opening fence, after the name |
+| display math | after the closing `$$`, on the same line |
+| caption line, and through it the table, figure or listing it captions | at the end of the line |
+| block quote | a line holding only the list, closing the quote's last paragraph (`> {.epigraph}`) |
+
+The anonymous span, written Pandoc-style as `[text]{attrs}`, exists for
+attributes that are properties of a piece of text rather than a new kind of
+node: an anchor on a phrase (`[this claim]{#claim-one}`), the language of a
+quotation (`[this taylor]{lang=en}`), or media restriction
+(`[web only]{media=web}`). A span with no attributes is just brackets, as
+in CommonMark. An *empty* link hugging an attribute list (`[](){#id}`, the
+MkDocs/autorefs anchor idiom) is the same anchor written the long way: an
+empty link is no link, so it reads as the span and is deprecated in favour
+of it (Appendix @[app:deprecations]).
 
 Three attributes are universal, accepted on every host:
 
@@ -254,10 +287,10 @@ Three attributes are universal, accepted on every host:
 
 `media=`
 :   Where the element is rendered: `all` (default), `print` or `web`. A
-    word, a paragraph, a code block, a callout or a video restricted to one
-    medium is the escape hatch of P5 when symmetry is impossible, and it
-    replaces mirrored `latex raw` and `html raw` blocks. Nothing is
-    conditional unless it says so.
+    word (in a span), a code block, a callout, an image or a video
+    restricted to one medium is the escape hatch of P5 when symmetry is
+    impossible, and it replaces mirrored `latex raw` and `html raw`
+    blocks. Nothing is conditional unless it says so.
 
 Zero-width nodes (comments, index entries, anchors on their own, counter
 definitions that print nothing, asides in the flow) take no space in the
@@ -336,8 +369,8 @@ two bracketings (Table @[tbl:sigils]).
 
 Table: The two sigils and their bracketings. {#tbl:sigils}
 
-| Sigil | Meaning | In braces (attribute) | Before brackets (node) |
-| ----- | ------- | --------------------- | ---------------------- |
+| Sigil | Meaning | In braces (attribute) | Standalone (sugar for a role) |
+| ----- | ------- | --------------------- | ----------------------------- |
 | `#`   | define | `{#id}` names an existing host element | `#[term]` creates an index entry (content), `#(fw:key)` a counter item (argument) |
 | `@`   | refer  | (none) | `@key` bare, `@[key …]` bracketed |
 
@@ -347,9 +380,14 @@ an image, a caption line, a span), whereas an index entry or a numbered
 finding in a table cell has none. Among the standalone forms, the bracket
 rule of §@[sec:families] does the routing: an index term is content
 (`#[byte order]`), a counter key is an argument (`#(fw:boot-loop)`), so the
-parser never has to consult a registry to tell them apart. `#{…}` (draft
-2's counter marker) is withdrawn; `#(…)` replaces it with one character
-changed and a rule behind it.
+parser never has to consult a registry to tell them apart. The standalone
+forms are sugar: the canonical spellings are the roles `{index}[…]` and
+`{counter}(…)` of §@[sec:catalogue], which the printer emits (challenge
+C6). `#{prefix:key}`, draft 2's counter marker and TeXSmith 0.6's
+spelling, is in one state: deprecated sugar for `#(prefix:key)`, horizon
+`fmt` (Appendix @[app:deprecations]), recognised only when `prefix` is a
+declared counter, so that a Ruby-style `#{user.name}` in prose stays
+literal (challenge C16). `#(…)` is the form with a rule behind it.
 
 `^` is no longer a sigil. It appears in `[^1]` (footnote, CommonMark
 convention) and `^x^` (superscript, PyMdownX convention) with unrelated
@@ -357,40 +395,103 @@ meanings; pretending it means "note" made the table lie.
 
 ### Registries {#sec:lookup}
 
-`@` and `#[…]` resolve against named registries (§@[sec:registries]). A
-reference `@a:b` whose head `a` is a declared counter prefix is a label or
-counter reference; `@gls:term` is a glossary reference; any other `@key` is
-a bibliography key. `#(fw:boot-loop)` is routed by its prefix to a
-declared counter and warns when the prefix is unknown. Resolution of `@` is
-a registry lookup, not a spelling: the prefix table in §@[sec:counters] is
-the single source of truth.
+`@` resolves against the registries of §@[sec:registries], in one order,
+stated here and referred to from everywhere else:
+
+1. *Cross-document aliases.* A key whose first segment is an alias of
+   `sources.crossrefs` (`@fwrev:fw:x`) is looked up in that inventory and
+   nowhere else (§@[sec:crossrefs]).
+2. *The two predeclared lookups.* `@doi:…` is a DOI cited in place;
+   `@gls:term` is a glossary term (§@[sec:glossary]).
+3. *Labels.* Every id an attribute list defines on a host, every counter
+   item, every implicit heading id (§@[sec:structure]), whatever the host:
+   a key with no colon (`@stock`, `@boot-sequence`, `@top`) is looked up
+   here, and so is a key whose head is a declared counter prefix
+   (`@fig:trace`, `@fw:boot-loop`).
+4. *The bibliography.* Any key.
+
+A key found both as a label and as a bibliography key is `ref-ambiguous`;
+a key found nowhere is `ref-unresolved`. A key with a colon whose head is
+neither an alias nor a declared prefix is a bibliography key only
+(BibTeX keys such as `knuth:1984` are common), so an anchor written
+`{#claim:one}` on a span cannot be reached with `@`: a colon in an id
+reserves its head for a declared prefix, and an anchor on a span, a
+container or any host with no series of its own takes a plain id
+(`{#claim-one}`) (challenge C24). `#(fw:boot-loop)` is routed by its
+prefix to a declared counter and is `prefix-unknown` otherwise. Resolution
+is a registry lookup, not a spelling: the prefix table in §@[sec:counters]
+and the front matter's `declare` and `sources` are the single source of
+truth.
 
 ### Lexical grammar {#sec:grammar}
 
 The patterns below are the normative recognisers for the four families and
 the two sigils, as PCRE. They are what an editor grammar or a linter needs;
 the prose in the rest of the spec explains them. Named groups are the
-fields the IR receives.
+fields the IR receives; `(?&name)` reuses a production defined once.
 
-Attribute list (family 1), after a host element, on its line or at end of
-line:
+#### Identifiers {#sec:identifiers}
+
+Every id, key and prefix in the language is built from three productions,
+defined here and cited by name everywhere else:
 
 ```text
-\{(?:\s*(?:#(?<id>[\w:.-]+)|\.(?<class>[\w-]+)|(?<key>[\w-]+)=(?<value>"(?:[^"\\]|\\.)*"|\S+)))+\s*\}
+(?(DEFINE)
+  (?<prefix>[A-Za-z][\w-]*)
+  (?<key>[A-Za-z0-9][\w.-]*)
+  (?<id>(?&prefix)(?::(?&key))+|(?&key))
+  (?<doi>doi:[^\s\[\]()<>]*[^\s\[\]()<>.,;:!?])
+)
+```
+
+`prefix`
+:   The head of a series or a registry: a counter prefix (§@[sec:counters]),
+    a cross-document alias, `gls`, `doi`. Letters, digits, `_` and `-`,
+    starting with a letter; matched case-insensitively.
+
+`key`
+:   One segment: the key of a label, a counter item or a bibliography
+    entry. Letters, digits, `_`, `.` and `-`, starting with a letter or a
+    digit (Zotero's `1RgTv` is a key). An all-digit key is never a
+    reference: `[^1]` is a footnote.
+
+`id`
+:   What `{#…}` defines and `@` refers to: a bare `key`, or a `prefix`
+    followed by one or more `:key` segments (`fig:trace`; `fwrev:fw:x` for
+    a cross-document reference). A counter item's key is one segment.
+
+`doi`
+:   The exception for a DOI cited in place: after `doi:` any run without
+    whitespace or brackets, ending on a character that is not sentence
+    punctuation, since a DOI holds `/` and `()` (challenge C3).
+
+A key ends on a letter or a digit when it is read from running text, so
+that sentence punctuation stays out (`@sec:intro.` refers to `sec:intro`).
+A bare `@` reference requires its first character to be a letter, so that
+`@1` stays text; a digit-initial key is written bracketed, `@[1RgTv]`,
+`@[1RgTv, p. 3]`, which is what the printer emits for it (challenge C27).
+
+#### Recognisers
+
+Attribute list (family 1), after a host element (Table @[tbl:hosts]):
+
+```text
+(?<attrs>\{(?:\s*(?:#(?<id>(?&id))|\.(?<class>[\w-]+)|(?<key>[\w-]+)=(?<value>"(?:[^"\\]|\\.)*"|[^\s}]+)))+\s*\})
 ```
 
 Inside a quoted value `\"` stands for a quote and `\\` for a backslash;
-any other backslash is literal. A bare value ends at whitespace or `}`. The
-deprecated Python-Markdown form is the same pattern with `\{:?` in place of
-`\{`.
+any other backslash is literal. A bare value ends at whitespace or `}`
+(challenge C1). The deprecated Python-Markdown form is the same pattern
+with `\{:?` in place of `\{`.
 
 Role (family 2); the head must be followed immediately by bracketed
-content (one group, or several for `index`) or by a parenthesised verbatim
-argument (balanced parentheses allowed inside):
+content (one group, or up to three for `index`) or by a parenthesised
+verbatim argument (balanced parentheses allowed inside); content nests
+balanced brackets and takes `\[`, `\]` as escapes (§@[sec:families]):
 
 ```text
-\{(?<name>[A-Za-z][\w-]*)(?:\s+(?<positional>[^\s=}]+))?(?:\s+(?<key>[\w-]+)=(?<value>"(?:[^"\\]|\\.)*"|\S+))*\}
-(?:(?:\[(?<content>(?:[^\[\]\\]|\\.)*)\])+|\((?<argument>(?:[^()]|\((?&argument)\))*)\))
+\{(?<name>(?&prefix))(?:\s+(?<positional>[^\s=}]+))?(?:\s+(?<key>[\w-]+)=(?<value>"(?:[^"\\]|\\.)*"|[^\s}]+))*\}
+(?:(?:\[(?<content>(?:[^\[\]\\]|\\.|\[(?&content)\])*)\])+|\((?<argument>(?:[^()]|\((?&argument)\))*)\))
 ```
 
 Anonymous span, a host for attributes only:
@@ -405,7 +506,7 @@ continues with `#`, `.` or `key=`, a role head with a bare identifier.
 Container fence (family 3), opening and closing lines:
 
 ```text
-^(?<fence>:{3,})\s*(?<name>[A-Za-z][\w-]*)(?:\s+(?<attrs>\{[^}]*\}))?\s*$
+^(?<fence>:{3,})\s*(?<name>(?&prefix))(?:\s+(?&attrs))?\s*$
 ^(?<fence>:{3,})\s*$
 ```
 
@@ -417,45 +518,58 @@ lines that follow:
 ^:{3,}\s*(?<directive>[A-Za-z][\w-]*(?:\.[\w-]+)+)\s*$
 ```
 
-Data directive info string (family 4), on the opening code fence:
+Data directive info string (family 4), on the opening code fence: the
+language, an optional node word, bare `key=value` options, and an optional
+attribute list in braces at the end, the only spelling that carries
+classes and an id (challenge C28). Its classes, id and pairs land in the
+fence's options (on a `mermaid` fence, on the generated image's
+attributes); the printer keeps the braces when there is a class or an id
+and writes bare `key=value` pairs otherwise:
 
 ```text
-^(?<lang>[\w+-]+)(?:\s+(?<node>code|table|table-config|image|raw))?(?<attrs>(?:\s+[\w-]+=(?:"(?:[^"\\]|\\.)*"|\S+))*)\s*$
+^(?<lang>[\w+-]+)(?:\s+(?<node>code|table|table-config|image|raw))?(?<options>(?:\s+[\w-]+=(?:"(?:[^"\\]|\\.)*"|[^\s}]+))*)(?:\s+(?&attrs))?\s*$
 ```
 
 Bare reference or citation (`@` refers). The look-behind is the X4 guard:
-no `@` inside a word, an e-mail address or a URL; the key must end on an
-alphanumeric so sentence punctuation stays out:
+no `@` inside a word, an e-mail address or a URL; the key is an `id` that
+starts with a letter and ends on a letter or a digit
+(§@[sec:identifiers]), or a `doi`:
 
 ```text
-(?<![\w@/:.-])@(?<key>[A-Za-z][\w:.-]*[A-Za-z0-9])
+(?<![\w@/:.-])@(?<key>(?&doi)|(?=[A-Za-z])(?&id)(?<=[A-Za-z0-9]))
 ```
 
-Bracketed reference or citation, required as soon as the reference
-contains a space. One or more items separated by `;`, each with optional
-prefix text, an optional `-` (suppress author), the key, and optional suffix
-or locator text (Pandoc's item grammar):
+Bracketed reference or citation, the form that holds what a bare key
+cannot: a locator, a suffix, several keys, a flag, a digit-initial key.
+One or more items separated by `;`, each an optional prefix text, an
+optional flag (`-` suppresses the author, `+` makes the item narrative,
+§@[sec:references]), the key — the last word before the first `,` — and an
+optional suffix or locator after that comma (Pandoc's item grammar):
 
 ```text
-(?<![\w@/:.-])@\[(?<item>[^\[\];]*?-?(?<key>[A-Za-z][\w:.-]*[A-Za-z0-9])[^\[\];]*)(?:;(?&item))*\]
+(?<![\w@/:.-])@\[(?<item>[^\[\];,]*?[-+]?(?<key>(?&doi)|(?&id)(?<=[A-Za-z0-9]))(?:,[^\[\];]*)?)(?:;(?&item))*\]
 ```
 
 Standalone definitions (`#` defines): an index entry with one to three
-bracket groups, a counter item with one parenthesised key; `\#` escapes:
+bracket groups, a counter item with one parenthesised `prefix:key`;
+`\#` escapes:
 
 ```text
 (?<!\\)#\[(?<term>[^\[\]]+)\](?:\[(?<sub>[^\[\]]+)\]){0,2}
-(?<!\\)#\((?<prefix>[A-Za-z][\w-]*):(?<key>[\w.-]+)\)
+(?<!\\)#\((?<prefix>(?&prefix)):(?<key>(?&key))\)
 ```
 
-Caption line, a paragraph of its own adjacent to the float:
+Caption line, a paragraph of its own adjacent to the float, ending in an
+optional attribute list (the universal `lang=` and `media=` included,
+challenge C23):
 
 ```text
-^(?<kind>Table|Figure|Listing):\s+(?<text>.*?)(?:\s*\{#(?<id>[\w:.-]+)\})?\s*$
+^(?<kind>Table|Figure|Listing):\s+(?<text>.*?)(?:\s*(?&attrs))?\s*$
 ```
 
-Escapes: `\@`, `\#`, and any backslash-escaped bracket inside role content.
-Inside code spans and fenced blocks none of the patterns fire.
+Escapes: `\@`, `\#`, and any backslash-escaped bracket inside role
+content; §@[sec:roundtrip] lists what the printer escapes. Inside code
+spans and fenced blocks none of the patterns fire.
 
 ## Conformance and deviations {#sec:conformance}
 
@@ -496,7 +610,7 @@ Table: Class X deviations from GFM. {#tbl:deviations}
 | X2 | `---` (thematic break) | horizontal rule | page break (paged media) at the top level, separator in a container | See §@[sec:structure]. Semantically it stays a divider; at the top level of the document the paged writers emit `\tsdivider` / `#ts-divider()`, a page break unless the template redefines it, and the web shows `<hr>`. Inside a container the same node is `\tsrule` / `#ts-rule()` / `<hr class="rule">`, a separator that never breaks the page. Disabled by the `strict` profile. |
 | X3 | `~x~` | strikethrough (single tilde) | subscript | PyMdownX tilde, long-established in the MkDocs world; the only class-E construct GFM assigns a different meaning to. |
 | X4 | `@word` | literal | reference or citation | Guarded: never fires inside e-mails, URLs, or code; `\@` escapes. Identical to Pandoc's behaviour with `--citeproc`. |
-| X5 | `#[…]`, `#(…)` | literal | index entry, counter item | `#[` or `#(` followed by a non-space never occurs in prose; `\#` escapes. No further guard is needed now that `#{…}` is gone. |
+| X5 | `#[…]`, `#(…)` | literal | index entry, counter item | `#[` or `#(` followed by a non-space never occurs in prose; `\#` escapes. The deprecated `#{prefix:key}` fires only for a declared prefix (§@[sec:sigils]). |
 
 A conformant TMark processor MUST implement classes C, E and D and MUST
 document which X-deviations are active.
@@ -936,11 +1050,12 @@ syntax. The node is `Aside` in both forms.
 
 #### Anchor (attribute)
 
-Not a node. Any element takes an id through attributes: `## Title
-{#sec:intro}`, `![alt](f.png){#fig:trace}`, `$$ … $$ {#eq:x}`, a caption
-line (§@[sec:floats]), a span (`[this claim]{#claim:one}`). Where a block
-has a caption line, the anchor lives on the caption line; otherwise on the
-element. One rule, no second place.
+Not a node. Any host (Table @[tbl:hosts]) takes an id through attributes:
+`## Title {#sec:intro}`, `![alt](f.png){#fig:trace}`, `$$ … $$ {#eq:x}`, a
+caption line (§@[sec:floats]), a span (`[this claim]{#claim-one}`). Where
+a block has a caption line, the anchor lives on the caption line; otherwise
+on the element. One rule, no second place. The id is an `id` of
+§@[sec:identifiers]; a duplicate is `label-duplicate`.
 
 The host decides the counter, not the prefix. A heading is a section, a
 `Table:` line is a table, an image is a figure: `Table: Stock {#stock}`
@@ -948,11 +1063,16 @@ registers `stock` with the table counter and `@stock` renders "table 3".
 The prefixed spelling `{#tbl:stock}` remains the recommended convention,
 because pandoc-crossref requires it, because it keeps `fig:trace` and
 `tbl:trace` apart, and because a reference reads better when its kind is in
-the key; when a prefix is present it must agree with the host, and a
-mismatch is linted. A prefix is *required* only where no host tells the
-kind: counter items (`#(fw:x)`), and an explicit prefix on a heading or
-image to number it in a custom series instead of its own
-(`## Boot loop {#fw:boot-loop}`).
+the key; a caption id without it is the hint `caption-id-off-convention`.
+A *predeclared* prefix must agree with the host — any of the heading
+prefixes `part chap sec app` agrees with any heading, since the
+level-to-prefix map is the template's — and a mismatch (`{#tbl:x}` on an
+image) is `prefix-host-mismatch`, the anchor being numbered in the series
+the prefix names all the same. A *user-declared* prefix on any host
+numbers that host in its series instead of the host's own:
+`## Boot loop {#fw:boot-loop}` is Finding FW-03 as well as a heading. A
+prefix is *required* only where no host tells the kind: counter items
+(`#(fw:x)`).
 
 #### Ref
 
@@ -968,25 +1088,28 @@ bibliography keys alike:
 [](other.md)                        section number of another document's main heading
 ```
 
-The brackets are optional and follow the sigil. Bare `@key` takes one word
-of `[A-Za-z0-9_:.-]`; trailing sentence punctuation stays out. The bracketed
-form `@[…]` is required as soon as the reference contains a space: a
-locator, a suffix, or several keys separated by `;`. A lone key may be
-written `@[key]` too: an item list of one item, which for a label is the
-same reference and for a citation is the short form whatever the document
-default (§Cite); the canonical printer keeps the brackets as written.
-Inside the brackets the item grammar is Pandoc's: optional prefix text, an
-optional flag (`-`, or `+` for a citation, §Cite), the key, optional suffix
-or locator. A capitalised prefix (`@Fig:x`) capitalises the
-label word (pandoc-crossref convention); prefixes are otherwise
-case-insensitive. Sugar: Pandoc's own `[@key, locator; @key2]`, accepted for
-import and never emitted.
+Both forms follow the sigil. A bare `@key` takes one `id`
+(§@[sec:identifiers]); trailing sentence punctuation stays out. The
+bracketed form `@[…]` holds what a bare key cannot: a locator, a suffix,
+several keys separated by `;`, a flag, or a digit-initial key. A lone key
+may be written `@[key]` too: an item list of one item, which for a label
+is the same reference and for a citation is the short form whatever the
+document default (§Cite); the canonical printer keeps the brackets as
+written. Inside the brackets the item grammar is Pandoc's: optional prefix
+text, an optional flag (`-`, or `+` for a citation, §Cite), the key,
+optional suffix or locator after the first comma. A capitalised prefix
+(`@Fig:x`) capitalises the label word (pandoc-crossref convention);
+prefixes are otherwise case-insensitive, and the key part is compared
+case-insensitively too. Sugar: Pandoc's own `[@key, locator; @key2]`,
+accepted for import and never emitted.
 
 A numeric reference renders the counter's `ref` template
 (§@[sec:counters]): "Figure 3", "figure 3", "Abbildung 3", "FW-01", as a
-hyperlink, identically in every medium. Unresolved: `[?key]` visibly, plus
-a warning. `\@` forces a literal `@`; e-mails and URLs never match (X4).
-Class X.
+hyperlink, identically in every medium; a label has one form only, the
+flags of §Cite do not apply to it. What the key resolves to is the one
+lookup order of §@[sec:lookup]. Unresolved: `[?key]` visibly, plus the
+warning `ref-unresolved`. `\@` forces a literal `@`; e-mails and URLs
+never match (X4). Class X.
 
 A *textual* reference lets the author write the prose and keeps the
 number out of the body:
@@ -1014,7 +1137,8 @@ answer to the oldest tension between web and print writing: the body says
 "reference to X, worded T", and each medium decides how to compensate for
 what it lacks. The same discipline retires "above" and "below": floats
 move in print, so a position word is a reference in disguise, and
-`tmark lint` flags it.
+`tmark check` hints `position-word` on it (and `hardcoded-number` on a
+"Figure 3" typed by hand). Both are style hints, never errors.
 
 #### Cite
 
@@ -1046,9 +1170,8 @@ read only under the switch, and whose items carry `narrative` for `+`
 (C51). Locators follow Pandoc: a recognised locator word (`p.`, `pp.`,
 `ch.`, `sec.`, `§`…) followed by a range, or free suffix text. The item
 grammar is Pandoc's, the bracket position is TMark's (`@[` rather than
-`[@`), so that one rule covers bare and bracketed forms: brackets appear
-when there is a space, a flag or a locator. Pandoc's `[@key, locator]` is
-accepted for import; Pandoc's bare `@key` is its narrative form, which is
+`[@`), so that one rule covers bare and bracketed forms. Pandoc's
+`[@key, locator]` is accepted for import; Pandoc's bare `@key` is its narrative form, which is
 what the web lowering for `mkdocs-bibtex` writes for a narrative citation
 and `[@key]` for a short one. This is Typst's one-`@`-for-all model,
 default form included: a bare `@key` is `#cite(<key>)` as Typst renders it
@@ -1069,30 +1192,37 @@ accepted as sugar and normalised to the `doi:` form; the X4 guard is
 untouched because the sigil precedes the URL instead of sitting inside it.
 Front-matter keys stay the readable choice for a source cited many times.
 
-Resolution order for any `@key`: declared counter prefix (`doi` and `gls`
-included), then bibliography. A key present in two registries is a hard
-warning. Class X. Backends: `\cite` with biblatex (`\textcite` for a
-`+key` item and for a bare key under `citations.narrative`), `#cite`
-(`form: "prose"`), CSL via citeproc.
+Whether a key is a citation or a label is the one lookup order of
+§@[sec:lookup] (the bibliography comes last; a key present there and as a
+label is `ref-ambiguous`). Class X. Backends: `\cite` with biblatex
+(`\textcite` for a `+key` item and for a bare key under
+`citations.narrative`), `#cite` (`form: "prose"`), CSL via citeproc.
 
 #### CounterItem
 
 Define *and print* a numbered item where no host element exists:
 
 ```md
+---
+declare:
+  counters:
+    fw: {name: Finding, format: "FW-{n:02d}"}
+---
 | Id | Requirement |
 | --- | --- |
-| #(n:joy) | Everyone shall be happy |
+| #(fw:joy) | Everyone shall be happy |
 
 #(fw:boot-loop) The firmware reboots when the watchdog fires.   ← define + print
-## Boot loop {#fw:boot-loop}                                    ← define silently (attribute)
+## Watchdog {#fw:watchdog}                                      ← define silently (attribute)
 The watchdog issue (@fw:boot-loop) is fixed in 1.4.2.           ← refer
 ```
 
 Canonical role `{counter}(fw:boot-loop)`; sugar `#(fw:boot-loop)`. The two
 spellings are one node, and the key is an argument, hence the parentheses
-(§@[sec:families]). An undeclared prefix warns. Sugar: `#{fw:boot-loop}`
-(shipping, deprecated in favour of `#(fw:boot-loop)`). Class X (X5). Backends: `\label`
+(§@[sec:families]); the key is one segment (§@[sec:identifiers]). An
+undeclared prefix is `prefix-unknown`; the same key defined twice is
+`label-duplicate`. Sugar: `#{fw:boot-loop}` (deprecated, recognised for a
+declared prefix only, §@[sec:sigils]). Class X (X5). Backends: `\label`
 plus the printed number, `<label>`, `<a id>`.
 
 #### IndexEntry
@@ -1584,12 +1714,15 @@ Fields:
     otherwise, which is what the predeclared entries use.
 
 A user may override the fields of a predeclared entry (`fig: {scope:
-document}`) but not add a prefix that shadows a role name. Prefixes match
-`[A-Za-z][A-Za-z0-9_-]*` and are matched case-insensitively
-(§@[sec:references]). Numbers are allocated in document order, shared across
-a multi-document build. Duplicates and dangling references warn loudly. The
-distinction between backend-numbered and TeXSmith-numbered series is an
-implementation detail: the syntax is identical.
+document}`). A prefix is a `prefix` of §@[sec:identifiers], matched
+case-insensitively (§@[sec:references]); it may not shadow a role name,
+not because the grammars collide (they are disjoint) but because the
+editor completes both after `{` and an author reading `{fw}` should not
+have to ask which it is. Numbers are allocated in document order, shared
+across a multi-document build. A duplicate label is `label-duplicate`, a
+dangling reference `ref-unresolved`. The distinction between
+backend-numbered and processor-numbered series is an implementation
+detail: the syntax is identical.
 
 ### Bibliography {#sec:bibliography}
 
@@ -1774,9 +1907,9 @@ other. The review's eleven points, with what was adopted, adapted or
 declined.
 
 1. *Drop `#{…}`; define counter items with `{#fw:x}` and a `print: inline`
-   counter option.* Adapted. `#{…}` is dropped. The standalone define is
-   `#[…]`, shared by index entries and counter items; `{#…}` stays the
-   attribute form. An attribute needs a host element: `{#n:joy}` alone in a
+   counter option.* Adapted. `#{…}` is deprecated (§@[sec:sigils]). The
+   standalone define is `#[…]` for index entries and `#(…)` for counter
+   items; `{#…}` stays the attribute form. An attribute needs a host element: `{#n:joy}` alone in a
    table cell or mid-sentence has nothing to attach to, which is precisely
    the case the counter marker exists for. Two bracketings for `#`, not one,
    but each with a distinct job (name a host, create a node).
@@ -1789,9 +1922,9 @@ declined.
 3. *Adopt Pandoc's citation grammar verbatim.* Adapted. The item grammar
    (locators, prefixes, `-` to suppress the author, `;` between items) is
    Pandoc's, and `@Fig:x` capitalises. The bracket position stays TMark's:
-   `@key` bare, `@[key, locator; key2]` as soon as there is a space. One
-   rule for both forms, and the shipping `@[…]` keeps working. Pandoc's
-   `[@key]` is accepted for import. This closes open question 1.
+   `@key` bare, `@[key, locator; key2]` for an item list. One rule for
+   both forms, and TeXSmith 0.6's `@[…]` keeps working. Pandoc's `[@key]`
+   is accepted for import. This closes open question 1.
 
 4. *One rule for roles versus attributes; role arguments become
    attributes.* Adapted. Disjoint grammars: attributes never begin with a
@@ -1847,9 +1980,8 @@ PyMdownX. With E in place, X3 shrinks to the single tilde, the one PyMdownX
 spelling GFM assigns a different meaning to.
 
 Every change above marks the superseded spelling as deprecated in Appendix
-@[app:deprecations] rather than removing it, except `#{…}`, `print: inline`
-and the `///` figure caption blocks, which were never the recommended
-spelling.
+@[app:deprecations] rather than removing it, except `print: inline` and
+the draft-2 `latex render` fence, which never shipped.
 
 Subsequent review rounds on draft 3 settled the following, each argued in
 the section it affects:
