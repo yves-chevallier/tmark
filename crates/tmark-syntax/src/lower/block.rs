@@ -191,11 +191,32 @@ impl Lowerer {
             Node::Blockquote(q) => {
                 let meta = self.meta_at(ctx, q.position.as_ref());
                 let mut content = self.lower_blocks(&q.children, ctx, document);
-                // `{.epigraph}` at the end of the quote.
+                // `{.epigraph}` at the end of the quote (spec §Attributes,
+                // Table "Hosts": a line holding only the list, closing the
+                // quote's last paragraph).
                 let mut attrs = Attrs::new();
                 if let Some(Block::Para(para)) = content.last_mut() {
-                    if let Some(taken) = take_trailing_attrs(&mut para.content) {
+                    let own_line = match para.content.as_slice() {
+                        [_] => true,
+                        [.., before, _] => matches!(before, Inline::SoftBreak(_)),
+                        [] => false,
+                    };
+                    if let Some(taken) = own_line
+                        .then(|| take_trailing_attrs(&mut para.content))
+                        .flatten()
+                    {
                         attrs = taken;
+                        if matches!(para.content.last(), Some(Inline::SoftBreak(_))) {
+                            para.content.pop();
+                        }
+                        // The paragraph reported the list as host-less
+                        // before the quote could take it (challenge C60).
+                        let span = para.meta.span;
+                        self.diagnostics.retain(|d| {
+                            !(d.code == Code::AttrNoHost
+                                && d.span.start >= span.start
+                                && d.span.end <= span.end)
+                        });
                     }
                 }
                 out.push(Item::Block(Block::BlockQuote(BlockQuote {
