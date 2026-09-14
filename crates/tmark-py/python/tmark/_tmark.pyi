@@ -188,7 +188,9 @@ def write(doc: dict[str, Any], backend: str, options: dict[str, Any] | None = No
     `inline_plain`, `inline_breaks`}, `latex` {`legacy_accents`},
     `headings` {`base_level`, `numbered`}, `refs` {`textual_print`,
     `textual_web`}, `numbering` (prefix -> `backend` | `tmark`), `typst`
-    {`math` (`mitex` | `native`)}, `source_map`. An unknown key is a
+    {`math` (`mitex` | `native`)}, `citations` {`narrative`: a bare `@key`
+    is the narrative citation; `None` follows the front matter's
+    `citations.narrative` feature}, `source_map`. An unknown key is a
     `TypeError`, a bad value a `ValueError`. `resolved` is the dict
     `resolve` returned, or its `handle`: pass the same one for every slot
     of a document so numbering never restarts; `None` resolves now, through
