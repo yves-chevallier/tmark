@@ -1,8 +1,141 @@
 # 13 — Handoff notes
 
-Two handoffs, newest first. Read `AGENTS.md`, then this file, then
+Three handoffs, newest first. Read `AGENTS.md`, then this file, then
 `11-roadmap.md`, then `design/reviews/`. Everything below is opinion from
 the inside of the work: verify it, do not trust it.
+
+## The review-and-fix round (2026-09-14)
+
+Written by the agent that ran the spec reviews and the fix branches
+listed below, for whoever takes `texsmith-migration` to `main`. Nothing
+here supersedes the migration-waves handoff's architecture; it corrects
+and extends it where the round changed something.
+
+### State of the branch
+
+- `texsmith-migration` at `9029359`, `git rev-list --count main..HEAD` =
+  137 (`main` unmoved at `9017bda`) — see the correction inline below
+  where the previous handoff undercounted this. Nine merges landed this
+  round: `fix/typst-escape` (`0424387`), `fix/citations` (`4593a6b`),
+  `fix/spec-text` (`c3bf402`), `fix/spec-code` (`d8041cf`),
+  `chore/release-prep` (`76b2fd0`), `fix/keystroke` (`01682b1`),
+  `fix/quote-boundaries` (`9029359`), plus two review commits written
+  straight to the branch (`3d97493`, `8e8dbce`). Full list: `git log
+  --oneline 353311f..HEAD`.
+- Measured clean: `cargo test --workspace` — 340 tests, 0 failed;
+  `cargo clippy --workspace --all-targets -- -D warnings` — clean;
+  `cargo fmt --all --check` — clean; `cargo +1.80 check --workspace
+  --all-targets` — clean (the MSRV job added to `.github/workflows/ci.yml`
+  this round, `dad4f56`, also makes CI run on `v*` tags); generated
+  artifacts current (`schema`, `registries` examples regenerate to no
+  diff). Workspace version is now `0.1.0` (`4bd0d0b`), every internal
+  path dependency version-pinned; `Cargo.lock` repointed three
+  transitive deps to their MSRV-1.80-compatible versions (`4f22f38`).
+  `tmark-writers` gained `unicode-ident = "1.0"` (Typst label escaping,
+  below). No tag is pushed yet.
+
+### What the round did
+
+- **Review 07** (`3d97493`, spec-vs-code over C27–C50): 0 blocking, 11
+  major, 14 minor. **Review 08** (`8e8dbce`, the spec's own internal
+  consistency, a lens review 07 does not cover): 5 blocking, 15 major,
+  19 minor. Every finding of both is dispositioned in their own
+  §Triage — fixed, deferred to a new challenge row, or closed as spec.
+- **fix/typst-escape**: the writer now escapes Typst's comment openers
+  `//` and `/*` (either silently ate the rest of the line), `~` (always
+  a non-break space), and `=`/`+`/`-`/`/` at a line start — verified
+  against typst 0.15.1.
+- **fix/citations** (closes C51): the citation model below.
+- **fix/spec-text**: draft 4 of `spec/tmark.md` — one normative
+  preamble, one registry lookup order, one identifier grammar, one
+  citation rule, one state for `#{prefix:key}`, and the C27/C30 row
+  grammars the code already implemented. Closes challenges through C60.
+- **fix/spec-code**: the code side of review 07's F1, F2, F7, F8, F10,
+  plus the digit-initial reference key (F3/C27), and drops
+  `Code::StrictXConstruct` (`c90815e`) — a diagnostic nothing ever
+  emitted, removed from `tmark.codes()` and `schema("diagnostic")`.
+- **chore/release-prep**: version `0.1.0`, the MSRV CI job, `tmark-lint`
+  tests raised 2 → 8 (`5cf6551`), TeXSmith's IR model header regenerated
+  and the PyPI name conflict flagged (`ebeff13`).
+- **fix/keystroke** (closes C61): `++…++` needed word boundaries and no
+  internal whitespace — `C++03 … C++` in ordinary prose was read as one
+  keystroke spanning the sentence.
+- **fix/quote-boundaries** (a corpus regression found after fix/spec-code
+  landed, fixed same day): a closing smart quote must also close before
+  an em/en dash, not only before ASCII punctuation.
+
+### The citation model, precisely (C51)
+
+A bare `@key` is the short citation on every backend (`\cite{key}`,
+`#cite(<key>)`) — the same rendering as bracketed `@[key]`. The feature
+`citations.narrative` (a `press.features` entry, no front-matter schema
+change) flips the bare form document-wide to narrative (`\textcite`,
+`form: "prose"`); inside brackets, a leading `+` makes one item narrative
+regardless of the document default (`RefItem.narrative`, a new IR
+boolean, absent when false), mirroring `-key` for the year alone.
+`tmark.write` accepts `options["citations"]["narrative"]` with the
+precedence of `lang`; `tmark.registries()["features"]` lists the row. The
+`[^key]` fix now inserts a space when the sugar hugs a preceding word.
+
+### The cross-repository contract now in force (additions this round)
+
+- `RefItem.narrative` is a new IR field: TeXSmith's `texsmith/ir/model.py`
+  and the schema hash need regenerating.
+- `Code::StrictXConstruct` is gone from `tmark.codes()` and
+  `schema("diagnostic")` — anything on TeXSmith's side keyed on it breaks
+  loudly rather than degrading. `Code::RefUnnumbered` (warning, added
+  just before this round, F8) stays and is now spec-documented: a
+  numeric reference to an anchor with no counter renders the anchor's
+  text instead of `?` / `Figure ?`.
+- The Typst writer's wider escaping (comments, `~`, line-start markers)
+  can change bytes of already-generated `.typ` output; re-render rather
+  than diff against an old artifact.
+- The wheel is `0.1.0` and `from_json`'s minor-version refusal is live
+  for the first time on a real version bump — see the pitfall below.
+- `vendor/tmark` in TeXSmith is still the symlink to `../../tmark`
+  (`pyproject.toml`'s `[tool.uv.sources]` path entry); unchanged, no
+  PyPI release yet.
+
+### Pitfalls learned this round
+
+- **A version bump breaks fixtures, not just code.** Moving the
+  workspace (and the wheel) to `0.1.0` made `tmark.ir.codec.from_json`'s
+  minor-version refusal reject every one of TeXSmith's twelve
+  `tests/passes/*.in.json` fixtures, recorded against the old dev
+  version; they needed a one-line regeneration each (`d8fbdf6`) before
+  the suite was green again. Expect this on every future version bump,
+  not just this one. TeXSmith also hardened the failure mode
+  (`953d46a`): a stale wheel now raises a named `RuntimeError` naming
+  both schema hashes instead of a confusing `decode_document` field
+  error.
+- **A fixture-clean fix can still regress on the corpus.**
+  `fix/spec-code`'s SmartyPants quote-boundary fix (review 07 F2) passed
+  every fixture and broke on real prose: a closing quote followed by an
+  em/en dash (`"…technique"—fitting`) is not
+  `char::is_ascii_punctuation`. Run the corpus loop after any
+  inline-boundary change, not only `cargo test`.
+- **Reviews can be written straight onto the integration branch.**
+  07 and 08 only read; committing them directly to `texsmith-migration`
+  (no worktree) and citing their finding ids from the fix branches' commit
+  bodies made each review's own §Triage table double as the round's task
+  list — no separate tracking file was needed.
+- The MSRV job is real now: `cargo +1.80 check` in CI will fail on a
+  dependency that only builds with a newer resolver; `4f22f38` had to
+  repoint three transitive versions down before this round could pass it.
+
+### What is next
+
+TeXSmith's `specs/merge-tasklist.md` is the live list; as of today it
+still has open, in order: pick the PyPI name (`tmark` is taken elsewhere
+— a user decision, blocking `pyproject.toml` and the module name on both
+sides), tag `v0.1.0`, then merge `texsmith-migration` into `main` with
+green CI. After that, on TeXSmith's side: point `pyproject.toml` at
+`tmark>=0.1,<0.2` from PyPI, drop `vendor/tmark` and its
+`[tool.uv.sources]` entry, move the six `ref: texsmith-migration` lines
+in `.github/workflows/*.yml` to the tag, get CI green, and cut `v0.7.0`.
+Measured today: tmark 340 tests, clippy `-D warnings`, fmt, MSRV 1.80,
+generated artifacts clean; TeXSmith 1347 tests, parity 196 identical / 0
+differing.
 
 ## End of the TeXSmith-migration waves (2026-09-11)
 
@@ -14,7 +147,11 @@ pitfalls still apply.
 ### State of the branch
 
 - Branch `texsmith-migration`, about sixty commits ahead of `main`, **not
-  merged**. `main` is at `9017bda` (end of the M3 round). The next step
+  merged**. [Stale even at the time: `git rev-list --count main..HEAD`
+  read 50 then, not "about sixty"; it is 137 after the round described
+  at the top of this file. Do not trust a commit count in prose —
+  recompute it.] `main` is at
+  `9017bda` (end of the M3 round). The next step
   is a pull request from `texsmith-migration` to `main`, after the
   reviews listed at the end of this handoff. Every wave was developed in
   a worktree (`wt/fixes`, `wt/tables`, `wt/registry`, `wt/writers`,
@@ -307,6 +444,15 @@ resolutions instead. It is not started, and must not land before
   ids restarting per file) all held again.
 
 ### Review mandates before merging to `main`
+
+**Done** (2026-09-14 round, see the new handoff at the top of this file):
+mandate 1 became `design/reviews/07-spec-conformance-migration.md` (0
+blocking, 11 major, 14 minor) plus `08-spec-consistency.md` (5 blocking,
+15 major, 19 minor, a review of the spec's internal consistency that
+mandate 1 did not ask for but the text needed); every finding is triaged
+in both files' own §Triage. Mandates 2–4 (writers-versus-legacy, the
+`tmark-py` API surface, the `Mkdocs` profile) are still open — nothing
+below ran them.
 
 Run these as separate reviewer agents (two at a time, see the rate-limit
 pitfall), each writing `design/reviews/07-…` and following incrementally;
