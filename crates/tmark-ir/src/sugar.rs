@@ -149,22 +149,30 @@ pub fn smart_symbol(text: &str, at: usize) -> Option<(usize, &'static str)> {
 }
 
 /// A straight double-quoted phrase at `at` in `text` (a `"` there): the
-/// byte range of the phrase between the quotes. SmartyPants boundaries
-/// (spec Appendix "PyMdownX compatibility profile", `"quotes"` row): a
-/// quote opens when it starts the run or follows whitespace or an opening
-/// bracket or dash, and is followed by a non-space; a quote closes when it
-/// follows a non-space and is followed by the end, whitespace or
-/// punctuation. Both are read inside one text run, never across a
-/// newline or another inline node, so the closing quote of a phrase that
-/// straddles markup never opens the next pair. Single quotes are not
-/// paired: an apostrophe is not a quote and the legacy extension never
-/// touched them.
+/// byte range of the phrase between the quotes. SmartyPants/Pandoc
+/// boundaries (spec Appendix "PyMdownX compatibility profile", `"quotes"`
+/// row): a quote opens when it starts the run or follows whitespace or an
+/// opening bracket or dash character (`(`, `[`, `{`, `-`, `—`, `–`, `/`),
+/// and is followed by a non-space; a quote closes when it follows a
+/// non-space and is followed by the end of the run, whitespace, or one of
+/// the punctuation characters `.` `,` `;` `:` `!` `?` `)` `]` `}` `-` `—`
+/// `–` `/` `'` (not every ASCII punctuation mark: an em/en dash after a
+/// closing quote, `"…"—`, must close the phrase rather than fall through
+/// to the next quote). A `"` that qualifies as both — between two words
+/// with no spaces on either side is neither, but e.g. between two
+/// dash-adjacent runs it can be — is closing while a pair is open, else
+/// opening; this scan enforces that by only ever testing the opening rule
+/// at `at` and the closing rule while looking for the partner. Both are
+/// read inside one text run, never across a newline or another inline
+/// node, so the closing quote of a phrase that straddles markup never
+/// opens the next pair. Single quotes are not paired: an apostrophe is
+/// not a quote and the legacy extension never touched them.
 pub fn quoted(text: &str, at: usize) -> Option<(usize, usize)> {
     if !text[at..].starts_with('"') {
         return None;
     }
     let opens = text[..at].chars().next_back().map_or(true, |c| {
-        c.is_whitespace() || matches!(c, '(' | '[' | '{' | '-' | '–' | '—')
+        c.is_whitespace() || matches!(c, '(' | '[' | '{' | '-' | '–' | '—' | '/')
     });
     let inner = &text[at + 1..];
     if !opens || inner.starts_with(char::is_whitespace) {
@@ -179,7 +187,25 @@ pub fn quoted(text: &str, at: usize) -> Option<(usize, usize)> {
         let before = inner[..end].chars().next_back();
         let after = inner[end + 1..].chars().next();
         if before.is_some_and(|c| !c.is_whitespace())
-            && after.map_or(true, |c| c.is_whitespace() || c.is_ascii_punctuation())
+            && after.map_or(true, |c| {
+                c.is_whitespace()
+                    || matches!(
+                        c,
+                        '.' | ','
+                            | ';'
+                            | ':'
+                            | '!'
+                            | '?'
+                            | ')'
+                            | ']'
+                            | '}'
+                            | '-'
+                            | '—'
+                            | '–'
+                            | '/'
+                            | '\''
+                    )
+            })
         {
             return Some((at + 1, at + 1 + end));
         }
@@ -253,5 +279,19 @@ mod tests {
             "a\"b is no close"
         );
         assert_eq!(quoted("\"a\nb\"", 0), None, "one line");
+        // A closing quote followed by an em/en dash still closes: the
+        // dash is punctuation, not a letter that would push the pair to
+        // the next quote (regression: b3ad4fa only allowed ASCII
+        // punctuation after a closing quote).
+        assert_eq!(
+            quoted("a \"quotation\"—and b", 2),
+            Some((3, 12)),
+            "closes before an em dash"
+        );
+        assert_eq!(
+            quoted("\"art, craft\"—fitting and \"X\"", 0),
+            Some((1, 11)),
+            "closes before an em dash, not at the next quote"
+        );
     }
 }

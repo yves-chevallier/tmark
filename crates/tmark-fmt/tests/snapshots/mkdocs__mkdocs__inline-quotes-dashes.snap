@@ -1,0 +1,7 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Authors declare what a document element is—"this is a theorem," "this is a section," "this is a quotation"—and let the macros decide.
+
+The root meant "art, craft, technique"—fitting for a craft-based reading. The "answer" is obvious.

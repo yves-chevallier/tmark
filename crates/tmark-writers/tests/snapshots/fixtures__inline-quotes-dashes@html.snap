@@ -1,0 +1,19 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>Authors declare what a document element is—“this is a theorem,” “this is a section,” “this is a quotation”—and let the macros decide.</p>
+<p>The root meant “art, craft, technique”—fitting for a craft-based reading. The “answer” is obvious.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
