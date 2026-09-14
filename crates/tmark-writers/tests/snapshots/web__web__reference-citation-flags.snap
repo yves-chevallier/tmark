@@ -1,0 +1,20 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+---
+press:
+  sources:
+    bibliography:
+      ein05: {type: article, author: "Einstein, Albert", year: 1905, title: Zur Elektrodynamik bewegter Körper}
+      ko20: {type: book, author: "Ada Knuth and Bob Ritchie", year: 2020, title: Systems}
+---
+
+Time is relative (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>) and (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>); as (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>) showed, and (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>, p. 33; <a class="ts-cite" href="#ref-ko20">Knuth 2020</a>), the year (<a class="ts-cite" href="#ref-ein05">1905</a>).
+
+## References
+
+<ol class="ts-bibliography">
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em></li>
+<li id="ref-ko20">Ada Knuth, Bob Ritchie. (2020). <em>Systems</em></li>
+</ol>

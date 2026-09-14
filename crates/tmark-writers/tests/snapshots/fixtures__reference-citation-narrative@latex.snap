@@ -1,0 +1,22 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+As \textcite{ein05} showed, the effect is real \cite[p. 33]{ein05} and dated \citeyear{ein05}; see \textcite{ein05}; \cite{ein05}.
+
+---requires---
+{
+  "packages": [],
+  "fragments": [
+    "ts-bibliography"
+  ],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": true,
+  "citations": [
+    "ein05"
+  ],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

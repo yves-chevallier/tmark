@@ -40,6 +40,7 @@ impl Writer for TypstWriter {
             abbr_keys: abbr::keys(doc),
             tex_logos: logos::enabled(doc),
             lang: refs::language(opts.lang.as_deref(), doc, res),
+            narrative: refs::narrative(opts.citations.narrative, doc),
             container: 0,
         };
         w.blocks(&doc.blocks);
@@ -66,6 +67,8 @@ pub(crate) struct Typst<'a> {
     pub(crate) tex_logos: bool,
     /// The language of the label words (`refs::language`).
     lang: Option<String>,
+    /// A bare `@key` takes `form: "prose"` (`refs::narrative`).
+    narrative: bool,
     /// Depth inside a container: anything that is not the document's
     /// top-level block sequence (block quote, callout, figure, div, tab,
     /// list item, cell, aside, footnote). A `HorizontalRule` there is

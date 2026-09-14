@@ -1,0 +1,14 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+press:
+  features:
+    citations.narrative: true
+  sources:
+    bibliography:
+      ein05: {type: article, author: "Einstein, Albert", year: 1905, title: Zur Elektrodynamik bewegter Körper}
+---
+
+As [^ein05] showed, the effect is real @[ein05, p. 33] and dated @[-ein05]; see @[+ein05; ein05].

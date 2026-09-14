@@ -243,52 +243,63 @@ impl Latex<'_> {
     }
 
     /// `Ref`: labels through `\hyperref`/`\ref`, citations through
-    /// `\cite` (bracketed group) or `\textcite` (bare), glossary terms
-    /// through `\tsgls`, `[?key]` when unresolved.
+    /// `\cite` — or `\textcite` for a `+key` item and for a bare `@key`
+    /// under `citations.narrative` (spec §Cite) — glossary terms through
+    /// `\tsgls`, `[?key]` when unresolved.
     fn reference(&mut self, n: &Ref) {
         self.out.begin(n.meta.id);
-        // Consecutive plain citations merge into one `\cite{k1,k2}`.
+        // Consecutive plain citations of one form merge into one
+        // `\cite{k1,k2}`.
         let mut pending: Vec<String> = Vec::new();
+        let mut pending_narrative = false;
         let mut written = 0usize;
-        let flush = |this: &mut Self, pending: &mut Vec<String>, written: &mut usize| {
-            if pending.is_empty() {
-                return;
-            }
-            if *written > 0 {
-                this.out.push(if n.bracketed { "; " } else { ", " });
-            }
-            *written += 1;
-            let command = if n.bracketed { "cite" } else { "textcite" };
-            if !n.bracketed {
-                this.req.fragment("ts-bibliography");
-            }
-            this.out
-                .push(&format!("\\{command}{{{}}}", pending.join(",")));
-            pending.clear();
-        };
+        let bare_narrative = self.narrative && !n.bracketed;
+        let narrative_of = |item: &tmark_ir::RefItem| item.narrative || bare_narrative;
+        let flush =
+            |this: &mut Self, pending: &mut Vec<String>, written: &mut usize, narrative: bool| {
+                if pending.is_empty() {
+                    return;
+                }
+                if *written > 0 {
+                    this.out.push(if n.bracketed { "; " } else { ", " });
+                }
+                *written += 1;
+                let command = if narrative { "textcite" } else { "cite" };
+                if narrative {
+                    this.req.fragment("ts-bibliography");
+                }
+                this.out
+                    .push(&format!("\\{command}{{{}}}", pending.join(",")));
+                pending.clear();
+            };
         for item in &n.items {
             let resolution = refs::lookup(self.res, n.meta.id, &item.key)
                 .map(|r| r.resolution.clone())
                 .unwrap_or(Resolution::Unresolved);
             if let Resolution::Citation { key } = &resolution {
                 self.req.cite(key);
+                let narrative = narrative_of(item);
                 if item.prefix.is_none() && item.suffix.is_none() && !item.suppress_author {
+                    if pending_narrative != narrative {
+                        flush(self, &mut pending, &mut written, pending_narrative);
+                    }
+                    pending_narrative = narrative;
                     pending.push(key.clone());
                     continue;
                 }
-                flush(self, &mut pending, &mut written);
+                flush(self, &mut pending, &mut written, pending_narrative);
                 if written > 0 {
                     self.out.push(if n.bracketed { "; " } else { ", " });
                 }
                 written += 1;
                 let command = if item.suppress_author {
                     "citeyear"
-                } else if n.bracketed {
-                    "cite"
-                } else {
+                } else if narrative {
                     "textcite"
+                } else {
+                    "cite"
                 };
-                if !n.bracketed {
+                if narrative && !item.suppress_author {
                     self.req.fragment("ts-bibliography");
                 }
                 self.out.push(&format!("\\{command}"));
@@ -305,7 +316,7 @@ impl Latex<'_> {
                 self.out.push(&format!("{{{key}}}"));
                 continue;
             }
-            flush(self, &mut pending, &mut written);
+            flush(self, &mut pending, &mut written, pending_narrative);
             if written > 0 {
                 self.out.push(if n.bracketed { "; " } else { ", " });
             }
@@ -387,7 +398,7 @@ impl Latex<'_> {
                 self.out.push(&escape::prose(suffix));
             }
         }
-        flush(self, &mut pending, &mut written);
+        flush(self, &mut pending, &mut written, pending_narrative);
         self.out.end(n.meta.id);
     }
 

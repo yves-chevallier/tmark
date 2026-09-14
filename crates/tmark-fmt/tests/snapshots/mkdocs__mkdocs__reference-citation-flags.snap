@@ -1,0 +1,13 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+---
+press:
+  sources:
+    bibliography:
+      ein05: {type: article, author: "Einstein, Albert", year: 1905, title: Zur Elektrodynamik bewegter Körper}
+      ko20: {type: book, author: "Ada Knuth and Bob Ritchie", year: 2020, title: Systems}
+---
+
+Time is relative [^ein05] and [^ein05]; as @[+ein05] showed, and @[+ein05, p. 33; ko20], the year @[-ein05].

@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-Slow to talk \cite{ein05}, said the tutor. \cite{ein05,AI2027} He failed the test, \href{https://doi.org/10.1007/s00016-014-0153-5}{10.1007/s00016-014-0153-5} see \cite{AI2027} and \footnote{A real footnote.}.
+As #cite(<ein05>, form: "prose") showed, the effect is real #cite(<ein05>, supplement: [p. 33]) and dated #cite(<ein05>, form: "year"); see #cite(<ein05>, form: "prose")#cite(<ein05>).
 
 ---requires---
 {
@@ -12,8 +12,7 @@ Slow to talk \cite{ein05}, said the tutor. \cite{ein05,AI2027} He failed the tes
   "assets": [],
   "bibliography": true,
   "citations": [
-    "ein05",
-    "AI2027"
+    "ein05"
   ],
   "acronyms": [],
   "index": [],

@@ -27,9 +27,9 @@ pub use tmark_registry::{
 };
 pub use tmark_syntax::{parse, parse_strict, Parsed};
 pub use tmark_writers::{
-    lower_web, write, writer, AssetRef, Backend, Body, Citations, CodeEngine, CodeOptions,
-    HeadingOptions, Lowered, Media, Numbering, RefOptions, Requires, SectionRefs, SourceMap,
-    TypstMath, WebOptions, Writer, WriterOptions,
+    lower_web, write, writer, AssetRef, Backend, Body, CitationOptions, Citations, CodeEngine,
+    CodeOptions, HeadingOptions, Lowered, Media, Numbering, RefOptions, Requires, SectionRefs,
+    SourceMap, TypstMath, WebOptions, Writer, WriterOptions,
 };
 
 /// The JSON schema of a public shape, by name: the ones of `tmark_ir::schema`

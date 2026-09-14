@@ -1321,7 +1321,7 @@ impl<'a> Lowerer<'a> {
             .iter()
             .all(|(_, res)| matches!(res, Resolution::Citation { .. }));
         if self.opts.citations == Citations::Passthrough && all_citations && !items.is_empty() {
-            return pandoc(r);
+            return pandoc(r, refs::narrative(None, self.main));
         }
         if let Some(text) = self.plural_labels(&items) {
             return text;
@@ -1691,11 +1691,19 @@ fn destination(url: &str) -> String {
     }
 }
 
-/// Pandoc's spelling of a citation group (`mkdocs-bibtex`).
-fn pandoc(r: &Ref) -> String {
+/// Pandoc's spelling of a citation group (`mkdocs-bibtex`). Pandoc's bare
+/// `@key` (`@key [locator]`) is the narrative citation, so a bare TMark
+/// `@key` is `[@key]` unless `citations.narrative` is on, and a lone
+/// `+key` item is Pandoc's bare form (spec §Cite, C51). Inside a group
+/// Pandoc has no narrative flag: `+` is dropped there.
+fn pandoc(r: &Ref, narrative: bool) -> String {
     if let [item] = r.items.as_slice() {
-        if !r.bracketed && item.prefix.is_none() && item.suffix.is_none() && !item.suppress_author {
-            return format!("@{}", item.key);
+        let narrative = item.narrative || (narrative && !r.bracketed);
+        if narrative && item.prefix.is_none() && !item.suppress_author {
+            return match &item.suffix {
+                Some(suffix) => format!("@{} [{suffix}]", item.key),
+                None => format!("@{}", item.key),
+            };
         }
     }
     let items: Vec<String> = r.items.iter().map(pandoc_item).collect();
@@ -1776,8 +1784,16 @@ mod tests {
             key: "ein05".into(),
             ..Default::default()
         });
-        assert_eq!(pandoc(&r), "@ein05");
+        assert_eq!(pandoc(&r, false), "[@ein05]");
+        assert_eq!(pandoc(&r, true), "@ein05");
         r.bracketed = true;
+        assert_eq!(pandoc(&r, true), "[@ein05]");
+        r.items[0].narrative = true;
+        assert_eq!(pandoc(&r, false), "@ein05");
+        r.items[0].suffix = Some("p. 3".into());
+        assert_eq!(pandoc(&r, false), "@ein05 [p. 3]");
+        r.items[0].narrative = false;
+        r.items[0].suffix = None;
         r.items[0].suffix = Some("p. 3".into());
         r.items.push(RefItem {
             key: "ko20".into(),
@@ -1785,6 +1801,6 @@ mod tests {
             suppress_author: true,
             ..Default::default()
         });
-        assert_eq!(pandoc(&r), "[@ein05, p. 3; see -@ko20]");
+        assert_eq!(pandoc(&r, true), "[@ein05, p. 3; see -@ko20]");
     }
 }

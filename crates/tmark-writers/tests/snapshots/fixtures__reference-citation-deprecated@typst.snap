@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-Slow to talk \[?ein05\], said the tutor. \[?ein05\]; \[?AI2027\] He failed the test, #link("https://doi.org/10.1007/s00016-014-0153-5")[10.1007/s00016-014-0153-5] see \[?AI2027\] and #footnote[A real footnote.].
+Slow to talk #cite(<ein05>), said the tutor. #cite(<ein05>)#cite(<AI2027>) He failed the test, #link("https://doi.org/10.1007/s00016-014-0153-5")[10.1007/s00016-014-0153-5] see #cite(<AI2027>) and #footnote[A real footnote.].
 
 ---requires---
 {
@@ -10,8 +10,11 @@ Slow to talk \[?ein05\], said the tutor. \[?ein05\]; \[?AI2027\] He failed the t
   "fragments": [],
   "shell_escape": false,
   "assets": [],
-  "bibliography": false,
-  "citations": [],
+  "bibliography": true,
+  "citations": [
+    "ein05",
+    "AI2027"
+  ],
   "acronyms": [],
   "index": [],
   "counters": []

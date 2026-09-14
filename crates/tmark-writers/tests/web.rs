@@ -439,15 +439,33 @@ fn citations_passthrough_for_mkdocs_bibtex() {
             ..WebOptions::default()
         },
     );
+    // Pandoc's bare `@key` is narrative; TMark's is the short form.
     assert!(
         lowered
             .text
-            .ends_with("Cite @ein05, [@ein05, p. 33; see -@ko20] and [?nope].\n"),
+            .ends_with("Cite [@ein05], [@ein05, p. 33; see -@ko20] and [?nope].\n"),
         "{}",
         lowered.text
     );
     assert!(lowered.bibliography.is_none());
     assert!(!lowered.text.contains("References"));
+    // Under `citations.narrative` the bare key is Pandoc's bare key.
+    let narrative = lower_with(
+        &format!("---\npress:\n  features:\n    citations.narrative: true\n---\n\n{text}"),
+        &rows_loader(),
+        site_options("page.md"),
+        &WebOptions {
+            citations: Citations::Passthrough,
+            ..WebOptions::default()
+        },
+    );
+    assert!(
+        narrative
+            .text
+            .ends_with("Cite @ein05, [@ein05, p. 33; see -@ko20] and [?nope].\n"),
+        "{}",
+        narrative.text
+    );
 }
 
 #[test]

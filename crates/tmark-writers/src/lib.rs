@@ -187,6 +187,18 @@ pub struct TypstOptions {
     pub math: TypstMath,
 }
 
+/// `citations.*` options: how a bare `@key` reads (spec §Cite, C51).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CitationOptions {
+    /// `Some(true)` renders a bare `@key` as the narrative citation
+    /// (`\textcite`, `#cite(…, form: "prose")`), `Some(false)` as the
+    /// short one (`\cite`, `#cite`); `None` follows the front matter's
+    /// `citations.narrative` feature, else the registry default (off).
+    /// `@[key]` is parenthetical whatever the setting.
+    pub narrative: Option<bool>,
+}
+
 /// Everything a writer is told besides the document and its resolution.
 /// A plain struct (design 07): anything needing knowledge of a template is
 /// a fragment contract, not an option.
@@ -205,6 +217,7 @@ pub struct WriterOptions {
     /// `Counter::tmark_numbered`.
     pub numbering: BTreeMap<String, Numbering>,
     pub typst: TypstOptions,
+    pub citations: CitationOptions,
     /// Record output ranges in [`Body::map`]; off leaves the map empty.
     pub source_map: bool,
 }
