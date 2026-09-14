@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "TMark registries: counters, labels, citations and includes resolved from the IR"
 
 [features]
 # Off by default so that feature unification through tmark-lint and
@@ -15,9 +16,9 @@ fs = []
 
 [dependencies]
 # The IR the registries are built from.
-tmark-ir = { path = "../tmark-ir" }
+tmark-ir = { path = "../tmark-ir", version = "0.1.0" }
 # Included files are parsed here (design/06-registries.md §Includes).
-tmark-syntax = { path = "../tmark-syntax" }
+tmark-syntax = { path = "../tmark-syntax", version = "0.1.0" }
 # Inventories are JSON with a schema (design/06-registries.md §Inventory format).
 serde = { workspace = true }
 serde_json = { workspace = true }

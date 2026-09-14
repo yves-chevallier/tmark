@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, texsmith-migration]
+    tags: ["v*"]
   pull_request:
 
 jobs:
@@ -26,6 +27,25 @@ jobs:
           cargo run -q -p tmark-ir --example schema
           cargo run -q -p tmark-ir --example registries
           git diff --exit-code
+
+  msrv:
+    # AGENTS.md pins `rust-version = "1.80"` in the workspace Cargo.toml;
+    # this job holds the workspace to it (build and test only — clippy and
+    # fmt are the stable job's job) so a newer-std construct like
+    # `Option::is_none_or` (see design/13-handoff.md "Pitfalls learned")
+    # cannot creep back in unnoticed.
+    name: cargo test (MSRV 1.80)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.80
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      - name: Check
+        run: cargo check --workspace --all-targets
+      - name: Test
+        run: cargo test --workspace
 
   python:
     name: tmark-py wheel and tests
