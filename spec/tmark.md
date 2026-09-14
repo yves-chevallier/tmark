@@ -2396,6 +2396,7 @@ Table: The diagnostics, by stage. {#tbl:diagnostics}
 | `ref-unresolved` | warning | a key found in no registry; renders `[?key]` | §@[sec:lookup] |
 | `ref-ambiguous` | warning | a key that is both a label and a bibliography key | §@[sec:lookup] |
 | `ref-implicit-id` | hint | a reference to a heading's implicit id | §@[sec:structure] |
+| `ref-unnumbered` | warning | a numeric reference (`@id`, `[](#id)`) to an anchor whose host has no counter; renders the anchor's text or its id | §@[sec:references] |
 | `prefix-unknown` | warning | a counter item, or a `#{…}`, whose prefix is not declared | §@[sec:references] |
 | `prefix-host-mismatch` | warning | a predeclared prefix on the wrong host | §@[sec:references] |
 | `label-duplicate` | warning | the same id defined twice | §@[sec:references] |
