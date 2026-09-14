@@ -73,8 +73,11 @@ pub fn analyse(
 /// node of `doc`: the node reprinted in its canonical spelling (design 05
 /// §Fixes: "rewriting a deprecated spelling is safe"). Diagnostics that
 /// already carry a fix, or whose span is not a node (front-matter keys),
-/// are left alone.
-pub fn fixes(doc: &Document, diagnostics: &mut [Diagnostic]) {
+/// are left alone. `text` is the source of `doc`'s own file: a replacement
+/// that opens with `@` right after a byte the X4 guard blocks
+/// (`sortie[^key]` → `sortie @key`) gets the space the printer would give
+/// it, since `@` never fires after a word character.
+pub fn fixes(doc: &Document, text: &str, diagnostics: &mut [Diagnostic]) {
     for d in diagnostics
         .iter_mut()
         .filter(|d| d.code == ir::Code::Deprecated && d.fix.is_none())
@@ -85,12 +88,21 @@ pub fn fixes(doc: &Document, diagnostics: &mut [Diagnostic]) {
                 node = Some(n);
             }
         });
-        if let Some(node) = node {
-            d.fix = Some(ir::Fix {
-                span: d.span,
-                replacement: print_node(node),
-            });
+        let Some(node) = node else {
+            continue;
+        };
+        let mut replacement = print_node(node);
+        let before = text
+            .get(..d.span.start as usize)
+            .and_then(|t| t.chars().next_back())
+            .filter(|_| d.span.file == doc.file);
+        if replacement.starts_with('@') && before.is_some_and(tmark_fmt::blocks_sigil) {
+            replacement.insert(0, ' ');
         }
+        d.fix = Some(ir::Fix {
+            span: d.span,
+            replacement,
+        });
     }
 }
 
@@ -136,6 +148,6 @@ pub fn check(
     let (_, analysis) = analyse(&parsed.document, text, loader, options, lint_config);
     let mut diagnostics = parsed.diagnostics;
     diagnostics.extend(analysis);
-    fixes(&parsed.document, &mut diagnostics);
+    fixes(&parsed.document, text, &mut diagnostics);
     (parsed.document, diagnostics)
 }

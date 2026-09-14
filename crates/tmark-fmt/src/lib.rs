@@ -18,6 +18,7 @@ mod out;
 use tmark_ir::Document;
 
 pub use edit::{edit, edit_many, print_node, print_node_with, EditError, NodeEdit, Replacement};
+pub use inline::blocks_sigil;
 
 /// Which spellings the printer emits. Design `04-printer.md` §Profiles.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]

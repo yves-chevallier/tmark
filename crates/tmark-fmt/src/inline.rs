@@ -538,14 +538,15 @@ fn is_bare_key(key: &str) -> bool {
         })
 }
 
+/// The X4 guard (spec §Lexical grammar): `@` fires only after a non-word
+/// character that is not one of `@/:.-`, so a reference printed right after
+/// such a character (`text.` then `[^key]`) needs a space before its sigil.
+pub fn blocks_sigil(prev: char) -> bool {
+    prev.is_alphanumeric() || matches!(prev, '_' | '@' | '/' | ':' | '.' | '-')
+}
+
 fn reference(out: &mut Out, items: &[RefItem], bracketed: bool) {
-    // The X4 guard: `@` fires only after a non-word character that is not
-    // one of `@/:.-` (spec §Lexical grammar). A reference printed right
-    // after such a character (`text.` then `[^key]`) gets a space.
-    if out
-        .last_char()
-        .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '@' | '/' | ':' | '.' | '-'))
-    {
+    if out.last_char().is_some_and(blocks_sigil) {
         out.push(" ");
     }
     if let [item] = items {
