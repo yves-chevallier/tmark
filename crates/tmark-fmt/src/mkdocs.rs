@@ -378,8 +378,17 @@ pub fn reference(out: &mut Out, items: &[RefItem]) -> bool {
             out.push(")");
             true
         }
+        // The footnote spellings take the bare-key class of §Ref
+        // (`[A-Za-z0-9_:.-]`); a key outside it (an implicit id of an
+        // accented heading, which the printer cannot tell from a
+        // bibliography key) keeps `@[key]`.
         _ if registries.iter().all(|r| *r == Registry::Bibliography)
-            && !items.iter().any(|i| lookup.footnotes.contains(&i.key)) =>
+            && !items.iter().any(|i| lookup.footnotes.contains(&i.key))
+            && items.iter().all(|i| {
+                i.key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | ':' | '.' | '-'))
+            }) =>
         {
             if let [item] = items {
                 out.push("[^");

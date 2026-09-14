@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-#link("b c")[a] #link("e)f")[d] #link(<h-i>)[g] #box(image("k l.png", height: 1em)) #link("n(o)p")[m]
+#link("b c")[a] #link("e)f")[d] #link(<h-i-aba1d4>)[g] #box(image("k l.png", height: 1em)) #link("n(o)p")[m]
 
 ---requires---
 {
