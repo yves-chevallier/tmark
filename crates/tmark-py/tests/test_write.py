@@ -98,6 +98,33 @@ def test_write_validates_options(parsed):
         tmark.write(parsed, "latex", resolved={"labels": []})
 
 
+CITED = """---
+press:
+  sources:
+    bibliography:
+      ein05: {type: article, author: "Einstein, Albert", year: 1905, title: Zur Elektrodynamik}
+---
+
+Cite @ein05, @[ein05] and @[+ein05].
+"""
+
+
+def test_citations_option_beats_the_front_matter():
+    # Spec §Cite (C51): a bare `@key` is the short citation unless the
+    # document, or this option, says narrative; `@[key]` and `+key` read
+    # as written either way.
+    doc = tmark.parse(CITED)
+    assert "Cite \\cite{ein05}, \\cite{ein05} and \\textcite{ein05}." in tmark.write(doc, "latex")["text"]
+    narrative = tmark.write(doc, "latex", {"citations": {"narrative": True}})["text"]
+    assert "Cite \\textcite{ein05}, \\cite{ein05} and \\textcite{ein05}." in narrative
+    switched = tmark.parse(CITED.replace("press:\n", "press:\n  features: {citations.narrative: true}\n"))
+    assert "\\textcite{ein05}, \\cite{ein05}" in tmark.write(switched, "latex")["text"]
+    assert "\\cite{ein05}, \\cite{ein05}" in tmark.write(switched, "latex", {"citations": {"narrative": False}})["text"]
+    assert 'form: "prose"' in tmark.write(doc, "typst", {"citations": {"narrative": True}})["text"]
+    with pytest.raises(TypeError, match="unknown key `citations.style`"):
+        tmark.write(doc, "latex", {"citations": {"style": "short"}})
+
+
 def test_write_loads_includes_through_the_loader():
     class L:
         def __init__(self):

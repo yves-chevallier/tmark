@@ -122,7 +122,7 @@ fn one(out: &mut Out, inline: &Inline, ctx: Context, next: Option<char>) {
             out.push(fence);
         }
         Inline::Link(n) => link(out, n, ctx),
-        Inline::Ref(n) => reference(out, &n.items),
+        Inline::Ref(n) => reference(out, &n.items, n.bracketed),
         Inline::Note(n) => match &n.label {
             Some(label) => {
                 out.push("[^");
@@ -518,7 +518,9 @@ pub fn destination(u: &str) -> String {
     }
 }
 
-/// `@key` when one plain item; `@[…]` otherwise (spec §Ref).
+/// `@key` when one plain item written bare; `@[…]` otherwise (spec §Ref:
+/// a lone `@[key]` keeps its brackets, which carry the parenthetical
+/// meaning of a citation under `citations.narrative`, C51).
 /// A key the bare `@key` grammar accepts (spec §Lexical grammar): a letter,
 /// then `[\w:.-]`, ending on an alphanumeric; `doi:` keys and URLs may hold
 /// `/`. Anything else (a digit-initial Zotero key, C27) prints bracketed,
@@ -536,20 +538,23 @@ fn is_bare_key(key: &str) -> bool {
         })
 }
 
-fn reference(out: &mut Out, items: &[RefItem]) {
-    // The X4 guard: `@` fires only after a non-word character that is not
-    // one of `@/:.-` (spec §Lexical grammar). A reference printed right
-    // after such a character (`text.` then `[^key]`) gets a space.
-    if out
-        .last_char()
-        .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '@' | '/' | ':' | '.' | '-'))
-    {
+/// The X4 guard (spec §Lexical grammar): `@` fires only after a non-word
+/// character that is not one of `@/:.-`, so a reference printed right after
+/// such a character (`text.` then `[^key]`) needs a space before its sigil.
+pub fn blocks_sigil(prev: char) -> bool {
+    prev.is_alphanumeric() || matches!(prev, '_' | '@' | '/' | ':' | '.' | '-')
+}
+
+fn reference(out: &mut Out, items: &[RefItem], bracketed: bool) {
+    if out.last_char().is_some_and(blocks_sigil) {
         out.push(" ");
     }
     if let [item] = items {
-        if item.prefix.is_none()
+        if !bracketed
+            && item.prefix.is_none()
             && item.suffix.is_none()
             && !item.suppress_author
+            && !item.narrative
             && is_bare_key(&item.key)
         {
             out.push("@");
@@ -568,6 +573,8 @@ fn reference(out: &mut Out, items: &[RefItem]) {
             }
             if item.suppress_author {
                 s.push('-');
+            } else if item.narrative {
+                s.push('+');
             }
             s.push_str(&item.key);
             if let Some(suffix) = &item.suffix {

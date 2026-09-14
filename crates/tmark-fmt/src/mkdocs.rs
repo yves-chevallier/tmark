@@ -131,6 +131,7 @@ fn plain_item(item: &RefItem) -> bool {
     item.prefix.is_none()
         && item.suffix.is_none()
         && !item.suppress_author
+        && !item.narrative
         && !item.key.is_empty()
         && !item
             .key

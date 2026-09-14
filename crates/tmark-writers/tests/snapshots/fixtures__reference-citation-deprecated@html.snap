@@ -2,10 +2,16 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-<p>Slow to talk <span class="unresolved">[?ein05]</span>, said the tutor. <span class="unresolved">[?ein05]</span>; <span class="unresolved">[?AI2027]</span> He failed the test, <a href="https://doi.org/10.1007/s00016-014-0153-5">doi:10.1007/s00016-014-0153-5</a> see <span class="unresolved">[?AI2027]</span> and <sup class="footnote-ref"><a href="#fn-note" id="fnref-note">1</a></sup>.</p>
+<p>Slow to talk <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>)</span>, said the tutor. <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>; <a href="#ref-AI2027">Kokotajlo 2025</a>)</span> He failed the test, <a href="https://doi.org/10.1007/s00016-014-0153-5">doi:10.1007/s00016-014-0153-5</a> see <span class="citation">(<a href="#ref-AI2027">Kokotajlo 2025</a>)</span> and <sup class="footnote-ref"><a href="#fn-note" id="fnref-note">1</a></sup>.</p>
 <section class="footnotes">
 <ol>
 <li id="fn-note">A real footnote. <a href="#fnref-note" class="footnote-backref">↩</a></li>
+</ol>
+</section>
+<section class="bibliography">
+<ol>
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em></li>
+<li id="ref-AI2027">Kokotajlo, Daniel. (2025). <em>AI 2027</em></li>
 </ol>
 </section>
 
@@ -15,8 +21,11 @@ expression: snapshot
   "fragments": [],
   "shell_escape": false,
   "assets": [],
-  "bibliography": false,
-  "citations": [],
+  "bibliography": true,
+  "citations": [
+    "ein05",
+    "AI2027"
+  ],
   "acronyms": [],
   "index": [],
   "counters": []

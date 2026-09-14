@@ -1,0 +1,25 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>As <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>)</span> showed, the effect is real <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>, p. 33)</span> and dated <span class="citation">(<a href="#ref-ein05">1905</a>)</span>; see <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>; <a href="#ref-ein05">Einstein 1905</a>)</span>.</p>
+<section class="bibliography">
+<ol>
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em></li>
+</ol>
+</section>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": true,
+  "citations": [
+    "ein05"
+  ],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

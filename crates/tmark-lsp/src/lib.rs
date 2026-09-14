@@ -303,7 +303,7 @@ impl Server {
             serde_json::from_str(&text).ok()
         });
         let mut parsed = tmark::parse_with(&text, FileId::default(), config.profile);
-        tmark::fixes(&parsed.document, &mut parsed.diagnostics);
+        tmark::fixes(&parsed.document, &text, &mut parsed.diagnostics);
         let index = LineIndex::new(&text);
         let analysis = self.docs.remove(uri.as_str()).and_then(|old| old.analysis);
         let doc = Doc {

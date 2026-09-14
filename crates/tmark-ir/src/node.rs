@@ -188,9 +188,13 @@ pub struct RefItem {
     /// Text before the key (`see`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
-    /// `@[-key]`.
+    /// `@[-key]`: the year alone.
     #[serde(default, skip_serializing_if = "is_false")]
     pub suppress_author: bool,
+    /// `@[+key]`: the narrative citation, whatever the document default
+    /// (spec §Cite, C51).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub narrative: bool,
     /// The key as written, prefix included (`fig:boot`, `ein05`, `Fig:x`).
     pub key: String,
     /// Source range of `key` alone: no `@`, `-`, prefix or suffix (spec

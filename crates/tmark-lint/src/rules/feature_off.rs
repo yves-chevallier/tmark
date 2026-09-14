@@ -2,7 +2,7 @@
 //! literal text: `^^x^^` without `inline.insert` (spec §Inline text,
 //! §Feature registry).
 
-use tmark_ir::{registry, Code, Diagnostic};
+use tmark_ir::{Code, Diagnostic};
 
 use super::{strings, sub_span};
 use crate::{Context, Rule};
@@ -41,12 +41,7 @@ impl Rule for FeatureOff {
     }
 
     fn check(&self, ctx: &Context, out: &mut Vec<Diagnostic>) {
-        let features = &ctx.doc.front_matter.keys.press.features;
-        let insert_on = features
-            .get("inline.insert")
-            .copied()
-            .unwrap_or_else(|| registry::feature("inline.insert").is_some_and(|f| f.default));
-        if insert_on {
+        if ctx.doc.front_matter.keys.press.feature("inline.insert") {
             return;
         }
         strings(ctx.doc, |text, span| {

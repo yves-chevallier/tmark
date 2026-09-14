@@ -102,6 +102,9 @@ def test_fixes_is_what_lint_fix_writes(fixture_inputs, fixture):
     fixed = tmark.fixes(text, loader=NoFiles())
     assert fixed == fixture("include")
     assert tmark.fixes("plain\n") == "plain\n"
+    # A citation hugging the word before it gets the space `@` needs
+    # (the X4 guard); the sugar was the short form, so the fix is `@key`.
+    assert tmark.fixes("En sortie[^spru485a] et [^ein05].\n") == "En sortie @spru485a et @ein05.\n"
 
 
 class NoFiles:

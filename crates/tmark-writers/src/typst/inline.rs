@@ -224,7 +224,9 @@ impl Typst<'_> {
 
     /// `Ref`: `#link(<key>)[Label]` for TMark-numbered series,
     /// `#ref(<key>)` for backend-numbered ones, `#cite(<key>)` for
-    /// citations, `#ts-gls("term")`, `[?key]` when unresolved.
+    /// citations (`form: "prose"` for a `+key` item and for a bare `@key`
+    /// under `citations.narrative`, spec §Cite), `#ts-gls("term")`,
+    /// `[?key]` when unresolved.
     fn reference(&mut self, n: &Ref) {
         self.out.begin(n.meta.id);
         for (written, item) in n.items.iter().enumerate() {
@@ -310,7 +312,7 @@ impl Typst<'_> {
                     }
                     if item.suppress_author {
                         args.push("form: \"year\"".to_string());
-                    } else if !n.bracketed {
+                    } else if item.narrative || (self.narrative && !n.bracketed) {
                         args.push("form: \"prose\"".to_string());
                     }
                     if let Some(prefix) = &item.prefix {

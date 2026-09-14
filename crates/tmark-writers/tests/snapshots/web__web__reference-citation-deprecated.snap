@@ -2,6 +2,21 @@
 source: crates/tmark-writers/tests/web.rs
 expression: snapshot
 ---
-Slow to talk [?ein05], said the tutor. [?ein05]; [?AI2027] He failed the test, [doi:10.1007/s00016-014-0153-5](https://doi.org/10.1007/s00016-014-0153-5) see [?AI2027] and [^note].
+---
+press:
+  sources:
+    bibliography:
+      ein05: {type: article, author: "Einstein, Albert", year: 1905, title: Zur Elektrodynamik bewegter Körper}
+      AI2027: {type: report, author: "Kokotajlo, Daniel", year: 2025, title: AI 2027}
+---
+
+Slow to talk (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>), said the tutor. (<a class="ts-cite" href="#ref-ein05">Einstein 1905</a>; <a class="ts-cite" href="#ref-AI2027">Kokotajlo 2025</a>) He failed the test, [doi:10.1007/s00016-014-0153-5](https://doi.org/10.1007/s00016-014-0153-5) see (<a class="ts-cite" href="#ref-AI2027">Kokotajlo 2025</a>) and [^note].
 
 [^note]: A real footnote.
+
+## References
+
+<ol class="ts-bibliography">
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em></li>
+<li id="ref-AI2027">Kokotajlo, Daniel. (2025). <em>AI 2027</em></li>
+</ol>

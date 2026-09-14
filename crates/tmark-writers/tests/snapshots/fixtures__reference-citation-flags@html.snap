@@ -1,0 +1,27 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<p>Time is relative <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>)</span> and <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>)</span>; as <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>)</span> showed, and <span class="citation">(<a href="#ref-ein05">Einstein 1905</a>, p. 33; <a href="#ref-ko20">Knuth 2020</a>)</span>, the year <span class="citation">(<a href="#ref-ein05">1905</a>)</span>.</p>
+<section class="bibliography">
+<ol>
+<li id="ref-ein05">Einstein, Albert. (1905). <em>Zur Elektrodynamik bewegter Körper</em></li>
+<li id="ref-ko20">Ada Knuth, Bob Ritchie. (2020). <em>Systems</em></li>
+</ol>
+</section>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [],
+  "bibliography": true,
+  "citations": [
+    "ein05",
+    "ko20"
+  ],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}

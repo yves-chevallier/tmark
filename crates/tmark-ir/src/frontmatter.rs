@@ -170,6 +170,16 @@ impl Press {
             && self.sources.is_empty()
             && self.features.is_empty()
     }
+
+    /// The switch `name` (spec §Feature registry): the front matter's
+    /// value, else the registry default; off for a name the registry does
+    /// not know.
+    pub fn feature(&self, name: &str) -> bool {
+        self.features
+            .get(name)
+            .copied()
+            .unwrap_or_else(|| crate::registry::feature(name).is_some_and(|f| f.default))
+    }
 }
 
 /// `declare`: what things *are*. Spec §Front matter, §Counters, §Admonition,

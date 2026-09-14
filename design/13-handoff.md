@@ -174,7 +174,24 @@ resolutions instead. It is not started, and must not land before
   `GlossaryDecl {style, groups, entries}`, whichever spelling the author
   used — so `passes/glossary.py`, which normalised the structured section
   into a flat mapping before resolution, is reading a typed object now and
-  has nothing left to normalise.
+  has nothing left to normalise. C51 added one: `RefItem.narrative`
+  (`@[+key]`, the narrative citation whatever the document default), a
+  boolean absent when false, so `model.py` and the schema hash are
+  regenerated again; nothing in TeXSmith's passes reads it.
+- **Citation forms (C51).** A bare `@key` is now the short citation on
+  every backend (`\cite`, `#cite(<key>)`), the same as `@[key]`; the
+  feature `citations.narrative` (a `press.features` entry, no schema
+  change) makes the bare form `\textcite` / `form: "prose"`, and `+key`
+  does so per item. `tmark.write` accepts `options["citations"]
+  ["narrative"]` as an override (the precedence of `lang`); TeXSmith's
+  `build_writer_options` may pass it from a CLI or template setting, or
+  leave the front matter to decide. `tmark.registries()["features"]`
+  lists the new row. TeXSmith's `docs/syntax/references.md` (line ~119)
+  and `docs/guide/features/bibliography.md` (line ~91) still say "`@key`
+  is the in-text (narrative) citation": they must state the new rule and
+  the switch. The `[^key]` fix now also inserts a space when the sugar
+  hugs a word (`sortie[^key]` → `sortie @key`), which the earlier fixer
+  got wrong on a real corpus.
 - **`Requires` and `FRAGMENTS`.** A writer names the contracts it used
   in `Requires.fragments` and the structural packages in
   `Requires.packages`; TeXSmith's fragment loader reads

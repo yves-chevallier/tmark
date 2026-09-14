@@ -50,6 +50,7 @@ impl Writer for LatexWriter {
             abbr_keys: abbr::keys(doc),
             lang: refs::language(opts.lang.as_deref(), doc, res),
             tex_logos: logos::enabled(doc),
+            narrative: refs::narrative(opts.citations.narrative, doc),
         };
         w.blocks(&doc.blocks);
         w.req.close();
@@ -90,6 +91,8 @@ pub(crate) struct Latex<'a> {
     pub(crate) tex_logos: bool,
     /// The language of the label words (`refs::language`).
     lang: Option<String>,
+    /// A bare `@key` is `\textcite` rather than `\cite` (`refs::narrative`).
+    narrative: bool,
 }
 
 impl Latex<'_> {

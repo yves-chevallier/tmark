@@ -40,6 +40,15 @@ pub fn language(option: Option<&str>, doc: &tmark_ir::Document, res: &Resolved) 
         .or_else(|| doc.front_matter.keys.lang.clone())
 }
 
+/// Whether a bare `@key` is the narrative citation (spec §Cite, C51):
+/// `WriterOptions::citations.narrative`, else the front matter's
+/// `citations.narrative` feature, else the registry default (off) — the
+/// precedence of [`language`], minus the resolution, which does not read
+/// the switch.
+pub fn narrative(option: Option<bool>, doc: &tmark_ir::Document) -> bool {
+    option.unwrap_or_else(|| doc.front_matter.keys.press.feature("citations.narrative"))
+}
+
 /// The label word of a series as the reference wants it: the counter's
 /// own `name`, re-localised into `lang` when the resolution had left it at
 /// the registry's word for the resolution's own language
