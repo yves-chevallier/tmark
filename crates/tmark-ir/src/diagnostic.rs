@@ -150,9 +150,6 @@ pub enum Code {
     PositionWord,
     /// Spec §Anchor: a caption id without the recommended prefix.
     CaptionIdOffConvention,
-    /// Spec §Conformance and deviations: an X-class construct under the
-    /// strict profile.
-    StrictXConstruct,
     /// Appendix "Deprecation schedule": a deprecated front-matter key.
     DeprecatedFrontmatterKey,
     /// Spec §Para: a leading strong span promoted to a lead-in.
@@ -227,7 +224,6 @@ impl Code {
         Code::HardcodedNumber,
         Code::PositionWord,
         Code::CaptionIdOffConvention,
-        Code::StrictXConstruct,
         Code::DeprecatedFrontmatterKey,
         Code::LeadPromotion,
         Code::HeadingSkip,
@@ -284,7 +280,6 @@ impl Code {
             Code::HardcodedNumber => "hardcoded-number",
             Code::PositionWord => "position-word",
             Code::CaptionIdOffConvention => "caption-id-off-convention",
-            Code::StrictXConstruct => "strict-x-construct",
             Code::DeprecatedFrontmatterKey => "deprecated-frontmatter-key",
             Code::LeadPromotion => "lead-promotion",
             Code::HeadingSkip => "heading-skip",
@@ -302,7 +297,6 @@ impl Code {
         match self {
             Code::FrontmatterYaml
             | Code::FrontmatterUnknownKey
-            | Code::StrictXConstruct
             | Code::ParseInternal
             | Code::TableYaml
             | Code::TableUnknownKey
@@ -388,7 +382,6 @@ impl Code {
             Code::HardcodedNumber
             | Code::PositionWord
             | Code::CaptionIdOffConvention
-            | Code::StrictXConstruct
             | Code::DeprecatedFrontmatterKey
             | Code::LeadPromotion
             | Code::HeadingSkip
@@ -449,9 +442,6 @@ impl Code {
             Code::PositionWord => "Spec §Ref: \"above\" or \"below\" used as a reference",
             Code::CaptionIdOffConvention => {
                 "Spec §Anchor: a caption id without the recommended prefix"
-            }
-            Code::StrictXConstruct => {
-                "Spec §Conformance and deviations: an X-class construct under the strict profile"
             }
             Code::DeprecatedFrontmatterKey => {
                 "Appendix \"Deprecation schedule\": a deprecated front-matter key"

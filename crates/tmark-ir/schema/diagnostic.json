@@ -308,13 +308,6 @@
           ]
         },
         {
-          "description": "Spec §Conformance and deviations: an X-class construct under the strict profile.",
-          "type": "string",
-          "enum": [
-            "strict-x-construct"
-          ]
-        },
-        {
           "description": "Appendix \"Deprecation schedule\": a deprecated front-matter key.",
           "type": "string",
           "enum": [
