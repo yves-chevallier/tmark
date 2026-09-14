@@ -1,0 +1,5 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+Le code est écrit en C\+\+03 alors que le C\+\+ moderne utilise i\+\+, jamais a \+\+ b, sauf pour ++ctrl+c++ qui reste un raccourci.
