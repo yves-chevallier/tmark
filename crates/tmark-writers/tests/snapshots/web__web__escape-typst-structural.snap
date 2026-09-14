@@ -1,0 +1,17 @@
+---
+source: crates/tmark-writers/tests/web.rs
+expression: snapshot
+---
+Ratio a // b and the rest.
+
+Block comment attempt: a /\* b \*/ c.
+
+= Not a heading, just a sentence starting with an equals sign.
+
+\- Not a bullet, just a sentence starting with a hyphen.
+
+\+ Not an enum item, just a sentence starting with a plus.
+
+/ term: not a term list, just prose starting with a slash.
+
+A tilde example: 10\~cm should stay a plain tilde.

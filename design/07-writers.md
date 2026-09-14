@@ -460,3 +460,20 @@ and options, §2 the LaTeX catalogue, §4 Typst math), the contract names of
   keeps writing ids only when explicit: the site's slugifier owns the rest.
 - `ProgressBar` values are fractions with at most four decimals
   (`text::trim_float`); the label defaults to the percentage.
+- The Typst escaper (`typst/escape.rs::markup`) escapes more than
+  TeXSmith's fixed `_ESCAPE_CHARS` table, because a plain `Str` can contain
+  bytes that table never had to cover: `~` unconditionally (a non-breaking
+  space in markup); a `/` immediately before another `/` or `*`, anywhere
+  in the text, because `//`/`/*` open a comment at any position and would
+  otherwise silently eat the rest of the line or a block; and `=`, `+`,
+  `-` or `/` at the start of the text (position 0, and again right after
+  an embedded `\n`) when they would be read as a heading, a list, an enum
+  or a term-list marker — Typst's "start of line" also includes the start
+  of any markup content block (`#footnote[= x]`, a table cell, a link's
+  content), not only a paragraph or a soft/hard break, so escaping
+  position 0 unconditionally is a safe superset rather than an attempt at
+  exact context tracking. `=` is escaped whenever leading, since a heading
+  marker is a run of one or more `=`; `+`, `-` and `/` only when followed
+  by a space, so a leading `-5` keeps Typst's own minus-sign substitution
+  and a leading `a--b` keeps its en-dash conversion. Verified against
+  typst 0.15.1 (fixture `escape-typst-structural`).

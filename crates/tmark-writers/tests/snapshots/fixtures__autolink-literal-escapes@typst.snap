@@ -2,7 +2,7 @@
 source: crates/tmark-writers/tests/fixtures.rs
 expression: snapshot
 ---
-see http://x.y, www.x.y/z, me\@x.y and #link("http://www.example.com")[www.example.com] or ftp://x.y
+see http:\//x.y, www.x.y/z, me\@x.y and #link("http://www.example.com")[www.example.com] or ftp:\//x.y
 
 ---requires---
 {
