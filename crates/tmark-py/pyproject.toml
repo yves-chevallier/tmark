@@ -6,8 +6,9 @@ requires = ["maturin>=1.7,<2"]
 build-backend = "maturin"
 
 [project]
-# TODO(owner): PyPI name — `tmark` is taken on PyPI by another project.
-name = "tmark"
+# Published as `tmark-core` (`tmark` on PyPI is an unrelated project); the
+# import name stays `tmark`.
+name = "tmark-core"
 description = "TMark: parse, format, lint and resolve TeXSmith Markdown"
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,7 +21,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/yves-chevallier/tmark"
+Repository = "https://github.com/yves-chevallier/tmark-core"
 
 [tool.maturin]
 python-source = "python"

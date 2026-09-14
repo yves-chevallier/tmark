@@ -126,9 +126,9 @@ precedence of `lang`; `tmark.registries()["features"]` lists the row. The
 ### What is next
 
 TeXSmith's `specs/merge-tasklist.md` is the live list; as of today it
-still has open, in order: pick the PyPI name (`tmark` is taken elsewhere
-— a user decision, blocking `pyproject.toml` and the module name on both
-sides), tag `v0.1.0`, then merge `texsmith-migration` into `main` with
+still has open, in order: ~~pick the PyPI name~~ (decided 2026-09-14:
+`tmark-core`, import name `tmark`, GitHub repository renamed
+`yves-chevallier/tmark-core`), tag `v0.1.0`, then merge `texsmith-migration` into `main` with
 green CI. After that, on TeXSmith's side: point `pyproject.toml` at
 `tmark>=0.1,<0.2` from PyPI, drop `vendor/tmark` and its
 `[tool.uv.sources]` entry, move the six `ref: texsmith-migration` lines

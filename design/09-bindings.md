@@ -38,7 +38,8 @@ PyO3 (abi3, Python ≥ 3.10) + maturin. The native module `tmark._tmark`
 is re-exported by the Python package `tmark` (`crates/tmark-py/python/tmark`,
 with `py.typed` and a generated stub `_tmark.pyi`); `pyproject.toml` sits
 at the crate. The wheel later gains the CLI binary as a console script
-(`tmark`) so `pip install tmark` gives both. API surface as built,
+(`tmark`) so `pip install tmark-core` gives both (the PyPI project is
+`tmark-core`; the import name stays `tmark`). API surface as built,
 deliberately small and JSON-shaped (ADR 0003):
 
 ```python

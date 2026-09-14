@@ -21,7 +21,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/yves-chevallier/tmark"
+repository = "https://github.com/yves-chevallier/tmark-core"
 rust-version = "1.80"
 
 [workspace.dependencies]

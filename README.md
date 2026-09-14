@@ -66,5 +66,5 @@ cargo run -p tmark-cli -- write FILE --to latex                       # the body
 cargo run -p tmark-cli -- lower FILE --to web                         # a MkDocs page with its TMark constructs spliced
 cargo run -p tmark-cli -- schema ir                                   # also frontmatter, diagnostic, resolved
 cargo test --workspace                                               # incl. the CommonMark suite, the fixtures and the writer snapshots
-pip install maturin && maturin develop -m crates/tmark-py/Cargo.toml  # the Python package `tmark` (or: pip install -e crates/tmark-py)
+pip install maturin && maturin develop -m crates/tmark-py/Cargo.toml  # the Python package `tmark`, published as `tmark-core` (or: pip install -e crates/tmark-py)
 ```
