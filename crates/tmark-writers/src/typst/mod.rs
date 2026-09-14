@@ -601,8 +601,21 @@ impl Typst<'_> {
         }
         self.out.push("#figure(\n");
         if images.is_empty() {
-            let body = self.render_blocks_inline(content);
-            self.out.push(&format!("  [{body}],\n"));
+            // A plain float (spec §Image, Figure: prose, a listing, a
+            // table with the images): its blocks as blocks, so that an
+            // image inside is a `#figure` of its own, numbered like any
+            // other and carrying its label, as LaTeX's `figure` in
+            // `figure` does. As inline content the images shrank to
+            // 1em boxes and lost their labels (review 07 F10).
+            let body = self.contained(|w| {
+                let mut buf = std::mem::replace(&mut w.out, Out::scratch());
+                w.blocks(content);
+                std::mem::swap(&mut w.out, &mut buf);
+                buf.finish_text()
+            });
+            self.out.push("  [\n");
+            self.out.push(body.trim_end());
+            self.out.push("\n  ],\n");
         } else if images.len() == 1 {
             self.out.push(&format!("  {},\n", image_call(images[0])));
         } else {

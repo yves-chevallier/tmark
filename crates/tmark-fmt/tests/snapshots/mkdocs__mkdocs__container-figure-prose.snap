@@ -1,0 +1,18 @@
+---
+source: crates/tmark-fmt/tests/mkdocs.rs
+expression: mkdocs(&canonical)
+---
+::: figure
+![Plot](p.svg){#fig:p}
+
+Some prose in the float.
+
+![Other](o.svg){#fig:o}
+:::
+
+/// caption
+    attrs: {id: fig:prose}
+A prose float.
+///
+
+See @fig:p, @fig:o and @fig:prose.

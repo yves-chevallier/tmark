@@ -1,0 +1,33 @@
+---
+source: crates/tmark-writers/tests/fixtures.rs
+expression: snapshot
+---
+<figure id="fig:prose">
+<img src="p.svg" alt="Plot" id="fig:p" />
+<p>Some prose in the float.</p>
+<img src="o.svg" alt="Other" id="fig:o" />
+<figcaption><span class="caption-label">Figure 3</span> A prose float.</figcaption>
+</figure>
+<p>See <a href="#fig:p" class="reference">Figure 1</a>, <a href="#fig:o" class="reference">Figure 2</a> and <a href="#fig:prose" class="reference">Figure 3</a>.</p>
+
+---requires---
+{
+  "packages": [],
+  "fragments": [],
+  "shell_escape": false,
+  "assets": [
+    {
+      "src": "p.svg",
+      "node": 3
+    },
+    {
+      "src": "o.svg",
+      "node": 9
+    }
+  ],
+  "bibliography": false,
+  "citations": [],
+  "acronyms": [],
+  "index": [],
+  "counters": []
+}
