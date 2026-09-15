@@ -1,7 +1,8 @@
-# Wheels of the `tmark` Python package (crates/tmark-py), built by maturin
-# with PyO3/maturin-action: abi3 from Python 3.10, one wheel per platform
-# (design/09-bindings.md §Python, "Building wheels"). Runs on a tag and on
-# demand; publishes to PyPI on a `v*` tag through trusted publishing.
+# Wheels of the `tmark-core` distribution (crates/tmark-py, import name
+# `tmark`), built by maturin with PyO3/maturin-action: abi3 from Python 3.10,
+# one wheel per platform (design/09-bindings.md §Python, "Building wheels").
+# Runs on a tag and on demand; publishes to PyPI on a `v*` tag through
+# trusted publishing.
 name: wheels
 
 on:
@@ -101,7 +102,7 @@ jobs:
           name: wheels-linux-x86_64
           path: dist
       - run: |
-          pip install pytest dist/tmark-*.whl
+          pip install pytest dist/tmark_core-*.whl
           pytest crates/tmark-py/tests
           python crates/tmark-py/scripts/gen_stubs.py --check
 
