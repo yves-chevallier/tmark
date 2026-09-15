@@ -123,7 +123,10 @@ jobs:
         with:
           name: sdist
           path: dist
-      - uses: PyO3/maturin-action@v1
+      # The canonical trusted-publishing action: it performs the OIDC
+      # exchange itself and names the claims PyPI rejected when the
+      # publisher on the project side does not match this workflow.
+      # (`maturin upload` is deprecated, PyO3/maturin#2334.)
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          command: upload
-          args: --non-interactive --skip-existing dist/*
+          skip-existing: true
